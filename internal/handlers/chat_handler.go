@@ -255,12 +255,55 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 }
 
 
-// GetHistory expone el chat de una sesion
-func (h *ChatHandler) GetHistory(c *fiber.Ctx) error {
+type ChatMessageResponse struct {
+	database.ChatMessage
+	RequiresConfirmation bool        `json:"requires_confirmation"`
+	PendingActionID      uint        `json:"pending_action_id"`
+	WaitingTool          interface{} `json:"waiting_tool"`
+}
+
+// GetHistory expone el chat de una sesion enriquecido con acciones pendientes
+func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
 	var history []database.ChatMessage
-	database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(50).Find(&history)
-	return c.JSON(history)
+	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(50).Find(&history).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Buscar acciones pendientes para esta sesión
+	var pendingActions []database.PendingAction
+	database.DB.Where("session_id = ? AND status = ?", sessionID, "PENDING").Find(&pendingActions)
+
+	// Mapa para búsqueda rápida por ToolCallID
+	pendingMap := make(map[string]database.PendingAction)
+	for _, p := range pendingActions {
+		pendingMap[p.ToolCallID] = p
+	}
+
+	// Enriquecer mensajes
+	response := make([]ChatMessageResponse, len(history))
+	for i, msg := range history {
+		response[i] = ChatMessageResponse{
+			ChatMessage: msg,
+		}
+
+		// Si el mensaje tiene tool calls, ver si alguno está pendiente
+		if msg.Role == "assistant" && msg.RawToolCalls != "" {
+			var tCalls []ai.ToolCall
+			if err := json.Unmarshal([]byte(msg.RawToolCalls), &tCalls); err == nil {
+				for _, tc := range tCalls {
+					if p, ok := pendingMap[tc.ID]; ok {
+						response[i].RequiresConfirmation = true
+						response[i].PendingActionID = p.ID
+						response[i].WaitingTool = tc
+						break // Solo soportamos una acción pendiente por mensaje por ahora
+					}
+				}
+			}
+		}
+	}
+
+	return c.JSON(response)
 }
 
 // GetSessions devuelve todas las sesiones ordenadas

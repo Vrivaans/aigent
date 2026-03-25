@@ -94,7 +94,7 @@ func main() {
 	api.Post("/sessions", chatHandler.CreateSession)
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
-	api.Get("/sessions/:id/chat", chatHandler.GetHistory)
+	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 
 	// LLM Provider Management
 	api.Get("/providers", handlers.HandleListProviders)

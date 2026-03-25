@@ -57,8 +57,8 @@
                 <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
               </div>
               <div class="conf-footer">
-                <button class="btn-approve" (click)="approveAction(msg)">Aprobar</button>
-                <button class="btn-reject" (click)="rejectAction(msg)">Rechazar</button>
+                <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">Aprobar</button>
+                <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">Rechazar</button>
               </div>
             </div>
           }

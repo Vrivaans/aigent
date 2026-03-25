@@ -100,7 +100,7 @@ export class Chat implements OnChanges, AfterViewChecked {
   }
 
   async approveAction(msg: ChatMessageUI) {
-    if (!this.sessionId || !msg.pending_action_id) return;
+    if (this.isThinking() || !this.sessionId || !msg.pending_action_id) return;
     
     this.isThinking.set(true);
     try {
@@ -124,7 +124,7 @@ export class Chat implements OnChanges, AfterViewChecked {
   }
 
   async rejectAction(msg: ChatMessageUI) {
-    if (!this.sessionId || !msg.pending_action_id) return;
+    if (this.isThinking() || !this.sessionId || !msg.pending_action_id) return;
     
     this.isThinking.set(true);
     try {

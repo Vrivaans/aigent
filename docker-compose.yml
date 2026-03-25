@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  app:
+    build: .
+    container_name: aigent-app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    env_file:
+      - .env
+    restart: unless-stopped
+
   db:
     image: postgres:15-alpine
     container_name: aigent-db

@@ -302,8 +302,9 @@ Instrucciones Críticas:
 5. NO expliques qué parámetros vas a usar, solo ejecuta la acción.
 6. Cuando recibas el resultado de una herramienta (rol "tool"), léelo y responde en lenguaje natural con un resumen útil.
 7. Sé proactivo. Si puedes resolver algo con una herramienta, hazlo de una vez.
-8. Cuando el usuario pida una acción, ejecutá las tools necesarias de inmediato sin pedir confirmación ni explicar el plan primero.`
-
+8. Cuando el usuario pida una acción, ejecutá las tools necesarias de inmediato sin pedir confirmación ni explicar el plan primero.
+9. Cuando termines de completar un flujo de ejecución de tools (serie de ejecuciones de tools encadenadas, como varios post, get, etc), es MUY IMPORTANTE que siempre me hagas un resumen muy corto de lo que hiciste e informes si algo salió mal.
+10. Guarda lo que creas necesario en las memorias de HandsAI como Knowledge (conocimiento a largo plazo) o como Intent (intención del agente, vos), según corresponda.`
 	// 2. Sincronizar Herramientas MCP
 	if err := b.SyncTools(ctx); err != nil {
 		log.Printf("⚠️ SyncTools Warning: %v", err)
