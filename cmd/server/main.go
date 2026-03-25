@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
+	"strings"
 
 	"aigent/internal/ai"
 	"aigent/internal/database"
@@ -23,6 +25,12 @@ func main() {
 		log.Println("Note: No .env file found, using system environment variables")
 	}
 
+	// 1.5 Validar llave de cifrado
+	encryptionKey := os.Getenv("DB_ENCRYPTION_KEY")
+	if len(encryptionKey) != 32 {
+		log.Fatalf("FATAL: DB_ENCRYPTION_KEY must be exactly 32 characters long (for AES-256). Current length: %d", len(encryptionKey))
+	}
+
 	// 2. Initializar Base de Datos
 	dbCfg := database.Config{
 		Host:     getEnv("DB_HOST", "localhost"),
@@ -39,10 +47,12 @@ func main() {
 	// 3. Inicializar integraciones (HandsAI y LLM OpenRouter)
 	handsaiCfg := handsai.Config{
 		BaseURL: getEnv("HANDSAI_URL", "http://localhost:8080/mcp"),
+		Token:   getEnv("HANDSAI_TOKEN", ""),
 	}
 	
 	brain := ai.NewBrain(
-		getEnv("OPENROUTER_API_KEY", ""),
+		"", // Key vacía: se buscará en DB por flujo
+		"", // BaseURL vacía: se buscará en DB por flujo
 		handsaiCfg,
 		nil, // Usa DefaultPermissionHandler (bloquea sensitive actions por consola)
 	)
@@ -59,9 +69,44 @@ func main() {
 
 	api := app.Group("/api")
 
+	api.Get("/debug/tools", func(c *fiber.Ctx) error {
+		raw, err := brain.HandsAI.GetTools(c.Context())
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		var parsed interface{}
+		json.Unmarshal(raw, &parsed)
+		return c.JSON(fiber.Map{
+			"status": "ok",
+			"raw": string(raw),
+			"parsed": parsed,
+		})
+	})
+
+	api.Get("/active-tools", func(c *fiber.Ctx) error {
+		_ = brain.SyncTools(c.Context())
+		return c.JSON(brain.Registry.List())
+	})
 	chatHandler := &handlers.ChatHandler{Brain: brain}
-	api.Post("/chat", chatHandler.HandleChat)
-	api.Get("/chat/history", chatHandler.GetHistory)
+	api.Get("/sessions", chatHandler.GetSessions)
+	api.Post("/sessions", chatHandler.CreateSession)
+	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
+	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
+	api.Get("/sessions/:id/chat", chatHandler.GetHistory)
+
+	api.Get("/active-tools", func(c *fiber.Ctx) error {
+		return c.JSON(brain.Registry.List())
+	})
+
+	// LLM Provider Management
+	api.Get("/providers", handlers.HandleListProviders)
+	api.Post("/providers", handlers.HandleCreateProvider)
+	api.Patch("/providers/:id", handlers.HandleUpdateProvider)
+	api.Patch("/providers/:id/set-default", handlers.HandleSetDefaultProvider)
+	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
+	api.Post("/providers/:id/test", handlers.HandleTestProvider)
 
 	taskHandler := &handlers.TaskHandler{}
 	api.Get("/tasks", taskHandler.GetTasks)
@@ -71,6 +116,18 @@ func main() {
 	api.Get("/rules", ruleHandler.GetRules)
 	api.Post("/rules", ruleHandler.CreateRule)
 	api.Delete("/rules/:id", ruleHandler.DeleteRule)
+
+	// Serve Static Angular Files (Production build)
+	app.Static("/", "./web/dist/web/browser")
+
+	// SPA Catch-all Route: any request not matching /api/* returns index.html
+	app.Get("/*", func(c *fiber.Ctx) error {
+		// Ignore undefined API routes
+		if strings.HasPrefix(c.Path(), "/api") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "API route not found"})
+		}
+		return c.SendFile("./web/dist/web/browser/index.html")
+	})
 
 	// 6. Iniciar Servidor web
 	port := getEnv("PORT", "3000")

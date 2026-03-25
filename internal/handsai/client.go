@@ -17,7 +17,7 @@ import (
 // Tipos JSON-RPC 2.0 requeridos por HandsAI Java
 type JSONRPCMessage struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      int64           `json:"id,omitempty"`
+	ID      interface{}     `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
@@ -32,12 +32,13 @@ type JSONRPCError struct {
 
 type CallToolRequestParams struct {
 	Name      string                 `json:"name"`
-	Arguments map[string]interface{} `json:"arguments,omitempty"`
+	Arguments map[string]interface{} `json:"arguments"`
 }
 
 // Config representa la configuración del cliente HandsAI
 type Config struct {
 	BaseURL    string // e.g., "http://localhost:8080/mcp" o la URL de prod
+	Token      string // Token de autenticación para el bridge
 	HTTPClient *http.Client
 }
 
@@ -88,6 +89,9 @@ func (c *Client) GetTools(ctx context.Context) (json.RawMessage, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
+	if c.cfg.Token != "" {
+		req.Header.Set("X-HandsAI-Token", c.cfg.Token)
+	}
 
 	resp, err := c.cfg.HTTPClient.Do(req)
 	if err != nil {
@@ -106,25 +110,30 @@ func (c *Client) GetTools(ctx context.Context) (json.RawMessage, error) {
 
 	// Parseamos asumiendo que el Java siempre envuelve la respuesta en JSON-RPC
 	var rpcResp JSONRPCMessage
-	if err := json.Unmarshal(body, &rpcResp); err != nil {
-		// Fallback: Si resulta que responde un JSON crudo sin formato JSON-RPC
-		return body, nil
+	if err := json.Unmarshal(body, &rpcResp); err == nil {
+		if rpcResp.Error != nil {
+			return nil, fmt.Errorf("rpc error: %s", rpcResp.Error.Message)
+		}
+		if len(rpcResp.Result) > 0 {
+			return rpcResp.Result, nil
+		}
 	}
 
-	if rpcResp.Error != nil {
-		return nil, fmt.Errorf("rpc error: %s", rpcResp.Error.Message)
-	}
-
-	// Si tiene formato JSON-RPC, retornamos el Result donde está el array de Tools
-	if len(rpcResp.Result) > 0 {
-		return rpcResp.Result, nil
+	// Fallback/Direct check: Si no es JSON-RPC o no tiene resultado, buscamos errores crudos
+	var rawErr map[string]interface{}
+	if err := json.Unmarshal(body, &rawErr); err == nil {
+		if eStr, ok := rawErr["error"].(string); ok {
+			return nil, fmt.Errorf("backend error: %s", eStr)
+		}
 	}
 
 	return body, nil
 }
 
-// CallTool lanza la peticion a POST /mcp/tools/call empacando el payload como JSON-RPC
 func (c *Client) CallTool(ctx context.Context, name string, args map[string]interface{}) (json.RawMessage, error) {
+	if args == nil {
+		args = make(map[string]interface{})
+	}
 	if !c.permHandler(ctx, name, args) {
 		return nil, errors.New("tool execution denied by user/policy")
 	}
@@ -156,6 +165,9 @@ func (c *Client) CallTool(ctx context.Context, name string, args map[string]inte
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if c.cfg.Token != "" {
+		req.Header.Set("X-HandsAI-Token", c.cfg.Token)
+	}
 
 	resp, err := c.cfg.HTTPClient.Do(req)
 	if err != nil {
@@ -173,19 +185,82 @@ func (c *Client) CallTool(ctx context.Context, name string, args map[string]inte
 	}
 
 	var rpcResp JSONRPCMessage
-	if err := json.Unmarshal(body, &rpcResp); err != nil {
-		// Fallback
-		return body, nil
+	if err := json.Unmarshal(body, &rpcResp); err == nil {
+		if rpcResp.Error != nil {
+			return nil, fmt.Errorf("handsai rpc error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
+		}
+		if len(rpcResp.Result) > 0 {
+			// El resultado MCP tiene la forma: {"content":[{"type":"text","text":"..."}],"isError":false}
+			// Necesitamos extraer el texto de cada content item y devolverlo como el resultado real.
+			var mcpResult struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+				IsError bool `json:"isError"`
+			}
+
+			if err := json.Unmarshal(rpcResp.Result, &mcpResult); err == nil {
+				if mcpResult.IsError {
+					return nil, fmt.Errorf("tool returned error: %s", func() string {
+						if len(mcpResult.Content) > 0 {
+							return mcpResult.Content[0].Text
+						}
+						return "unknown error"
+					}())
+				}
+
+				// Concatenar todos los textos del resultado y detectar errores de Java no flaggeados
+				var texts []string
+				var hasJavaError bool
+				for _, c := range mcpResult.Content {
+					if c.Type == "text" && c.Text != "" {
+						texts = append(texts, c.Text)
+						lower := strings.ToLower(c.Text)
+						if strings.Contains(lower, "error executing tool") ||
+							strings.Contains(lower, "cannot invoke") ||
+							strings.Contains(lower, "exception:") {
+							hasJavaError = true
+						}
+					}
+				}
+
+				if hasJavaError {
+					return nil, fmt.Errorf("tool returned internal error: %v", texts)
+				}
+
+				if len(texts) > 0 {
+					combined := texts[0]
+					if len(texts) > 1 {
+						// Si hay múltiples, unirlos en un array JSON
+						allTexts, _ := json.Marshal(texts)
+						combined = string(allTexts)
+					}
+					// Intentar devolver como JSON; si no es JSON válido, wrappearlo
+					var js json.RawMessage
+					if err := json.Unmarshal([]byte(combined), &js); err == nil {
+						return js, nil
+					}
+					// No es JSON — devolver como string JSON
+					wrapped, _ := json.Marshal(map[string]string{"result": combined})
+					return json.RawMessage(wrapped), nil
+				}
+			}
+
+			// El resultado no tiene content[], devolver el result bruto
+			return rpcResp.Result, nil
+		}
 	}
 
-	if rpcResp.Error != nil {
-		return nil, fmt.Errorf("handsai rpc error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
+	// Fallback: intentar detectar error en respuesta cruda
+	var rawErr map[string]interface{}
+	if err := json.Unmarshal(body, &rawErr); err == nil {
+		if eStr, ok := rawErr["error"].(string); ok {
+			return nil, fmt.Errorf("backend error: %s", eStr)
+		}
 	}
 
-	// Puede que result esté vacío pero que tools haya operado correctamente
-	if rpcResp.Result == nil {
-		return []byte(`{"status":"success"}`), nil
-	}
-
-	return rpcResp.Result, nil
+	// Sin resultado útil — loguear el body crudo para debug
+	log.Printf("⚠️ CallTool '%s': no content in response. Raw body: %s", name, string(body))
+	return body, nil
 }

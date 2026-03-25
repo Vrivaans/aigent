@@ -1,0 +1,34 @@
+<div class="tasks-container">
+  <h3>Tareas Programadas</h3>
+  <p class="desc">Cron jobs generados por AIgent en el backend de Go.</p>
+
+  <div class="tasks-list">
+    @for (task of tasks(); track task.id) {
+      <div class="task-card">
+        <div class="header">
+          <span class="tool">{{task.tool_name}}</span>
+          <button class="delete-btn" (click)="deleteTask(task.id)">×</button>
+        </div>
+        <h4 class="name">{{task.name}}</h4>
+        
+        <div class="meta">
+          <div class="meta-item">
+            <span class="icon">⏱️</span> {{task.cron_expression}}
+          </div>
+          <div class="meta-item">
+            <span class="icon">⏭️</span> {{formatDate(task.next_run_at)}}
+          </div>
+        </div>
+
+        <details>
+          <summary>Ver Payload JSON</summary>
+          <pre>{{ task.payload | json }}</pre>
+        </details>
+      </div>
+    }
+
+    @if (tasks().length === 0) {
+      <div class="empty">No hay tareas programadas actualmente. Pídele al chat que recuerde algo.</div>
+    }
+  </div>
+</div>

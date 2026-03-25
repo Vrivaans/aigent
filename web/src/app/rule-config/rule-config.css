@@ -1,0 +1,102 @@
+.rules-container h3 {
+  font-size: 16px;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.rules-container .desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.add-box {
+  background: rgba(255,255,255,0.02);
+  border: 1px dashed var(--panel-border);
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.add-box input, .add-box textarea {
+  background: var(--bg-color);
+  border: 1px solid var(--panel-border);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.add-box button {
+  background: var(--accent);
+  color: #fff;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.add-box button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rule-card {
+  background: var(--bg-color);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 12px;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.rule-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-color: rgba(88, 166, 255, 0.5); /* subtle accent */
+}
+
+.rule-card .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rule-card .category {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.delete-btn {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.delete-btn:hover {
+  color: var(--danger);
+}
+
+.rule-card .content {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 20px 0;
+}

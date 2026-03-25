@@ -48,8 +48,14 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 			continue
 		}
 
-		// Ejecutamos la herramienta en HandsAI
-		_, err := brain.HandsAI.CallTool(ctx, task.ToolName, args)
+		// Ejecutamos la herramienta a través del Registry (soporta tanto nativas como MCP)
+		tDef, exists := brain.Registry.Get(task.ToolName)
+		if !exists {
+			log.Printf("❌ Task '%s' failed: Tool '%s' not found in registry", task.Name, task.ToolName)
+			continue
+		}
+
+		_, err := tDef.Execute(ctx, args)
 		if err != nil {
 			log.Printf("❌ Task '%s' Execution Failed: %v", task.Name, err)
 		} else {

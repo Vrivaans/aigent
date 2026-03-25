@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"aigent/internal/ai"
@@ -19,51 +21,216 @@ type ChatRequest struct {
 }
 
 func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
+
 	var req ChatRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid JSON format"})
 	}
 
+	// Validate Session
+	var session database.Session
+	if err := database.DB.First(&session, sessionID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	}
+
+	// Update title if it's the first message
+	if session.Title == "Nueva conversación" && len(req.Message) > 0 {
+		title := req.Message
+		if len(title) > 30 {
+			title = title[:30] + "..."
+		}
+		database.DB.Model(&session).Update("title", title)
+	}
+
 	// 1. Save user message history
 	userMsg := database.ChatMessage{
-		Role:    "user",
-		Content: req.Message,
+		SessionID: session.ID,
+		Role:      "user",
+		Content:   req.Message,
 	}
 	if err := database.DB.Create(&userMsg).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save history"})
 	}
 
-	// 2. Traer el historial reciente (10 mensajes)
+	// 2. Traer el historial de ESTA sesion (10 mensajes anteriores)
 	var history []database.ChatMessage
-	database.DB.Order("created_at asc").Limit(10).Find(&history)
+	database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(10).Find(&history)
 
-	// 3. Ejecutar The Brain Loop (Reglas + Tools -> INFERENCIA -> Proxy MCP)
-	// Timeout de 2 min: La invocación LLM + Ejecución HandsAI puede tardar un poco
+	// 3. Ejecutar The Brain Loop
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	respMsg, err := h.Brain.ProcessChatInteraction(ctx, history, req.Message)
+	respMsg, intermediates, err := h.Brain.ProcessChatInteraction(ctx, session.ID, history, req.Message)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// 4. Guardar respuesta final en historia
+	// 4. Persistir mensajes intermedios (tool_calls y resultados) acumulados por el Brain
+	for i := range intermediates {
+		database.DB.Create(&intermediates[i])
+	}
+
+	// 5. Guardar la respuesta FINAL del asistente
+	var rawTools string
+	if len(respMsg.ToolCalls) > 0 {
+		b, _ := json.Marshal(respMsg.ToolCalls)
+		rawTools = string(b)
+	}
 	asstMsg := database.ChatMessage{
-		Role:    "assistant",
-		Content: respMsg.Content,
+		SessionID:    session.ID,
+		Role:         "assistant",
+		Content:      respMsg.Content,
+		RawToolCalls: rawTools,
 	}
 	database.DB.Create(&asstMsg)
 
-	// Extraemos tool calls por si el frontend los quiere graficar lindo (como un pop-up que diga "Trello actualizado")
+	// 6. Manejar si requiere confirmación
+	var pendingID uint
+	if respMsg.RequiresConfirmation && respMsg.WaitingToolCall != nil {
+		pending := database.PendingAction{
+			SessionID:  session.ID,
+			ToolName:   respMsg.WaitingToolCall.Function.Name,
+			Arguments:  respMsg.WaitingToolCall.Function.Arguments,
+			ToolCallID: respMsg.WaitingToolCall.ID,
+			Status:     "PENDING",
+		}
+		database.DB.Create(&pending)
+		pendingID = pending.ID
+	}
+
 	return c.JSON(fiber.Map{
-		"response": asstMsg.Content,
-		"tool_calls": respMsg.ToolCalls,
+		"response":              asstMsg.Content,
+		"tool_calls":            respMsg.ToolCalls,
+		"status":                "ok",
+		"requires_confirmation": respMsg.RequiresConfirmation,
+		"pending_action_id":     pendingID,
+		"waiting_tool":          respMsg.WaitingToolCall,
 	})
 }
 
-// GetHistory expone el chat al initial load del dashabord
+type ConfirmRequest struct {
+	Approved bool `json:"approved"`
+}
+
+func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
+	id := c.Params("pending_id")
+	var req ConfirmRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid body"})
+	}
+
+	var pending database.PendingAction
+	if err := database.DB.First(&pending, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Action not found"})
+	}
+
+	if !req.Approved {
+		pending.Status = "REJECTED"
+		database.DB.Save(&pending)
+		return c.JSON(fiber.Map{"status": "rejected"})
+	}
+
+	// EXECUTE TOOL
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	var args map[string]interface{}
+	json.Unmarshal([]byte(pending.Arguments), &args)
+
+	// Necesitamos el Brain para obtener el Sanitize y el Registry
+	// Pero el Handlers.ChatHandler ya tiene el Brain.
+	// Ojo: En confirmación el nombre viene sanitizado de la DB.
+
+	// Buscamos herramienta — el nombre en DB está sanitizado (guiones→guiones_bajos),
+	// pero el Registry usa el nombre original del MCP (puede tener guiones).
+	tDef, exists := h.Brain.Registry.GetBySanitized(pending.ToolName)
+	if !exists {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Tool no longer registered: " + pending.ToolName})
+	}
+
+	// Mapeamos argumentos sanitizados a originales (como en ProcessChatInteraction)
+	finalArgs := make(map[string]interface{})
+	for k, v := range args {
+		origK, ok := tDef.ArgMapping[k]
+		if ok {
+			finalArgs[origK] = v
+		} else {
+			finalArgs[k] = v
+		}
+	}
+
+	result, err := tDef.Execute(ctx, finalArgs)
+	if err != nil {
+		// Log the error to DB so LLM knows it failed, then return 500 to frontend
+		errResMsg := database.ChatMessage{
+			SessionID:  pending.SessionID,
+			Role:       "tool",
+			Content:    fmt.Sprintf("ERROR: %v", err),
+			ToolCallID: pending.ToolCallID,
+		}
+		database.DB.Create(&errResMsg)
+		pending.Status = "REJECTED"
+		database.DB.Save(&pending)
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	pending.Status = "APPROVED"
+	database.DB.Save(&pending)
+
+	// Guardamos el resultado de la tool para que el siguiente chat lo vea en contexto
+	toolResMsg := database.ChatMessage{
+		SessionID:  pending.SessionID,
+		Role:       "tool",
+		Content:    string(result),
+		ToolCallID: pending.ToolCallID,
+	}
+	database.DB.Create(&toolResMsg)
+
+	// Respuesta de confirmación simple — NO hacemos re-inferencia aquí.
+	// Razón: la re-inferencia puede hacer que el LLM llame herramientas adicionales,
+	// dejando tool_calls huérfanos en el historial que Google/Vertex rechaza en
+	// la próxima petición con "number of function response parts must equal function call parts".
+	finalContent := fmt.Sprintf("✅ Listo. La acción '%s' se ejecutó correctamente.", pending.ToolName)
+
+	finalAsstMsg := database.ChatMessage{
+		SessionID: pending.SessionID,
+		Role:      "assistant",
+		Content:   finalContent,
+	}
+	database.DB.Create(&finalAsstMsg)
+
+	return c.JSON(fiber.Map{
+		"status":   "approved",
+		"result":   string(result),
+		"response": finalContent,
+	})
+}
+
+
+// GetHistory expone el chat de una sesion
 func (h *ChatHandler) GetHistory(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
 	var history []database.ChatMessage
-	database.DB.Order("created_at asc").Limit(50).Find(&history)
+	database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(50).Find(&history)
 	return c.JSON(history)
+}
+
+// GetSessions devuelve todas las sesiones ordenadas
+func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
+	var sessions []database.Session
+	database.DB.Order("updated_at desc").Find(&sessions)
+	return c.JSON(sessions)
+}
+
+// CreateSession crea una nueva sesión de chat
+func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
+	session := database.Session{
+		Title: "Nueva conversación",
+	}
+	if err := database.DB.Create(&session).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create session"})
+	}
+	return c.JSON(session)
 }

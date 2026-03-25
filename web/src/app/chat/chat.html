@@ -1,0 +1,98 @@
+<div class="chat-container">
+  
+  <div class="messages" #scrollContainer>
+    @if (messages().length === 0) {
+      <div class="empty-state">
+        <div class="icon">✨</div>
+        <h2>AIgent Operator</h2>
+        <p>Conectado al Core de HandsAI. ¿En qué te puedo ayudar?</p>
+      </div>
+    }
+
+    @for (msg of messages(); track msg.id) {
+      @if (msg.content || (msg.tool_calls && msg.tool_calls.length > 0) || msg.role === 'tool' || msg.requires_confirmation) {
+        <div class="message" [class.user]="msg.role === 'user'" [class.system]="msg.role === 'system'" [class.tool]="msg.role === 'tool'">
+          
+          @if (msg.role !== 'tool') {
+            <div class="avatar">
+              @if (msg.role === 'user') {
+                👤
+              } @else if (msg.role === 'system') {
+                ⚠️
+              } @else {
+                🤖
+              }
+            </div>
+          }
+          
+          <div class="content">
+          @if (msg.tool_calls && msg.tool_calls.length > 0) {
+            <div class="tool-calls-container">
+              @for (tool of msg.tool_calls; track $index) {
+                <div class="tool-call-badge">
+                  <span class="icon">⚙️</span>
+                  <span class="text">Ejecutando: <strong>{{ tool.function?.name || tool.name || 'tool' }}</strong></span>
+                </div>
+              }
+            </div>
+          }
+          @if (msg.role === 'tool') {
+            <details class="tool-result-details">
+              <summary>Ver resultado de herramienta</summary>
+              <pre>{{ msg.content }}</pre>
+            </details>
+          } @else {
+            <p class="msg-text">{{ msg.content }}</p>
+          }
+
+          @if (msg.requires_confirmation && !msg.confirmed && !msg.rejected) {
+            <div class="confirmation-card">
+              <div class="conf-header">
+                <span class="icon">🛡️</span>
+                <span>Confirmar Acción Sensible</span>
+              </div>
+              <div class="conf-body">
+                El agente desea ejecutar: <br>
+                <strong>{{ msg.waiting_tool?.function?.name }}</strong>
+                <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
+              </div>
+              <div class="conf-footer">
+                <button class="btn-approve" (click)="approveAction(msg)">Aprobar</button>
+                <button class="btn-reject" (click)="rejectAction(msg)">Rechazar</button>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+      }
+    }
+
+    @if (isThinking()) {
+      <div class="message thinking">
+        <div class="avatar">🤖</div>
+        <div class="content">
+          <div class="dot-typing"></div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrapper">
+      <textarea 
+        [ngModel]="inputText()" 
+        (ngModelChange)="inputText.set($event)"
+        (keydown)="onKeyDown($event)"
+        placeholder="Escribe un comando para AIgent... (ej: 'Revisa slack cada 3 horas')"
+        rows="1">
+      </textarea>
+      <button (click)="sendMessage()" [disabled]="!inputText().trim() || isThinking()">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+    <div class="footer-tip">
+      Presiona <kbd>Enter</kbd> para enviar. El agente decidirá si usar Tools.
+    </div>
+  </div>
+
+</div>

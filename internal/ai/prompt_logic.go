@@ -5,147 +5,542 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"aigent/internal/database"
 	"aigent/internal/handsai"
+	"aigent/internal/utils"
+	"os"
 )
 
 // Brain es el orquestador principal que une el LLM (OpenRouter) con el motor de acciones (HandsAI)
 type Brain struct {
-	LLM     *OpenRouterClient
-	HandsAI *handsai.Client
+	LLM      *OpenRouterClient
+	HandsAI  *handsai.Client
+	Registry *ToolRegistry
 }
 
-func NewBrain(llmKey string, handsaiCfg handsai.Config, permHandler handsai.PermissionHandler) *Brain {
-	return &Brain{
-		LLM:     NewClient(llmKey),
-		HandsAI: handsai.NewClient(handsaiCfg, permHandler),
+func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler handsai.PermissionHandler) *Brain {
+	b := &Brain{
+		LLM:      NewClient(llmKey, llmBaseURL),
+		HandsAI:  handsai.NewClient(handsaiCfg, permHandler),
+		Registry: NewToolRegistry(),
+	}
+
+	// Registro de Herramientas Nativas (Go)
+	b.Registry.Register(ToolDef{
+		Name:        "schedule_task",
+		Description: "Programa una tarea recurrente (@hourly, * * * * *, etc.) que invocará otras herramientas de forma autónoma.",
+		Parameters:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Nombre de la tarea"},"cron_expression":{"type":"string","description":"Expresión en palabras, ej: @hourly, o cada 1 minuto (* * * * *)"},"tool_name":{"type":"string","description":"La herramienta a correr"},"payload":{"type":"object","description":"Argumentos para la herramienta"}},"required":["name","cron_expression","tool_name","payload"]}`),
+		Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
+			payloadRaw, _ := json.Marshal(args["payload"])
+			newTask := database.Task{
+				Name:           fmt.Sprintf("%v", args["name"]),
+				CronExpression: fmt.Sprintf("%v", args["cron_expression"]),
+				ToolName:       fmt.Sprintf("%v", args["tool_name"]),
+				Payload:        payloadRaw,
+			}
+			if err := database.DB.Create(&newTask).Error; err != nil {
+				return nil, fmt.Errorf("failed to save scheduled task: %w", err)
+			}
+			return []byte(fmt.Sprintf(`{"status":"success","task_id":%d}`, newTask.ID)), nil
+		},
+	})
+
+	return b
+}
+
+// SyncTools fetches tools from HandsAI and registers them in the local Registry
+func (b *Brain) SyncTools(ctx context.Context) error {
+	handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch tools from HandsAI: %w", err)
+	}
+
+	var mcpResponse struct {
+		Tools []struct {
+			Name        string          `json:"name"`
+			Description string          `json:"description"`
+			InputSchema json.RawMessage `json:"inputSchema"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(handsaiToolsRaw, &mcpResponse); err != nil {
+		// Algunos bridges devuelven la lista directo como array
+		var directArray []struct {
+			Name        string          `json:"name"`
+			Description string          `json:"description"`
+			InputSchema json.RawMessage `json:"inputSchema"`
+		}
+		if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
+			mcpResponse.Tools = directArray
+		} else {
+			return fmt.Errorf("failed to parse MCP tools (tried object and array): %w. Body: %s", err, string(handsaiToolsRaw))
+		}
+	}
+
+	for _, mt := range mcpResponse.Tools {
+		origName := mt.Name
+
+		// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
+		// Las operaciones de LECTURA (get, list, search, read, ver, buscar) son automáticas.
+		isSensitive := false
+		lowerName := strings.ToLower(origName)
+
+		// 1. Si el nombre contiene un verbo de lectura, nunca es sensible
+		readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
+		isReadOnly := false
+		for _, rv := range readVerbs {
+			if strings.Contains(lowerName, rv) {
+				isReadOnly = true
+				break
+			}
+		}
+
+		if !isReadOnly {
+			// 2. Si no es lectura, verificar si es una operación de escritura
+			writeVerbs := []string{
+				"create", "delete", "update", "post", "publicar", "social_post",
+				"save", "move", "add", "approve", "send", "dar_like",
+				"schedule", "moltbook_create", "moltbook_verify",
+				"jules_create", "jules_approve", "odoo_crm_create",
+				"odoo_crm_update", "odoo_project_task_create",
+			}
+			for _, wv := range writeVerbs {
+				if strings.Contains(lowerName, wv) {
+					isSensitive = true
+					break
+				}
+			}
+		}
+
+		// Sanitizar el esquema de entrada (recursivamente)
+		sanitizedSchema, argMap := sanitizeJSONSchema(mt.InputSchema)
+
+		b.Registry.Register(ToolDef{
+			Name:        origName,
+			Description: mt.Description,
+			Parameters:  sanitizedSchema,
+			ArgMapping:  argMap,
+			Sensitive:   isSensitive,
+			Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
+				return b.HandsAI.CallTool(ctx, origName, args)
+			},
+		})
+	}
+	return nil
+}
+
+func sanitizeJSONSchema(raw json.RawMessage) (json.RawMessage, map[string]string) {
+	var schema interface{}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return raw, nil
+	}
+
+	argMap := make(map[string]string)
+	sanitized := sanitizeRecursive(schema, argMap)
+
+	// Post-procesamiento: Si es un objeto sin propiedades, Gemini puede quejarse.
+	// Si el esquema raíz es un objeto y no tiene propiedades, lo dejamos como opcional o vacío.
+	if sMap, ok := sanitized.(map[string]interface{}); ok {
+		if props, ok := sMap["properties"].(map[string]interface{}); ok && len(props) == 0 {
+			delete(sMap, "properties")
+			delete(sMap, "required")
+		}
+	}
+
+	res, _ := json.Marshal(sanitized)
+	return res, argMap
+}
+
+func sanitizeRecursive(val interface{}, argMap map[string]string) interface{} {
+	switch v := val.(type) {
+	case map[string]interface{}:
+		// REGLA GEMINI: Solo permitir keywords soportadas
+		allowedKeywords := map[string]bool{
+			"type":                 true,
+			"properties":           true,
+			"items":                true,
+			"required":             true,
+			"description":          true,
+			"enum":                 true,
+			"additionalProperties": true,
+		}
+
+		newMap := make(map[string]interface{})
+		for k, child := range v {
+			if !allowedKeywords[k] {
+				continue // Strip unsupported keywords like pattern, format, allOf, etc.
+			}
+
+			newK := k
+			if k == "properties" {
+				// Solo sanitizamos los nombres de las propiedades reales
+				props, ok := child.(map[string]interface{})
+				if ok {
+					newProps := make(map[string]interface{})
+					for propK, propV := range props {
+						sanitizedK := sanitizeName(propK)
+						newProps[sanitizedK] = sanitizeRecursive(propV, argMap)
+						if argMap != nil {
+							argMap[sanitizedK] = propK
+						}
+					}
+					newMap[k] = newProps
+					continue
+				}
+			}
+
+			if k == "required" {
+				reqs, ok := child.([]interface{})
+				if ok {
+					newReqs := make([]interface{}, 0, len(reqs))
+					for _, r := range reqs {
+						if rStr, ok := r.(string); ok {
+							newReqs = append(newReqs, sanitizeName(rStr))
+						} else {
+							newReqs = append(newReqs, r)
+						}
+					}
+					newMap[k] = newReqs
+					continue
+				}
+			}
+
+			// REGLA GEMINI: 'type' debe ser un string simple, no un array (ej. ["string", "null"])
+			if k == "type" {
+				if types, ok := child.([]interface{}); ok {
+					// Buscamos el primer tipo que NO sea null
+					found := false
+					for _, t := range types {
+						if tStr, ok := t.(string); ok && tStr != "null" {
+							newMap[k] = tStr
+							found = true
+							break
+						}
+					}
+					if !found {
+						newMap[k] = "string" // Fallback seguro
+					}
+					continue
+				}
+				if tStr, ok := child.(string); ok && tStr == "null" {
+					newMap[k] = "string" // Google/Gemini no permite type: null
+					continue
+				}
+			}
+
+			// REGLA GEMINI: Remover 'null' de los enums
+			if k == "enum" {
+				if enums, ok := child.([]interface{}); ok {
+					newEnums := make([]interface{}, 0, len(enums))
+					for _, e := range enums {
+						if e != nil {
+							newEnums = append(newEnums, e)
+						}
+					}
+					newMap[k] = newEnums
+					continue
+				}
+			}
+
+			// Recursión para el resto de campos (ej. items en arrays)
+			newMap[newK] = sanitizeRecursive(child, argMap)
+		}
+		return newMap
+	case []interface{}:
+		newSlice := make([]interface{}, len(v))
+		for i, item := range v {
+			newSlice[i] = sanitizeRecursive(item, argMap)
+		}
+		return newSlice
+	default:
+		return v
 	}
 }
 
 // ProcessChatInteraction ejecuta The Brain Loop: Rules + Tools -> LLM -> Execution
-func (b *Brain) ProcessChatInteraction(ctx context.Context, chatHistory []database.ChatMessage, newUserMsg string) (*ChoiceMessage, error) {
-	// 1. Obtener reglas dinámicas para enriquecer el contexto
+func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chatHistory []database.ChatMessage, newUserMsg string) (*ChoiceMessage, []database.ChatMessage, error) {
+	// 0. Obtener Proveedor LLM de la base de datos y crear cliente local (sin mutar Brain.LLM global)
+	var provider database.LLMProvider
+	if err := database.DB.Where("is_default = ? AND is_active = ?", true, true).First(&provider).Error; err != nil {
+		return nil, nil, fmt.Errorf("No hay un modelo seleccionado por defecto. Configura uno en /providers")
+	}
+
+	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+	apiKey, err := utils.Decrypt(provider.APIKey, masterKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", provider.Name, err)
+	}
+
+	// Cliente LLM local — seguro para concurrencia, no comparte estado con b.LLM
+	llmClient := NewClient(apiKey, provider.BaseURL)
+
+	defaultModel := provider.DefaultModel
+	if defaultModel == "" {
+		defaultModel = "meta-llama/llama-3.3-70b-instruct"
+	}
+	log.Printf("🌐 Provider: %s | Model: %s | URL: %s", provider.Name, defaultModel, provider.BaseURL)
+
+	// 1. Obtener reglas dinámicas
 	var rules []database.Rule
 	if err := database.DB.Find(&rules).Error; err != nil {
 		log.Printf("Warning: Failed to fetch rules: %v", err)
 	}
-
 	var rulesText string
 	for _, r := range rules {
 		rulesText += fmt.Sprintf("- [%s] %s\n", r.Category, r.Content)
 	}
-
-	systemPrompt := `Eres AIgent, un operador digital asistente persistente.
-Siempre que te den una instrucción que aplique a futuro, programala usando herramientas cron o informala.
+	systemPrompt := `Eres AIgent, un asistente operativo con capacidad de ejecución real.
 REGLAS ACTUALES DEL USUARIO:
 ` + rulesText + `
-Sigue estas reglas al pie de la letra. Analiza los requests y utiliza las herramientas integradas para satisfacer el requerimiento.`
 
-	// 2. Traer herramientas disponibles dinámicamente desde HandsAI Java API
-	handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tools from HandsAI: %w", err)
+Instrucciones Críticas:
+1. Tu propósito no es solo hablar, sino EJECUTAR acciones para el usuario.
+2. Cada vez que tengas usar una herramienta leé y entendé sus descripciones para formar correctamente los flujos de ejecución si son necesarios.
+3. BAJO NINGUNA CIRCUNSTANCIA respondas con un bloque de código JSON de ejemplo.
+4. NUNCA menciones que "no tienes acceso directo" o que "estás simulando". Tus herramientas SON reales.
+5. NO expliques qué parámetros vas a usar, solo ejecuta la acción.
+6. Cuando recibas el resultado de una herramienta (rol "tool"), léelo y responde en lenguaje natural con un resumen útil.
+7. Sé proactivo. Si puedes resolver algo con una herramienta, hazlo de una vez.
+8. Cuando el usuario pida una acción, ejecutá las tools necesarias de inmediato sin pedir confirmación ni explicar el plan primero.`
+
+	// 2. Sincronizar Herramientas MCP
+	if err := b.SyncTools(ctx); err != nil {
+		log.Printf("⚠️ SyncTools Warning: %v", err)
 	}
 
-	// 3. Mapear la firma de herramientas de HandsAI a la firma estándar de OpenAI/OpenRouter
-	var mcpTools []struct {
-		Name        string          `json:"name"`
-		Description string          `json:"description"`
-		InputSchema json.RawMessage `json:"inputSchema"` 
-	}
-	if err := json.Unmarshal(handsaiToolsRaw, &mcpTools); err != nil {
-		log.Printf("Warning: Failed to parse MCP tools: %v", err)
-	}
-
+	// 3. Preparar listado de herramientas y mapeo sanitizado -> original
+	sanitizedToOriginal := make(map[string]string)
 	var openRouterTools []Tool
-	
-	// Inject Native "schedule_task" tool for background cron operations	
-	openRouterTools = append(openRouterTools, Tool{
-		Type: "function",
-		Function: ToolFunction{
-			Name:        "schedule_task",
-			Description: "Programa una tarea recurrente para ser ejecutada autónomamente en el futuro utilizando las otras herramientas. Utilizala cuando el usuario pida recordar o revisar algo cada cierto tiempo.",
-			Parameters:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Nombre de la tarea"},"cron_expression":{"type":"string","description":"Expresión en palabras, ej: @hourly, o cada 1 minuto (* * * * *)"},"tool_name":{"type":"string","description":"La herramienta a correr"},"payload":{"type":"object","description":"Argumentos para la herramienta"}},"required":["name","cron_expression","tool_name","payload"]}`),
-		},
-	})
+	for _, rt := range b.Registry.List() {
+		shortName := sanitizeName(rt.Name)
+		sanitizedToOriginal[shortName] = rt.Name
 
-	for _, mt := range mcpTools {
+		params := rt.Parameters
+		if len(params) == 0 || string(params) == "null" || string(params) == "{}" {
+			params = json.RawMessage(`{"type":"object","properties":{}}`)
+		}
 		openRouterTools = append(openRouterTools, Tool{
 			Type: "function",
 			Function: ToolFunction{
-				Name:        mt.Name,
-				Description: mt.Description,
-				Parameters:  mt.InputSchema,
+				Name:        shortName,
+				Description: rt.Description,
+				Parameters:  params,
 			},
 		})
 	}
 
-	// 4. Transformar el historial de base de datos a mensajes de IA
-	messages := []ChatMessage{{Role: "system", Content: systemPrompt}}
-	for _, msg := range chatHistory {
-		messages = append(messages, ChatMessage{Role: msg.Role, Content: msg.Content})
-	}
-	messages = append(messages, ChatMessage{Role: "user", Content: newUserMsg})
-
-	req := ChatCompletionRequest{
-		Messages: messages,
-		Tools:    openRouterTools,
-	}
-
-	// 5. Inferencia (Brain Loop - pensar decidir actuar)
-	resp, err := b.LLM.CreateChatCompletion(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("llm inference failed: %w", err)
-	}
-
-	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from llm")
-	}
-
-	msg := resp.Choices[0].Message
-
-	// 6. Tool Proxy: Si el LLM decide usar herramientas HandsAI, las ejecutamos automáticamente
-	if len(msg.ToolCalls) > 0 {
-		for _, tc := range msg.ToolCalls {
-			log.Printf("🦾 LLM decided to call tool: %s", tc.Function.Name)
-			
-			var args map[string]interface{}
-			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
-
-			// Manejo de la Tool Nativa: schedule_task
-			if tc.Function.Name == "schedule_task" {
-				payloadRaw, _ := json.Marshal(args["payload"])
-				newTask := database.Task{
-					Name:           fmt.Sprintf("%v", args["name"]),
-					CronExpression: fmt.Sprintf("%v", args["cron_expression"]),
-					ToolName:       fmt.Sprintf("%v", args["tool_name"]),
-					Payload:        payloadRaw,
-				}
-				if err := database.DB.Create(&newTask).Error; err != nil {
-					log.Printf("❌ Failed to save scheduled task: %v", err)
-					msg.Content += fmt.Sprintf("\n(Error programando la tarea: %v)", err)
-				} else {
-					log.Printf("✅ Task Scheduled Successfully: %s", newTask.Name)
-					msg.Content += fmt.Sprintf("\n(Tarea '%s' programada y guardada en base de datos. Se visualizará en el dashboard.)", newTask.Name)
-				}
-				continue
-			}
-
-			// Ejecutamos herramientas de HandsAI (POST REST)
-			result, err := b.HandsAI.CallTool(ctx, tc.Function.Name, args)
-			
-			if err != nil {
-				log.Printf("❌ Tool execution failed/denied: %v", err)
-				msg.Content += fmt.Sprintf("\n(Intenté ejecutar %s pero falló o requiere confirmación: %v)", tc.Function.Name, err)
-			} else {
-				log.Printf("✅ Tool execution success: %s", string(result))
-				// Hackathon MVP shortcut: we just append the success text to the agent's internal thought/message 
-				// In a full implementation, we'd send a tool_result message back to OpenRouter to let it process the response.
-				msg.Content += fmt.Sprintf("\n(Ejecuté herramienta %s con éxito: %s)", tc.Function.Name, string(result))
-			}
+	// 4. Reconstruir historial de mensajes EN MEMORIA desde la base de datos
+	// Paso 1: Construir set de tool_call IDs que tienen una respuesta en el historial
+	respondedToolCallIDs := make(map[string]bool)
+	for _, dbMsg := range chatHistory {
+		if dbMsg.Role == "tool" && dbMsg.ToolCallID != "" {
+			respondedToolCallIDs[dbMsg.ToolCallID] = true
 		}
 	}
 
-	return &msg, nil
+	// Paso 2: Añadir mensajes filtrando tool_calls huérfanos (sin respuesta)
+	// Google/Vertex exige que cada tool_call tenga exactamente una tool response.
+	messages := []ChatMessage{{Role: "system", Content: systemPrompt}}
+	for _, dbMsg := range chatHistory {
+		content := dbMsg.Content
+		if content == "" {
+			content = " " // Google/Vertex rechaza content vacío
+		}
+		m := ChatMessage{
+			Role:    dbMsg.Role,
+			Content: content,
+		}
+		if dbMsg.Role == "tool" {
+			m.ToolCallID = dbMsg.ToolCallID
+		}
+		if dbMsg.Role == "assistant" && dbMsg.RawToolCalls != "" {
+			var tCalls []ToolCall
+			if err := json.Unmarshal([]byte(dbMsg.RawToolCalls), &tCalls); err == nil {
+				// Filtrar solo los tool_calls que tienen respuesta
+				var pairedCalls []ToolCall
+				for _, tc := range tCalls {
+					if respondedToolCallIDs[tc.ID] {
+						pairedCalls = append(pairedCalls, tc)
+					}
+				}
+				if len(pairedCalls) > 0 {
+					m.ToolCalls = pairedCalls
+				} else {
+					// Todos huérfanos — no incluir como assistant con tool_calls
+					// (solo incluir el texto si hay)
+					m.ToolCalls = nil
+				}
+			}
+		}
+		messages = append(messages, m)
+	}
+	// Solo añadir mensaje de usuario si no está vacío
+	if newUserMsg != "" {
+		messages = append(messages, ChatMessage{Role: "user", Content: newUserMsg})
+	}
+
+	// 5. Agent Loop — SOLO en memoria. Sin escrituras a DB aquí.
+	// Los mensajes intermedios se acumulan en esta slice y en dbMsgsToSave.
+	// El handler se encarga de persistirlos al final.
+	var dbMsgsToSave []database.ChatMessage
+	maxIterations := 5
+
+	for i := 0; i < maxIterations; i++ {
+		log.Printf("🤖 [Iter %d/%d] Calling LLM with %d messages, %d tools", i+1, maxIterations, len(messages), len(openRouterTools))
+
+		req := ChatCompletionRequest{
+			Model:    defaultModel,
+			Messages: messages,
+			Tools:    openRouterTools,
+		}
+
+		// Debug: mostrar qué mensajes llevan de contexto al LLM en esta iteración
+		var ctxSummary []string
+		for _, m := range messages {
+			if m.Role == "tool" {
+				ctxSummary = append(ctxSummary, fmt.Sprintf("tool(id=%s,len=%d)", m.ToolCallID, len(m.Content)))
+			} else {
+				ctxSummary = append(ctxSummary, fmt.Sprintf("%s(%d calls, %d chars)", m.Role, len(m.ToolCalls), len(m.Content)))
+			}
+		}
+		log.Printf("📚 [Iter %d] Context: %v", i+1, ctxSummary)
+
+		resp, err := llmClient.CreateChatCompletion(ctx, req)
+		if err != nil {
+			log.Printf("❌ LLM API Error (%s): %v", provider.Name, err)
+			return nil, nil, fmt.Errorf("llm inference failed: %w", err)
+		}
+		if resp == nil || len(resp.Choices) == 0 {
+			return nil, nil, fmt.Errorf("no response from llm")
+		}
+
+		msg := resp.Choices[0].Message
+		log.Printf("📩 LLM response: content=%d chars, tool_calls=%d", len(msg.Content), len(msg.ToolCalls))
+
+		// ── CASO A: Sin herramientas → respuesta final del usuario ──────────────
+		if len(msg.ToolCalls) == 0 {
+			return &msg, dbMsgsToSave, nil
+		}
+
+		// ── CASO B: Hay herramientas ──────────────────────────────────────────────
+		// Detectar si alguna requiere confirmación
+		hasSensitive := false
+		var sensitiveTC *ToolCall
+		for i, tc := range msg.ToolCalls {
+			realName, ok := sanitizedToOriginal[tc.Function.Name]
+			if !ok {
+				realName = tc.Function.Name
+			}
+			if tDef, exists := b.Registry.Get(realName); exists && tDef.Sensitive {
+				hasSensitive = true
+				sensitiveTC = &msg.ToolCalls[i]
+				break
+			}
+		}
+
+		if hasSensitive {
+			// NO añadimos a dbMsgsToSave aquí — el handler de chat guarda respMsg
+			// como el mensaje final del asistente (con RawToolCalls).
+			// Si lo agregáramos acá también, habría dos asistentes con el mismo tool_call
+			// y solo una respuesta tool → el filtro de huérfanos borraría uno pero el contexto quedaría mal.
+			log.Printf("🔒 Tool '%s' requires confirmation, returning for user approval.", sensitiveTC.Function.Name)
+			msg.RequiresConfirmation = true
+			msg.WaitingToolCall = sensitiveTC
+			return &msg, dbMsgsToSave, nil
+		}
+
+		// ── Ejecución inmediata (no sensibles) ───────────────────────────────────
+		// 1. Añadir mensaje del asistente (con tool_calls) al contexto en memoria
+		// Nunca content vacío: Google/Vertex lo rechaza con INVALID_ARGUMENT
+		assistantContent := msg.Content
+		if assistantContent == "" {
+			assistantContent = " "
+		}
+		rawTools, _ := json.Marshal(msg.ToolCalls)
+		messages = append(messages, ChatMessage{
+			Role:      "assistant",
+			Content:   assistantContent,
+			ToolCalls: msg.ToolCalls,
+		})
+		// Acumular para DB (se guardará al final por el handler)
+		dbMsgsToSave = append(dbMsgsToSave, database.ChatMessage{
+			SessionID:    sessionID,
+			Role:         "assistant",
+			Content:      msg.Content, // guardamos el original en DB
+			RawToolCalls: string(rawTools),
+		})
+
+		// 2. Ejecutar cada herramienta y añadir resultado al contexto en memoria
+		for _, tc := range msg.ToolCalls {
+			realName, ok := sanitizedToOriginal[tc.Function.Name]
+			if !ok {
+				realName = tc.Function.Name
+			}
+			tDef, exists := b.Registry.Get(realName)
+			if !exists {
+				log.Printf("⚠️ Tool not found in registry: %s", realName)
+				continue
+			}
+
+			var args map[string]interface{}
+			json.Unmarshal([]byte(tc.Function.Arguments), &args)
+			finalArgs := make(map[string]interface{})
+			for k, v := range args {
+				if origK, ok := tDef.ArgMapping[k]; ok {
+					finalArgs[origK] = v
+				} else {
+					finalArgs[k] = v
+				}
+			}
+
+			log.Printf("🦾 Executing tool: %s with args: %v", realName, finalArgs)
+			result, execErr := tDef.Execute(ctx, finalArgs)
+			resultStr := string(result)
+			if execErr != nil {
+				resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
+				log.Printf("❌ Tool error: %v", execErr)
+			} else {
+				log.Printf("✅ Tool result: %s", resultStr)
+			}
+
+			// Añadir al contexto en memoria (CLAVE para que el LLM lo lea)
+			messages = append(messages, ChatMessage{
+				Role:       "tool",
+				Content:    resultStr,
+				ToolCallID: tc.ID,
+			})
+			// Acumular para DB
+			dbMsgsToSave = append(dbMsgsToSave, database.ChatMessage{
+				SessionID:  sessionID,
+				Role:       "tool",
+				Content:    resultStr,
+				ToolCallID: tc.ID,
+			})
+		}
+		// Loop continúa: el LLM leerá [assistant(tool_calls) → tool(result)]
+	}
+
+	return &ChoiceMessage{Content: "Proceso completado."}, dbMsgsToSave, nil
+}
+
+func sanitizeName(name string) string {
+	var res strings.Builder
+	for _, r := range name {
+		// Algunos modelos (especialmente Gemini) son muy estrictos: solo [a-zA-Z0-9_]
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			res.WriteRune(r)
+		} else {
+			res.WriteRune('_')
+		}
+	}
+	return res.String()
+}
+
+func getToolNames(tools []Tool) []string {
+	var names []string
+	for _, t := range tools {
+		names = append(names, t.Function.Name)
+	}
+	return names
 }

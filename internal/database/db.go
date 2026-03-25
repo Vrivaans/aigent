@@ -44,9 +44,12 @@ func ConnectDB(cfg Config) error {
 // autoMigrate run structure migrations safely and dynamically
 func autoMigrate(db *gorm.DB) error {
 	log.Println("Running AutoMigration for GORM models...")
-	return db.AutoMigrate(
-		&Task{},
+	return DB.AutoMigrate(
 		&Rule{},
+		&Task{},
+		&Session{},
 		&ChatMessage{},
+		&PendingAction{},
+		&LLMProvider{},
 	)
 }

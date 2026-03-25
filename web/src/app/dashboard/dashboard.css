@@ -1,0 +1,122 @@
+.tasks-container h3 {
+  font-size: 16px;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.tasks-container .desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card {
+  background: var(--bg-color);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-color: var(--accent);
+}
+
+.task-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background-color: var(--accent);
+}
+
+.task-card .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.task-card .tool {
+  font-size: 10px;
+  text-transform: uppercase;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.delete-btn {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.delete-btn:hover {
+  color: var(--danger);
+}
+
+.task-card .name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin-bottom: 12px;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.meta-item {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+details {
+  border-top: 1px solid var(--panel-border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+summary {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  user-select: none;
+}
+
+pre {
+  background: var(--panel-bg);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 20px 0;
+  line-height: 1.5;
+}

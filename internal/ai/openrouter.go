@@ -7,20 +7,29 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
 type OpenRouterClient struct {
 	APIKey     string
+	BaseURL    string
 	HTTPClient *http.Client
 }
 
-// DefaultModel define un modelo gratuito de OpenRouter con alta eficacia para Tool Calling
+// DefaultModel define un modelo de OpenRouter con alta eficacia para Tool Calling
 const DefaultModel = "meta-llama/llama-3.3-70b-instruct"
 
-func NewClient(apiKey string) *OpenRouterClient {
+func NewClient(apiKey, baseURL string) *OpenRouterClient {
+	if baseURL == "" {
+		baseURL = "https://openrouter.ai/api/v1"
+	}
+	// Normalizar: quitar slashes y espacios finales para evitar URLs como /v1//chat/completions
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	apiKey = strings.TrimSpace(apiKey)
 	return &OpenRouterClient{
-		APIKey: apiKey,
+		APIKey:     apiKey,
+		BaseURL:    baseURL,
 		HTTPClient: &http.Client{Timeout: 90 * time.Second},
 	}
 }
@@ -33,10 +42,11 @@ type ChatCompletionRequest struct {
 }
 
 type ChatMessage struct {
-	Role       string      `json:"role"`
-	Content    string      `json:"content"` // Convertimos content en texto para simplificar
-	Name       string      `json:"name,omitempty"`
-	ToolCallID string      `json:"tool_call_id,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"` // Convertimos content en texto para simplificar
+	Name       string     `json:"name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // Tool definitions (estandar OpenAI usado por OpenRouter)
@@ -60,9 +70,11 @@ type Choice struct {
 }
 
 type ChoiceMessage struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Role                 string     `json:"role"`
+	Content              string     `json:"content"`
+	ToolCalls            []ToolCall `json:"tool_calls,omitempty"`
+	RequiresConfirmation bool       `json:"requires_confirmation,omitempty"`
+	WaitingToolCall      *ToolCall  `json:"waiting_tool_call,omitempty"`
 }
 
 type ToolCall struct {
@@ -86,7 +98,8 @@ func (c *OpenRouterClient) CreateChatCompletion(ctx context.Context, req ChatCom
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(bodyBytes))
+	url := c.BaseURL + "/chat/completions"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, err
 	}

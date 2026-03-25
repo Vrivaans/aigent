@@ -1,0 +1,64 @@
+<main class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>AIgent <span>v1.0</span></h1>
+      <p class="subtitle">Powered by HandsAI</p>
+    </div>
+
+    <button class="new-chat-btn" (click)="createNewSession()">+ New Chat</button>
+
+    <nav class="tabs">
+      <button [class.active]="currentTab === 'chats'" (click)="currentTab = 'chats'">
+        Chats
+      </button>
+      <button [class.active]="currentTab === 'dashboard'" (click)="currentTab = 'dashboard'">
+        Tasks
+      </button>
+      <button [class.active]="currentTab === 'rules'" (click)="currentTab = 'rules'">
+        Rules
+      </button>
+      <button [class.active]="currentTab === 'providers'" (click)="currentTab = 'providers'">
+        Providers
+      </button>
+      <button [class.active]="currentTab === 'tools'" (click)="currentTab = 'tools'; loadTools()">
+        Tools
+      </button>
+    </nav>
+
+    <div class="sidebar-content">
+      @if (currentTab === 'chats') {
+      <div class="session-list">
+        @for (s of sessions(); track s.id) {
+        <div class="session-item" [class.active]="s.id === activeSessionId()" (click)="selectSession(s.id)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>{{ s.title }}</span>
+        </div>
+        }
+      </div>
+      } @else if (currentTab === 'dashboard') {
+      <app-dashboard></app-dashboard>
+      } @else if (currentTab === 'rules') {
+      <app-rule-config></app-rule-config>
+      } @else if (currentTab === 'providers') {
+      <app-providers></app-providers>
+      } @else if (currentTab === 'tools') {
+      <div class="tools-list">
+        @for (tool of tools(); track tool.name) {
+        <div class="tool-item">
+          <div class="tool-name">⚙️ {{ tool.name }}</div>
+          <div class="tool-desc">{{ tool.description }}</div>
+        </div>
+        } @empty {
+        <div class="no-tools">No hay herramientas activas.</div>
+        }
+      </div>
+      }
+    </div>
+  </aside>
+
+  <section class="main-content">
+    <app-chat [sessionId]="activeSessionId()"></app-chat>
+  </section>
+</main>

@@ -1,0 +1,92 @@
+<div class="providers-container">
+  <div class="header">
+    <h1>Proveedores de LLM</h1>
+    <p>Gestiona tus conexiones de IA y selecciona el modelo por defecto.</p>
+    <button class="btn-primary" (click)="resetForm(); showAddForm.set(!showAddForm())">
+      {{ showAddForm() ? 'Cancelar' : '+ Añadir Proveedor' }}
+    </button>
+  </div>
+
+  <!-- Modal de Creación -->
+  <div class="modal-overlay" *ngIf="showAddForm()" (click)="showAddForm.set(false)">
+    <div class="add-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ isEditing() ? 'Editar Proveedor' : 'Nuevo Proveedor' }}</h3>
+        <button class="btn-close" (click)="showAddForm.set(false)">×</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input [(ngModel)]="newProvider.name" placeholder="Ej: Groq Official" />
+        </div>
+        <div class="form-group">
+          <label>Base URL</label>
+          <input [(ngModel)]="newProvider.base_url" placeholder="https://..." />
+        </div>
+        <div class="form-group">
+          <label>API Key (Dejar en blanco para no cambiar)</label>
+          <input type="password" [(ngModel)]="newProvider.api_key" placeholder="gsk_..." />
+        </div>
+        <div class="form-group">
+          <label>Modelo Default</label>
+          <input [(ngModel)]="newProvider.default_model" placeholder="llama-3.3-70b-versatile" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-submit" (click)="onSaveProvider()">
+          {{ isEditing() ? 'Actualizar Modelo' : 'Guardar Modelo' }}
+        </button>
+        <button class="btn-test" *ngIf="isEditing()" (click)="testProvider()" [disabled]="isTesting()">
+          {{ isTesting() ? '⏳ Probando...' : '🧪 Probar conexión' }}
+        </button>
+      </div>
+      <div class="test-result" *ngIf="testResult()" [class.ok]="testResult()!.ok" [class.fail]="!testResult()!.ok">
+        {{ testResult()!.ok ? '✅' : '❌' }} {{ testResult()!.message }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de Proveedores -->
+  <div class="providers-grid">
+    <div class="provider-card" *ngFor="let p of providers()" 
+         [class.is-default]="p.is_default"
+         (click)="editProvider(p)">
+      <div class="card-header">
+        <div class="info">
+          <h3>{{ p.name }}</h3>
+          <span class="badge" *ngIf="p.is_default">Default</span>
+        </div>
+        <div class="status-indicator" [class.active]="p.is_active"></div>
+      </div>
+      
+      <div class="details">
+        <div class="detail-row">
+          <span class="label">Modelo</span>
+          <span class="value">{{ p.default_model }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Endpoint</span>
+          <span class="value truncate">{{ p.base_url }}</span>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn-secondary" 
+                *ngIf="!p.is_default" 
+                (click)="setAsDefault(p.ID, $event)">
+          Establecer como Default
+        </button>
+        <button class="btn-danger"
+                (click)="deleteProvider(p.ID, $event)">
+          🗑️
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" *ngIf="providers().length === 0 && !showAddForm()">
+    <div class="icon">🤖</div>
+    <h2>No hay proveedores registrados</h2>
+    <p>Añade tu primera conexión a Groq o OpenRouter para empezar.</p>
+  </div>
+</div>
