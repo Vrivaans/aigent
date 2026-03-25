@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"aigent/internal/ai"
@@ -188,23 +189,68 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 	database.DB.Create(&toolResMsg)
 
-	// Respuesta de confirmación simple — NO hacemos re-inferencia aquí.
-	// Razón: la re-inferencia puede hacer que el LLM llame herramientas adicionales,
-	// dejando tool_calls huérfanos en el historial que Google/Vertex rechaza en
-	// la próxima petición con "number of function response parts must equal function call parts".
-	finalContent := fmt.Sprintf("✅ Listo. La acción '%s' se ejecutó correctamente.", pending.ToolName)
+	// 7. RE-INFERENCIA: Reanudamos el bucle del agente para ver si hay más pasos.
+	// 7a. Obtener el historial actualizado (incluyendo el resultado que acabamos de guardar)
+	var history []database.ChatMessage
+	database.DB.Where("session_id = ?", pending.SessionID).Order("created_at asc").Limit(20).Find(&history)
 
-	finalAsstMsg := database.ChatMessage{
-		SessionID: pending.SessionID,
-		Role:      "assistant",
-		Content:   finalContent,
+	// 7b. Reanudar bucle
+	newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	msg, toSave, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, history, "")
+	if err != nil {
+		log.Printf("⚠️ Error re-inferring after confirm: %v", err)
+		return c.JSON(fiber.Map{
+			"status":   "approved",
+			"result":   string(result),
+			"response": "Ejecutado, pero falló la re-inferencia: " + err.Error(),
+		})
 	}
-	database.DB.Create(&finalAsstMsg)
+
+	// 8. Persistir mensajes intermedios generados en la re-inferencia
+	for _, m := range toSave {
+		database.DB.Create(&m)
+	}
+
+	// 9. Manejar la respuesta final de la re-inferencia
+	var finalResponse string = "✅ Acción ejecutada correctamente."
+	var nextPendingID uint
+	if msg != nil {
+		var rawTools string
+		if len(msg.ToolCalls) > 0 {
+			b, _ := json.Marshal(msg.ToolCalls)
+			rawTools = string(b)
+		}
+		asstMsg := database.ChatMessage{
+			SessionID:    pending.SessionID,
+			Role:         "assistant",
+			Content:      msg.Content,
+			RawToolCalls: rawTools,
+		}
+		database.DB.Create(&asstMsg)
+		finalResponse = msg.Content
+
+		// Si la re-inferencia disparó OTRA acción sensible, crear el PendingAction
+		if msg.RequiresConfirmation && msg.WaitingToolCall != nil {
+			newPending := database.PendingAction{
+				SessionID:  pending.SessionID,
+				ToolName:   msg.WaitingToolCall.Function.Name,
+				Arguments:  msg.WaitingToolCall.Function.Arguments,
+				ToolCallID: msg.WaitingToolCall.ID,
+				Status:     "PENDING",
+			}
+			database.DB.Create(&newPending)
+			nextPendingID = newPending.ID
+			finalResponse = "⏳ Acción ejecutada. Pendiente de la siguiente confirmación..."
+		}
+	}
 
 	return c.JSON(fiber.Map{
-		"status":   "approved",
-		"result":   string(result),
-		"response": finalContent,
+		"status":     "approved",
+		"result":     string(result),
+		"response":   finalResponse,
+		"pending_id": nextPendingID,
 	})
 }
 

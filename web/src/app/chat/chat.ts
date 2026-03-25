@@ -102,18 +102,12 @@ export class Chat implements OnChanges, AfterViewChecked {
   async approveAction(msg: ChatMessageUI) {
     if (!this.sessionId || !msg.pending_action_id) return;
     
+    this.isThinking.set(true);
     try {
-      const res = await this.api.confirmAction(this.sessionId, msg.pending_action_id, true);
+      await this.api.confirmAction(this.sessionId, msg.pending_action_id, true);
       msg.confirmed = true;
       msg.requires_confirmation = false;
-      
-      this.messages.update(m => [...m, {
-        id: Date.now(),
-        role: 'assistant',
-        content: res.response || `✅ Acción ejecutada: ${msg.waiting_tool?.function?.name}. Resultado: ${res.result}`,
-        created_at: new Date().toISOString()
-      }]);
-      this.scrollToBottom();
+      await this.loadHistory();
     } catch (e: any) {
       console.error(e);
       msg.requires_confirmation = false;
@@ -124,24 +118,24 @@ export class Chat implements OnChanges, AfterViewChecked {
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
+    } finally {
+      this.isThinking.set(false);
     }
   }
 
   async rejectAction(msg: ChatMessageUI) {
     if (!this.sessionId || !msg.pending_action_id) return;
     
+    this.isThinking.set(true);
     try {
       await this.api.confirmAction(this.sessionId, msg.pending_action_id, false);
       msg.rejected = true;
       msg.requires_confirmation = false;
-      this.messages.update(m => [...m, {
-        id: Date.now(),
-        role: 'system',
-        content: `❌ Acción rechazada por el usuario.`,
-        created_at: new Date().toISOString()
-      }]);
+      await this.loadHistory();
     } catch (e) {
       console.error(e);
+    } finally {
+      this.isThinking.set(false);
     }
   }
 
