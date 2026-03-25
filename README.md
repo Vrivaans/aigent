@@ -27,6 +27,14 @@ AIgent nace para resolver tres problemas críticos en la automatización con age
 - **🎨 Experiencia Premium**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
 - **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
 
+## 🏗️ Decisiones de Arquitectura ("The Why")
+
+En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en la eficiencia y la seguridad:
+
+1.  **¿Por qué Go?**: Se eligió Go por su baja latencia y su mínima huella de memoria en comparación con otros lenguajes como Java. Esto permite que el **90% de los recursos del VPS** se dediquen exclusivamente al razonamiento del agente y al procesamiento pesado de herramientas mediante HandsAI.
+2.  **Seguridad Proactiva (AES-256-GCM)**: Dado que manejamos identidades y credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano, ni siquiera en variables de entorno fijas después de su configuración inicial.
+3.  **Resiliencia en el Chain-of-Thought**: Implementamos una lógica de "Loop Resume" que detecta estados de pausa y reanuda la inferencia tras la aprobación humana. Esto garantiza que procesos complejos (ej: "Crear en Odoo -> Notificar en Trello") no se pierdan en el tiempo.
+
 ---
 
 ## 🛠️ Stack Tecnológico
