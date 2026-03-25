@@ -10,9 +10,11 @@ import (
 	"aigent/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
+	"strings"
 )
 
 type ProviderRequest struct {
+	ID           uint   `json:"id"`
 	Name         string `json:"name"`
 	BaseURL      string `json:"base_url"`
 	APIKey       string `json:"api_key"`
@@ -118,7 +120,7 @@ func HandleDeleteProvider(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 
-// HandleTestProvider realiza una llamada mínima al proveedor para verificar que la API key y URL son válidas.
+// HandleTestProvider realiza una llamada mínima al proveedor existente por ID.
 func HandleTestProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -133,7 +135,41 @@ func HandleTestProvider(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"ok": false, "error": "Failed to decrypt API key: " + err.Error()})
 	}
 
-	model := provider.DefaultModel
+	return performTestConnection(c, provider.Name, provider.BaseURL, apiKey, provider.DefaultModel)
+}
+
+// HandleTestProviderConfig realiza una prueba de conexión con datos crudos (sin guardar en DB).
+func HandleTestProviderConfig(c *fiber.Ctx) error {
+	var req ProviderRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid body"})
+	}
+
+	if req.BaseURL == "" || req.APIKey == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Base URL and API Key are required"})
+	}
+
+	apiKey := req.APIKey
+	// Si la key es el placeholder, cargamos la real de la DB si tenemos ID
+	if apiKey == "********" && req.ID > 0 {
+		var provider database.LLMProvider
+		if err := database.DB.First(&provider, req.ID).Error; err == nil {
+			masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+			decrypted, err := utils.Decrypt(provider.APIKey, masterKey)
+			if err == nil {
+				apiKey = decrypted
+			}
+		}
+	}
+
+	return performTestConnection(c, req.Name, req.BaseURL, apiKey, req.DefaultModel)
+}
+
+func performTestConnection(c *fiber.Ctx, name, baseURL, apiKey, model string) error {
+	// Normalización
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	apiKey = strings.TrimSpace(apiKey)
+	
 	if model == "" {
 		model = "gpt-3.5-turbo"
 	}
@@ -147,7 +183,7 @@ func HandleTestProvider(c *fiber.Ctx) error {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	testURL := provider.BaseURL + "/chat/completions"
+	testURL := baseURL + "/chat/completions"
 	req2, _ := http.NewRequestWithContext(c.Context(), "POST", testURL, bytes.NewReader(bodyBytes))
 	req2.Header.Set("Authorization", "Bearer "+apiKey)
 	req2.Header.Set("Content-Type", "application/json")
@@ -155,13 +191,14 @@ func HandleTestProvider(c *fiber.Ctx) error {
 	httpClient := &http.Client{}
 	resp, err := httpClient.Do(req2)
 	if err != nil {
-		return c.JSON(fiber.Map{"ok": false, "error": err.Error()})
+		return c.JSON(fiber.Map{"ok": false, "error": "Fallo al conectar: " + err.Error()})
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		return c.JSON(fiber.Map{"ok": true, "message": "✅ Conexión exitosa con " + provider.Name})
+		return c.JSON(fiber.Map{"ok": true, "message": "✅ Conexión exitosa con " + name})
 	}
+	
 	return c.JSON(fiber.Map{
 		"ok":      false,
 		"status":  resp.StatusCode,

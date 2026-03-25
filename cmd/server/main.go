@@ -96,16 +96,13 @@ func main() {
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.GetHistory)
 
-	api.Get("/active-tools", func(c *fiber.Ctx) error {
-		return c.JSON(brain.Registry.List())
-	})
-
 	// LLM Provider Management
 	api.Get("/providers", handlers.HandleListProviders)
 	api.Post("/providers", handlers.HandleCreateProvider)
 	api.Patch("/providers/:id", handlers.HandleUpdateProvider)
 	api.Patch("/providers/:id/set-default", handlers.HandleSetDefaultProvider)
 	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
+	api.Post("/providers/test", handlers.HandleTestProviderConfig)
 	api.Post("/providers/:id/test", handlers.HandleTestProvider)
 
 	taskHandler := &handlers.TaskHandler{}

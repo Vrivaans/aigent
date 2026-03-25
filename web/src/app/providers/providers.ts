@@ -87,12 +87,15 @@ export class Providers implements OnInit {
   }
 
   async testProvider() {
-    const id = this.editingId();
-    if (!id) return;
+    const config = {
+      ...this.newProvider,
+      id: this.editingId() || 0
+    };
+    
     this.isTesting.set(true);
     this.testResult.set(null);
     try {
-      const res = await this.api.testProvider(id);
+      const res = await this.api.testProvider(config);
       this.testResult.set(res);
     } catch (e: any) {
       this.testResult.set({ ok: false, message: e.message || 'Error desconocido' });

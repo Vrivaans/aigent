@@ -143,8 +143,12 @@ export class ApiService {
     await fetch(`${this.baseUrl}/providers/${id}`, { method: 'DELETE' });
   }
 
-  async testProvider(id: number): Promise<{ ok: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/providers/${id}/test`, { method: 'POST' });
+  async testProvider(config: any): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch(`${this.baseUrl}/providers/test`, { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
     return res.json();
   }
 

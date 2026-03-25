@@ -36,7 +36,7 @@
         <button class="btn-submit" (click)="onSaveProvider()">
           {{ isEditing() ? 'Actualizar Modelo' : 'Guardar Modelo' }}
         </button>
-        <button class="btn-test" *ngIf="isEditing()" (click)="testProvider()" [disabled]="isTesting()">
+        <button class="btn-test" (click)="testProvider()" [disabled]="isTesting()">
           {{ isTesting() ? '⏳ Probando...' : '🧪 Probar conexión' }}
         </button>
       </div>
