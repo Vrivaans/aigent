@@ -101,3 +101,11 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 
 ## 📽️ Demo y Video
 *(Enlaza aquí tu video de presentación de YouTube/Loom)*
+
+**⚠️ Nota sobre la elección del modelo**
+> El rendimiento de AIgent depende directamente de las capacidades de razonamiento
+> del modelo configurado. Los modelos **menores de 100B parámetros** funcionan bien
+> para tareas simples y consultas directas, pero pueden tener dificultades para
+> encadenar flujos de ejecución complejos entre múltiples herramientas.
+> Para aprovechar al máximo la orquestación de AIgent se recomienda usar modelos
+> **de 100B parámetros o más**
