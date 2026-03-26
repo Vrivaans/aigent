@@ -4,36 +4,59 @@
 [![Powered by Go](https://img.shields.io/badge/Powered_by-Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 [![Angular 21](https://img.shields.io/badge/Angular-21-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.io/)
 
-**AIgent** es un potente orquestador de agentes de IA diseñado para actuar como un puente seguro y resiliente entre el usuario y sus herramientas de trabajo (Trello, Odoo, HandsAI). A diferencia de los chatbots tradicionales, AIgent no solo habla: **ejecuta**.
+**AIgent** es un operador  diseñado para actuar como un puente seguro y resiliente entre el usuario y sus herramientas de trabajo (operando las tools de HandsAI principalmente). A diferencia de los chatbots tradicionales, AIgent no solo habla: **ejecuta**. El propósito es que el agente pueda operar herramientas de forma autónoma y segura, y que esas herramientas sean software de terceros.
 
----
+## 💡 El problema que resuelve
 
-## 💡 ¿Por qué AIgent?
+La mayoría de los agentes de IA saben *hablar*, pero no saben *hacer*.
+Conectar un LLM a sistemas reales —un CRM, un ERP, un gestor de tareas— requiere
+integraciones manuales, exponer credenciales al modelo, y lidiar con flujos que se
+rompen cuando algo falla a mitad del camino o muchos MCP servers.
 
-En el ecosistema actual de IA, la mayoría de los bots se limitan a responder preguntas o generar texto. El verdadero reto surge cuando queremos que la IA **opere** herramientas reales de forma segura. 
+**AIgent** resuelve esto en dos capas:
 
-AIgent nace para resolver tres problemas críticos en la automatización con agentes:
-1. **Seguridad**: Gestionar API Keys de forma centralizada y cifrada para el uso de modelos.
-2. **Resiliencia**: Que el agente no se detenga si una tarea requiere múltiples pasos y confirmaciones sensibles.
-3. **Orquestación**: Unificar herramientas dispares (CRM, Productividad, ERP) bajo un mismo cerebro agéntico.
+### 🖐️ Capa de ejecución: HandsAI
+[HandsAI](https://vrivaans.github.io/handsai-presentation/) es el puente entre el
+agente y el mundo real. Registrás cualquier API REST una vez, y HandsAI la expone
+como herramienta MCP. El agente nunca ve URLs, tokens ni credenciales — HandsAI
+los inyecta de forma transparente en cada llamada y protege las respuestas contra
+inyecciones de prompt.
+
+> *Si AIgent es el cerebro, HandsAI son las manos.*
+
+### 🧠 Capa de orquestación: AIgent
+AIgent actúa como el cerebro agéntico que opera sobre HandsAI. No solo ejecuta
+herramientas: encadena operaciones complejas entre sistemas distintos
+(ej: Odoo → Trello → Bluesky), gestiona las API Keys de los modelos de forma
+cifrada con AES-256-GCM, y nunca se detiene ante una confirmación sensible gracias
+al **Loop Resume** — un mecanismo que reanuda automáticamente el hilo de
+razonamiento del agente tras la aprobación humana.
+
+### Los tres problemas que resuelve AIgent
+1. **Seguridad**: Las credenciales nunca viajan al modelo. Ni las de las APIs externas
+   (HandsAI) ni las de los proveedores de IA (AIgent).
+2. **Resiliencia**: Los flujos multi-paso no se pierden. El agente retoma exactamente
+   donde lo dejó tras una confirmación.
+3. **Orquestación**: Un solo agente puede operar herramientas de CRM, ERP y
+   productividad sin que el humano intervenga en cada paso.
 
 ---
 
 ## 🌟 Características Principales
 
-- **🛡️ Seguridad Grado Industrial**: Almacenamiento de API Keys cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
+- **🛡️ Seguridad**: Almacenamiento de API Keys cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
 - **🔄 Resiliencia Agéntica (Loop Resume)**: El sistema nunca se detiene. Tras una confirmación de acción sensible, el agente reanuda automáticamente su hilo de pensamiento para completar flujos complejos (ej. Odoo -> Trello) sin intervención adicional.
 - **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas MCP, permitiendo automatizar flujos reales de negocio.
-- **🎨 Experiencia Premium**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
+- **🎨 UX/UI**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
 - **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
 
-## 🏗️ Decisiones de Arquitectura ("The Why")
+## 🏗️ Decisiones de Arquitectura
 
 En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en la eficiencia y la seguridad:
 
 1.  **¿Por qué Go?**: Se eligió Go por su baja latencia y su mínima huella de memoria en comparación con otros lenguajes como Java. Esto permite que el **90% de los recursos del VPS** se dediquen exclusivamente al razonamiento del agente y al procesamiento pesado de herramientas mediante HandsAI.
 2.  **Seguridad Proactiva (AES-256-GCM)**: Dado que manejamos identidades y credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano, ni siquiera en variables de entorno fijas después de su configuración inicial.
-3.  **Resiliencia en el Chain-of-Thought**: Implementamos una lógica de "Loop Resume" que detecta estados de pausa y reanuda la inferencia tras la aprobación humana. Esto garantiza que procesos complejos (ej: "Crear en Odoo -> Notificar en Trello") no se pierdan en el tiempo.
+3.  **Resiliencia en el Chain-of-Thought**: Implementamos una lógica de "Loop Resume" que detecta estados de pausa y reanuda la inferencia tras la aprobación humana. Esto garantiza que procesos complejos (ej: "Crear en Odoo -> Crear en Trello") no se pierdan en el tiempo.
 
 ---
 
@@ -78,7 +101,3 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 
 ## 📽️ Demo y Video
 *(Enlaza aquí tu video de presentación de YouTube/Loom)*
-
----
-
-Desarrollado con ❤️ para la Hackatón CubePath 2026.
