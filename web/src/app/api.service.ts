@@ -45,16 +45,40 @@ export interface LLMProvider {
 export class ApiService {
   private baseUrl = 'http://localhost:3000/api';
 
+  private get headers() {
+    const token = localStorage.getItem('aigent_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+  }
+
+  async login(username: string, password: string): Promise<{ token: string }> {
+    const res = await fetch(`${this.baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    return data;
+  }
+
   async getSessions(): Promise<Session[]> {
-    return fetch(`${this.baseUrl}/sessions`).then(res => res.json());
+    return fetch(`${this.baseUrl}/sessions`, { headers: this.headers }).then(res => res.json());
   }
 
   async createSession(): Promise<Session> {
-    return fetch(`${this.baseUrl}/sessions`, { method: 'POST' }).then(res => res.json());
+    return fetch(`${this.baseUrl}/sessions`, { 
+      method: 'POST',
+      headers: this.headers 
+    }).then(res => res.json());
   }
 
   async getChatHistory(sessionId: number): Promise<ChatMessage[]> {
-    return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`).then(res => res.json());
+    return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
+      headers: this.headers
+    }).then(res => res.json());
   }
 
   async sendChatMessage(sessionId: number, message: string): Promise<{
@@ -66,7 +90,7 @@ export class ApiService {
   }> {
     return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify({ message })
     }).then(res => res.json());
   }
@@ -74,7 +98,7 @@ export class ApiService {
   async confirmAction(sessionId: number, pendingId: number, approved: boolean): Promise<any> {
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/confirm/${pendingId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify({ approved })
     });
     const data = await res.json();
@@ -85,40 +109,43 @@ export class ApiService {
   }
 
   async getRules(): Promise<Rule[]> {
-    return fetch(`${this.baseUrl}/rules`).then(res => res.json());
+    return fetch(`${this.baseUrl}/rules`, { headers: this.headers }).then(res => res.json());
   }
 
   async createRule(rule: Partial<Rule>): Promise<Rule> {
     return fetch(`${this.baseUrl}/rules`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify(rule)
     }).then(res => res.json());
   }
 
   async deleteRule(id: number) {
-    return fetch(`${this.baseUrl}/rules/${id}`, { method: 'DELETE' }).then(res => res.json());
+    return fetch(`${this.baseUrl}/rules/${id}`, { 
+      method: 'DELETE',
+      headers: this.headers 
+    }).then(res => res.json());
   }
 
   async getTasks(): Promise<Task[]> {
-    return fetch(`${this.baseUrl}/tasks`).then(res => res.json());
+    return fetch(`${this.baseUrl}/tasks`, { headers: this.headers }).then(res => res.json());
   }
 
   async getActiveTools(): Promise<any[]> {
-    const res = await fetch(`${this.baseUrl}/active-tools`);
+    const res = await fetch(`${this.baseUrl}/active-tools`, { headers: this.headers });
     return res.json();
   }
 
   // LLM Providers
   async getProviders(): Promise<LLMProvider[]> {
-    const res = await fetch(`${this.baseUrl}/providers`);
+    const res = await fetch(`${this.baseUrl}/providers`, { headers: this.headers });
     return res.json();
   }
 
   async createProvider(provider: Partial<LLMProvider>): Promise<LLMProvider> {
     const res = await fetch(`${this.baseUrl}/providers`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify(provider)
     });
     return res.json();
@@ -127,7 +154,7 @@ export class ApiService {
   async updateProvider(id: number, provider: Partial<LLMProvider>): Promise<LLMProvider> {
     const res = await fetch(`${this.baseUrl}/providers/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify(provider)
     });
     return res.json();
@@ -135,24 +162,31 @@ export class ApiService {
 
   async setDefaultProvider(id: number): Promise<void> {
     await fetch(`${this.baseUrl}/providers/${id}/set-default`, {
-      method: 'PATCH'
+      method: 'PATCH',
+      headers: this.headers
     });
   }
 
   async deleteProvider(id: number): Promise<void> {
-    await fetch(`${this.baseUrl}/providers/${id}`, { method: 'DELETE' });
+    await fetch(`${this.baseUrl}/providers/${id}`, { 
+      method: 'DELETE',
+      headers: this.headers 
+    });
   }
 
   async testProvider(config: any): Promise<{ ok: boolean; message: string }> {
     const res = await fetch(`${this.baseUrl}/providers/test`, { 
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers,
       body: JSON.stringify(config)
     });
     return res.json();
   }
 
   async deleteTask(id: number) {
-    return fetch(`${this.baseUrl}/tasks/${id}`, { method: 'DELETE' }).then(res => res.json());
+    return fetch(`${this.baseUrl}/tasks/${id}`, { 
+      method: 'DELETE',
+      headers: this.headers 
+    }).then(res => res.json());
   }
 }

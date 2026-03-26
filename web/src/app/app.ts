@@ -5,16 +5,19 @@ import { Dashboard } from './dashboard/dashboard';
 import { RuleConfig } from './rule-config/rule-config';
 import { Providers } from './providers/providers';
 import { ApiService, Session } from './api.service';
+import { AuthService } from './auth/auth.service';
+import { LoginComponent } from './auth/login';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers],
+  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App implements OnInit {
   private api = inject(ApiService);
+  public auth = inject(AuthService);
   
   currentTab: 'chats' | 'dashboard' | 'rules' | 'tools' | 'providers' = 'chats';
   sessions = signal<Session[]>([]);
@@ -22,6 +25,12 @@ export class App implements OnInit {
   tools = signal<any[]>([]);
 
   async ngOnInit() {
+    if (this.auth.isLoggedIn()) {
+      await this.initAppData();
+    }
+  }
+
+  async initAppData() {
     await this.loadSessions();
     await this.loadTools();
     if (this.sessions().length > 0) {
@@ -29,6 +38,10 @@ export class App implements OnInit {
     } else {
       await this.createNewSession();
     }
+  }
+
+  logout() {
+    this.auth.logout();
   }
 
   async loadTools() {

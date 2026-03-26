@@ -159,3 +159,39 @@ app-chat, app-dashboard, app-rule-config {
   color: var(--text-muted);
   padding: 2rem;
 }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 1.5rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.logout-btn svg {
+  opacity: 0.7;
+}
+
+.logout-btn:hover svg {
+  opacity: 1;
+}

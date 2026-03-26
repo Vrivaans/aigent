@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"aigent/internal/ai"
+	"aigent/internal/auth"
 	"aigent/internal/database"
 	"aigent/internal/handlers"
 	"aigent/internal/handsai"
@@ -20,15 +21,20 @@ import (
 )
 
 func main() {
-	// 1. Cargar variables de entorno (ignora si no hay archivo, ideal para Docker)
+	// 1. Cargar variables de entorno
 	if err := godotenv.Load(); err != nil {
 		log.Println("Note: No .env file found, using system environment variables")
 	}
 
-	// 1.5 Validar llave de cifrado
+	// 1.5 Validar llave de cifrado y credenciales
 	encryptionKey := os.Getenv("DB_ENCRYPTION_KEY")
 	if len(encryptionKey) != 32 {
 		log.Fatalf("FATAL: DB_ENCRYPTION_KEY must be exactly 32 characters long (for AES-256). Current length: %d", len(encryptionKey))
+	}
+	adminUser := os.Getenv("ADMIN_USERNAME")
+	adminPass := os.Getenv("ADMIN_PASSWORD")
+	if adminUser == "" || adminPass == "" {
+		log.Fatal("FATAL: ADMIN_USERNAME and ADMIN_PASSWORD must be set in .env")
 	}
 
 	// 2. Initializar Base de Datos
@@ -44,20 +50,20 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// 3. Inicializar integraciones (HandsAI y LLM OpenRouter)
+	// 3. Inicializar integraciones (HandsAI y LLM)
 	handsaiCfg := handsai.Config{
 		BaseURL: getEnv("HANDSAI_URL", "http://localhost:8080/mcp"),
 		Token:   getEnv("HANDSAI_TOKEN", ""),
 	}
 	
 	brain := ai.NewBrain(
-		"", // Key vacía: se buscará en DB por flujo
-		"", // BaseURL vacía: se buscará en DB por flujo
+		"", 
+		"", 
 		handsaiCfg,
-		nil, // Usa DefaultPermissionHandler (bloquea sensitive actions por consola)
+		nil,
 	)
 
-	// 4. Levantar Cron Worker en background para tareas autonomas
+	// 4. Levantar Cron Worker
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go scheduler.StartCronWorker(ctx, brain)
@@ -68,6 +74,9 @@ func main() {
 	app.Use(logger.New())
 
 	api := app.Group("/api")
+
+	// Public routes
+	api.Post("/login", handlers.HandleLogin)
 
 	api.Get("/debug/tools", func(c *fiber.Ctx) error {
 		raw, err := brain.HandsAI.GetTools(c.Context())
@@ -84,6 +93,9 @@ func main() {
 			"parsed": parsed,
 		})
 	})
+
+	// Protected routes (require JWT)
+	api.Use(auth.NewAuthMiddleware())
 
 	api.Get("/active-tools", func(c *fiber.Ctx) error {
 		_ = brain.SyncTools(c.Context())
@@ -114,19 +126,18 @@ func main() {
 	api.Post("/rules", ruleHandler.CreateRule)
 	api.Delete("/rules/:id", ruleHandler.DeleteRule)
 
-	// Serve Static Angular Files (Production build)
+	// Serve Static Angular Files
 	app.Static("/", "./web/dist/web/browser")
 
-	// SPA Catch-all Route: any request not matching /api/* returns index.html
+	// SPA Catch-all
 	app.Get("/*", func(c *fiber.Ctx) error {
-		// Ignore undefined API routes
 		if strings.HasPrefix(c.Path(), "/api") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "API route not found"})
 		}
 		return c.SendFile("./web/dist/web/browser/index.html")
 	})
 
-	// 6. Iniciar Servidor web
+	// 6. Iniciar Servidor
 	port := getEnv("PORT", "3000")
 	log.Printf("🚀 Starting AIgent Server on port %s", port)
 	if err := app.Listen(":" + port); err != nil {
@@ -134,7 +145,6 @@ func main() {
 	}
 }
 
-// getEnv helper para leer variables con default
 func getEnv(key, fallback string) string {
 	if val, ok := os.LookupEnv(key); ok {
 		return val

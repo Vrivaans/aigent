@@ -1,0 +1,30 @@
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo">🤖</div>
+      <h1>AIgent Login</h1>
+      <p>Acceso restringido para el operador</p>
+    </div>
+
+    <form (submit)="onLogin()">
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" [(ngModel)]="username" name="username" placeholder="Nombre de usuario" autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" [(ngModel)]="password" name="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <div class="error-msg" *ngIf="error()">
+        {{ error() }}
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="isLoading()">
+        <span *ngIf="!isLoading()">Entrar</span>
+        <span *ngIf="isLoading()" class="spinner-small"></span>
+      </button>
+    </form>
+  </div>
+</div>
