@@ -1,0 +1,116 @@
+<div class="agents-panel">
+  <div class="panel-header">
+    <div class="header-main">
+      <h2 class="view-title">Agentes Especializados</h2>
+      <p class="view-desc">Define agentes con modelos y herramientas específicas para tareas distintas.</p>
+    </div>
+    <button class="btn-create" (click)="openCreateModal()">
+      + Nuevo Agente
+    </button>
+  </div>
+
+  <div class="agents-grid">
+    @for (agent of agents(); track agent.id) {
+    <div class="agent-card" [class.is-default]="agent.id === 1">
+      <div class="agent-header">
+        <div class="agent-id">#{{ agent.id }}</div>
+        @if (agent.id === 1) {
+        <span class="badge-default">Sistema</span>
+        } @else {
+        <span class="badge-custom">Personalizado</span>
+        }
+      </div>
+      <div class="agent-body">
+        <h3 class="agent-name">{{ agent.name }}</h3>
+        <p class="agent-description" *ngIf="agent.description">{{ agent.description }}</p>
+        <div class="agent-meta">
+          <span class="meta-label">Proveedor:</span>
+          <span class="meta-value">{{ agent.llm_provider?.name || 'Por defecto' }}</span>
+        </div>
+        <div class="agent-meta">
+          <span class="meta-label">Herramientas:</span>
+          <span class="meta-value">{{ agent.tools?.length || 0 }} activas</span>
+        </div>
+      </div>
+      <div class="agent-footer">
+        <button class="btn-edit" (click)="openEditModal(agent)">
+          Configurar
+        </button>
+        @if (agent.id !== 1) {
+        <button class="btn-delete" (click)="deleteAgent(agent.id)">
+          Eliminar
+        </button>
+        }
+      </div>
+    </div>
+    }
+  </div>
+
+  <!-- Modal -->
+  @if (showModal()) {
+  <div class="modal-overlay" (click)="showModal.set(false)">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ isEditing() ? 'Configurar Agente' : 'Crear Nuevo Agente' }}</h3>
+        <button class="close-btn" (click)="showModal.set(false)">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nombre del Agente</label>
+          <input type="text" [(ngModel)]="currentAgent.name" placeholder="Ej: Social Media Bot"
+            [disabled]="currentAgent.id === 1">
+        </div>
+
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea [(ngModel)]="currentAgent.description" placeholder="Describe el propósito de este agente..."
+            rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Proveedor / Modelo de IA</label>
+          <select [(ngModel)]="currentAgent.llm_provider_id">
+            @for (p of providers(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }} ({{ p.default_model }})</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Herramientas Habilitadas ({{ currentAgent.tools.length }} seleccionadas)</span>
+            <div style="font-size: 0.8rem; font-weight: normal; color: #3b82f6;">
+              <span style="cursor: pointer; margin-right: 10px;" (click)="selectAllTools()">Seleccionar todas</span>
+              <span style="cursor: pointer;" (click)="deselectAllTools()">Quitar todas</span>
+            </div>
+          </label>
+          <p class="field-help"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span>El agente solo podrá ver y ejecutar estas tools.</span>
+            <input type="text" [(ngModel)]="toolSearchQuery" placeholder="🔍 Buscar tools..." class="search-tools-input"
+              style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; font-size: 0.85rem; width: 200px;">
+          </p>
+          <div class="tools-selection-grid">
+            @for (tool of filteredTools(); track tool.name) {
+            <div class="tool-chip" [class.selected]="isToolSelected(tool.name)" (click)="toggleTool(tool.name)">
+              <span class="chip-icon">{{ isToolSelected(tool.name) ? '✅' : '⚙️' }}</span>
+              <span class="chip-name">{{ tool.name }}</span>
+            </div>
+            } @empty {
+            <div class="no-tools-available">No se encontraron herramientas.</div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="showModal.set(false)">Cancelar</button>
+        <button class="btn-save" (click)="saveAgent()">
+          {{ isEditing() ? 'Guardar Cambios' : 'Crear Agente' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</div>

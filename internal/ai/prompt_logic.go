@@ -276,10 +276,37 @@ func sanitizeRecursive(val interface{}, argMap map[string]string) interface{} {
 
 // ProcessChatInteraction ejecuta The Brain Loop: Rules + Tools -> LLM -> Execution
 func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chatHistory []database.ChatMessage, newUserMsg string) (*ChoiceMessage, []database.ChatMessage, error) {
-	// 0. Obtener Proveedor LLM de la base de datos y crear cliente local (sin mutar Brain.LLM global)
+	// 0. Obtener Sesión para saber el Agente asociado
+	var session database.Session
+	if err := database.DB.Preload("Agent").Preload("Agent.LLMProvider").First(&session, sessionID).Error; err != nil {
+		return nil, nil, fmt.Errorf("no se encontró la sesión: %w", err)
+	}
+
 	var provider database.LLMProvider
-	if err := database.DB.Where("is_default = ? AND is_active = ?", true, true).First(&provider).Error; err != nil {
-		return nil, nil, fmt.Errorf("No hay un modelo seleccionado por defecto. Configura uno en /providers")
+	useDefault := true
+
+	if session.Agent != nil && session.Agent.LLMProviderID != nil {
+		if session.Agent.LLMProvider.ID != 0 {
+			provider = session.Agent.LLMProvider
+			useDefault = false
+		} else {
+			// fallback in case preload didn't work properly
+			if err := database.DB.First(&provider, *session.Agent.LLMProviderID).Error; err == nil {
+				useDefault = false
+			} else {
+				log.Printf("⚠️ Provider ID %d not found for Agent %s. Falling back to default.", *session.Agent.LLMProviderID, session.Agent.Name)
+			}
+		}
+	}
+
+	if useDefault {
+		if err := database.DB.Where("is_default = ? AND is_active = ?", true, true).First(&provider).Error; err != nil {
+			agentName := "desconocido"
+			if session.Agent != nil {
+				agentName = session.Agent.Name
+			}
+			return nil, nil, fmt.Errorf("El agente '%s' no tiene un modelo específico, y no hay un proveedor global por defecto. Configura uno en la pestaña Agentes o Proveedores", agentName)
+		}
 	}
 
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")

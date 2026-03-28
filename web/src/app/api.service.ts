@@ -22,6 +22,23 @@ export interface Rule {
   importance: number;
 }
 
+export interface Agent {
+  id: number;
+  name: string;
+  description: string;
+  llm_provider_id: number;
+  llm_provider?: LLMProvider;
+  tools?: AgentTool[];
+  is_default: boolean;
+  created_at?: string;
+}
+
+export interface AgentTool {
+  id: number;
+  agent_id: number;
+  tool_name: string;
+}
+
 export interface Task {
   id: number;
   name: string;
@@ -32,7 +49,7 @@ export interface Task {
 }
 
 export interface LLMProvider {
-  ID: number;
+  id: number;
   name: string;
   base_url: string;
   api_key: string;
@@ -51,6 +68,15 @@ export class ApiService {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
+  }
+
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const res = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers: { ...this.headers, ...options.headers }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
   async login(username: string, password: string): Promise<{ token: string }> {
@@ -128,25 +154,44 @@ export class ApiService {
   }
 
   async deleteRule(id: number) {
-    return fetch(`${this.baseUrl}/rules/${id}`, { 
-      method: 'DELETE',
-      headers: this.headers 
-    }).then(res => res.json());
+    return this.request(`/rules/${id}`, { method: 'DELETE' });
   }
 
-  async getTasks(): Promise<Task[]> {
-    return fetch(`${this.baseUrl}/tasks`, { headers: this.headers }).then(res => res.json());
+  // --- Agents ---
+  async getAgents(): Promise<Agent[]> {
+    return this.request('/admin/agents');
+  }
+
+  async getProviders(): Promise<LLMProvider[]> {
+    return this.request('/providers');
   }
 
   async getActiveTools(): Promise<any[]> {
-    const res = await fetch(`${this.baseUrl}/active-tools`, { headers: this.headers });
-    return res.json();
+    return this.request('/active-tools');
   }
 
-  // LLM Providers
-  async getProviders(): Promise<LLMProvider[]> {
-    const res = await fetch(`${this.baseUrl}/providers`, { headers: this.headers });
-    return res.json();
+  async createAgent(data: any): Promise<Agent> {
+    return this.request('/admin/agents', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateAgent(id: number, data: any): Promise<Agent> {
+    return this.request(`/admin/agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteAgent(id: number) {
+    return this.request(`/admin/agents/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getTasks(): Promise<Task[]> {
+    return this.request('/tasks');
   }
 
   async createProvider(provider: Partial<LLMProvider>): Promise<LLMProvider> {

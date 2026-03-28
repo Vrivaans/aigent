@@ -125,6 +125,9 @@ func main() {
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 
 	// LLM Provider Management
+	agentHandler := &handlers.AgentHandler{}
+	admin := api.Group("/admin")
+
 	api.Get("/providers", handlers.HandleListProviders)
 	api.Post("/providers", handlers.HandleCreateProvider)
 	api.Patch("/providers/:id", handlers.HandleUpdateProvider)
@@ -132,6 +135,12 @@ func main() {
 	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
 	api.Post("/providers/test", handlers.HandleTestProviderConfig)
 	api.Post("/providers/:id/test", handlers.HandleTestProvider)
+
+	// Agent management
+	admin.Get("/agents", agentHandler.GetAgents)
+	admin.Post("/agents", agentHandler.CreateAgent)
+	admin.Put("/agents/:id", agentHandler.UpdateAgent)
+	admin.Delete("/agents/:id", agentHandler.DeleteAgent)
 
 	// HandsAI Config Management
 	configHandler := &handlers.ConfigHandler{Brain: brain}

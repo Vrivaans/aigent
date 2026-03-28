@@ -4,14 +4,17 @@ import { Chat } from './chat/chat';
 import { Dashboard } from './dashboard/dashboard';
 import { RuleConfig } from './rule-config/rule-config';
 import { Providers } from './providers/providers';
+import { AgentsComponent } from './agents/agents';
 import { ApiService, Session } from './api.service';
 import { AuthService } from './auth/auth.service';
 import { LoginComponent } from './auth/login';
 
+export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'agents';
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent],
+  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent, AgentsComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
@@ -19,7 +22,7 @@ export class App implements OnInit {
   private api = inject(ApiService);
   public auth = inject(AuthService);
   
-  currentTab: 'chats' | 'dashboard' | 'rules' | 'tools' | 'providers' = 'chats';
+  currentTab: Tab = 'chats';
   sessions = signal<Session[]>([]);
   activeSessionId = signal<number | null>(null);
   tools = signal<any[]>([]);

@@ -72,7 +72,7 @@ export class Providers implements OnInit {
 
   editProvider(p: LLMProvider) {
     this.isEditing.set(true);
-    this.editingId.set(p.ID);
+    this.editingId.set(p.id);
     this.newProvider = {
       name: p.name,
       base_url: p.base_url,

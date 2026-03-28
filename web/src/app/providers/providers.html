@@ -73,11 +73,11 @@
       <div class="card-actions">
         <button class="btn-secondary" 
                 *ngIf="!p.is_default" 
-                (click)="setAsDefault(p.ID, $event)">
+                (click)="setAsDefault(p.id, $event)">
           Establecer como Default
         </button>
         <button class="btn-danger"
-                (click)="deleteProvider(p.ID, $event)">
+                (click)="deleteProvider(p.id, $event)">
           🗑️
         </button>
       </div>
