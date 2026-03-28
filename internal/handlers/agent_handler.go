@@ -124,10 +124,9 @@ func (h *AgentHandler) DeleteAgent(c *fiber.Ctx) error {
 			return err
 		}
 		
-		// Note: agent_rules join table is many2many, so we need to clean that up too if we want perfect data integrity, 
-		// but GORM typically handles this if configured. For now manual cleanup for tools.
-		if err := tx.Table("agent_rules").Where("agent_id = ?", id).Delete(nil).Error; err != nil {
-			// ignore error if table doesn't exist yet
+		// Asignar todas las sesiones (chats) de este agente al Agente General (ID: 1) para no perder el historial
+		if err := tx.Model(&database.Session{}).Where("agent_id = ?", id).Update("agent_id", 1).Error; err != nil {
+			return err
 		}
 
 		if err := tx.Delete(&database.Agent{}, id).Error; err != nil {

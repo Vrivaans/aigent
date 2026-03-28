@@ -14,8 +14,7 @@ type Agent struct {
 	Description   string       `gorm:"type:text" json:"description"`
 	LLMProviderID *uint        `json:"llm_provider_id"`
 	LLMProvider   LLMProvider  `gorm:"foreignKey:LLMProviderID" json:"llm_provider"`
-	Tools         []AgentTool  `gorm:"foreignKey:AgentID" json:"tools"`
-	Rules         []Rule       `gorm:"many2many:agent_rules;" json:"rules"`
+	Tools         []AgentTool  `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"tools"`
 	IsDefault     bool         `gorm:"default:false" json:"is_default"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
@@ -44,6 +43,8 @@ type Task struct {
 // Rule represents behavioral constraints or configuration injected into OpenRouter Prompts
 type Rule struct {
 	ID         uint      `gorm:"primarykey" json:"id"`
+	AgentID    *uint     `json:"agent_id"`
+	Agent      *Agent    `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"agent,omitempty"`
 	Category   string    `gorm:"size:100;not null" json:"category"`
 	Content    string    `gorm:"type:text;not null" json:"content"`
 	Importance int       `gorm:"default:1" json:"importance"`

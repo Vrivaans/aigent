@@ -3,11 +3,23 @@
   <p class="desc">Define el contexto permanente que el AIgent debe obedecer.</p>
 
   <div class="add-box">
-    <input 
-      type="text" 
-      placeholder="Categoría (ej: Idioma)" 
-      [ngModel]="newCategory()"
-      (ngModelChange)="newCategory.set($event)">
+    <div class="inline-fields">
+      <select 
+        class="agent-select"
+        [ngModel]="newAgentId()" 
+        (ngModelChange)="newAgentId.set($event)">
+        <option [ngValue]="null">🌐 Regla Global (Todos los agentes)</option>
+        @for (agent of agents(); track agent.id) {
+          <option [ngValue]="agent.id">🤖 Solo para: {{ agent.name }}</option>
+        }
+      </select>
+      
+      <input 
+        type="text" 
+        placeholder="Categoría (ej: Idioma)" 
+        [ngModel]="newCategory()"
+        (ngModelChange)="newCategory.set($event)">
+    </div>
       
     <textarea 
       placeholder="Descripción (ej: Responder siempre en español)" 
@@ -25,7 +37,14 @@
     @for (rule of rules(); track rule.id) {
       <div class="rule-card">
         <div class="header">
-          <span class="category">{{rule.category}}</span>
+          <div class="badges">
+            @if (rule.agent_id) {
+              <span class="agent-badge specific">🤖 {{ rule.agent?.name || 'Agente' }}</span>
+            } @else {
+              <span class="agent-badge global">🌐 Global</span>
+            }
+            <span class="category">{{rule.category}}</span>
+          </div>
           <button class="delete-btn" (click)="deleteRule(rule.id)">×</button>
         </div>
         <div class="content">{{rule.content}}</div>

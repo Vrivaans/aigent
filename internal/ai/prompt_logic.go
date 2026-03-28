@@ -324,14 +324,18 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 	}
 	log.Printf("🌐 Provider: %s | Model: %s | URL: %s", provider.Name, defaultModel, provider.BaseURL)
 
-	// 1. Obtener reglas dinámicas
+	// 1. Obtener reglas dinámicas (Globales + Específicas del Agente)
 	var rules []database.Rule
-	if err := database.DB.Find(&rules).Error; err != nil {
+	if err := database.DB.Where("agent_id IS NULL OR agent_id = ?", session.AgentID).Order("importance desc").Find(&rules).Error; err != nil {
 		log.Printf("Warning: Failed to fetch rules: %v", err)
 	}
 	var rulesText string
 	for _, r := range rules {
-		rulesText += fmt.Sprintf("- [%s] %s\n", r.Category, r.Content)
+		agentScope := "GLOBAL"
+		if r.AgentID != nil {
+			agentScope = "ESPECÍFICA"
+		}
+		rulesText += fmt.Sprintf("- [%s] (%s) %s\n", r.Category, agentScope, r.Content)
 	}
 	systemPrompt := `Eres AIgent, un asistente operativo con capacidad de ejecución real.
 REGLAS ACTUALES DEL USUARIO:

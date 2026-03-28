@@ -47,8 +47,8 @@ razonamiento del agente tras la aprobación humana.
 - **🛡️ Seguridad**: Almacenamiento de API Keys y Tokens del Bridge cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
 - **⚙️ Configuración Dinámica**: Gestión de conexiones a proveedores (Groq, OpenRouter) y puentes (HandsAI) directamente desde la UI. Los cambios se aplican en caliente sin reiniciar el servidor.
 - **🔄 Resiliencia Agéntica (Loop Resume)**: El sistema nunca se detiene. Tras una confirmación de acción sensible, el agente reanuda automáticamente su hilo de pensamiento para completar flujos complejos (ej. Odoo -> Trello) sin intervención adicional.
-- **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas MCP, permitiendo automatizar flujos reales de negocio con sincronización bajo demanda.
-- **🌟 Agentes Especializados**: Ya no dependés de un único bot monolítico. Podés crear múltiples Agentes con identidades propias, eligiendo qué herramientas MCP exactas pueden acceder y con qué modelo o proveedor (Groq, OpenRouter) procesarán la información. Esto salva masivamente los costos limitando el uso de `Input Tokens` y mejora el enfoque (reduciendo alucinaciones).
+- **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas, permitiendo automatizar flujos reales de negocio con sincronización bajo demanda.
+- **🌟 Agentes Especializados**: Ya no dependés de un único bot monolítico. Podés crear múltiples Agentes con identidades propias, eligiendo qué herramientas exactas pueden acceder y con qué modelo o proveedor (Groq, OpenRouter) procesarán la información. Esto salva masivamente los costos limitando el uso de `Input Tokens` y mejora el enfoque (reduciendo alucinaciones).
 - **🎨 UX/UI**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
 - **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
 

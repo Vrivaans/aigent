@@ -1,5 +1,5 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
-import { ApiService, Rule } from '../api.service';
+import { ApiService, Rule, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -13,12 +13,15 @@ import { FormsModule } from '@angular/forms';
 export class RuleConfig implements OnInit {
   private api = inject(ApiService);
   rules = signal<Rule[]>([]);
+  agents = signal<Agent[]>([]);
   
   newCategory = signal('');
   newContent = signal('');
+  newAgentId = signal<number | null>(null);
 
   async ngOnInit() {
     this.loadRules();
+    this.loadAgents();
   }
 
   async loadRules() {
@@ -26,10 +29,16 @@ export class RuleConfig implements OnInit {
     this.rules.set(r);
   }
 
+  async loadAgents() {
+    const a = await this.api.getAgents();
+    this.agents.set(a);
+  }
+
   async createRule() {
     if (!this.newCategory() || !this.newContent()) return;
     
     await this.api.createRule({
+      agent_id: this.newAgentId(),
       category: this.newCategory(),
       content: this.newContent(),
       importance: 1
@@ -37,6 +46,7 @@ export class RuleConfig implements OnInit {
     
     this.newCategory.set('');
     this.newContent.set('');
+    this.newAgentId.set(null);
     this.loadRules();
   }
 

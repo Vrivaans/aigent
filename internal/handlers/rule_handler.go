@@ -9,6 +9,7 @@ import (
 type RuleHandler struct{}
 
 type CreateRuleRequest struct {
+	AgentID    *uint  `json:"agent_id"`
 	Category   string `json:"category"`
 	Content    string `json:"content"`
 	Importance int    `json:"importance"`
@@ -16,7 +17,7 @@ type CreateRuleRequest struct {
 
 func (h *RuleHandler) GetRules(c *fiber.Ctx) error {
 	var rules []database.Rule
-	if err := database.DB.Order("importance desc").Find(&rules).Error; err != nil {
+	if err := database.DB.Preload("Agent").Order("importance desc").Find(&rules).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(rules)
@@ -29,6 +30,7 @@ func (h *RuleHandler) CreateRule(c *fiber.Ctx) error {
 	}
 
 	rule := database.Rule{
+		AgentID:    req.AgentID,
 		Category:   req.Category,
 		Content:    req.Content,
 		Importance: req.Importance,
@@ -37,6 +39,8 @@ func (h *RuleHandler) CreateRule(c *fiber.Ctx) error {
 	if err := database.DB.Create(&rule).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	
+	database.DB.Preload("Agent").First(&rule, rule.ID)
 
 	return c.JSON(rule)
 }
