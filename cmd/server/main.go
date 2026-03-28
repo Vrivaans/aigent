@@ -13,6 +13,7 @@ import (
 	"aigent/internal/handlers"
 	"aigent/internal/handsai"
 	"aigent/internal/scheduler"
+	"aigent/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -21,6 +22,7 @@ import (
 )
 
 func main() {
+	//go run cmd/server/main.go
 	// 1. Cargar variables de entorno
 	if err := godotenv.Load(); err != nil {
 		log.Println("Note: No .env file found, using system environment variables")
@@ -51,14 +53,27 @@ func main() {
 	}
 
 	// 3. Inicializar integraciones (HandsAI y LLM)
-	handsaiCfg := handsai.Config{
-		BaseURL: getEnv("HANDSAI_URL", "http://localhost:8080/mcp"),
-		Token:   getEnv("HANDSAI_TOKEN", ""),
+	// La configuración de HandsAI viene EXCLUSIVAMENTE de la base de datos.
+	// No hay fallback a variables de entorno — debe configurarse desde la UI.
+	handsaiCfg := handsai.Config{}
+
+	var handsaiDB database.HandsAIConfig
+	if err := database.DB.First(&handsaiDB).Error; err == nil && handsaiDB.URL != "" {
+		plainToken, decErr := utils.Decrypt(handsaiDB.Token, encryptionKey)
+		if decErr != nil {
+			log.Printf("⚠️  Failed to decrypt HandsAI token from DB: %v. HandsAI will be disabled.", decErr)
+		} else {
+			handsaiCfg.BaseURL = handsaiDB.URL
+			handsaiCfg.Token = plainToken
+			log.Printf("📦 HandsAI config loaded from database: %s", handsaiCfg.BaseURL)
+		}
+	} else {
+		log.Println("ℹ️  No HandsAI config found in database. Configure it from the Providers page.")
 	}
-	
+
 	brain := ai.NewBrain(
-		"", 
-		"", 
+		"",
+		"",
 		handsaiCfg,
 		nil,
 	)
@@ -89,7 +104,7 @@ func main() {
 		json.Unmarshal(raw, &parsed)
 		return c.JSON(fiber.Map{
 			"status": "ok",
-			"raw": string(raw),
+			"raw":    string(raw),
 			"parsed": parsed,
 		})
 	})
@@ -116,6 +131,12 @@ func main() {
 	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
 	api.Post("/providers/test", handlers.HandleTestProviderConfig)
 	api.Post("/providers/:id/test", handlers.HandleTestProvider)
+
+	// HandsAI Config Management
+	configHandler := &handlers.ConfigHandler{Brain: brain}
+	api.Get("/config/handsai", configHandler.GetHandsAIConfig)
+	api.Patch("/config/handsai", configHandler.UpdateHandsAIConfig)
+	api.Delete("/config/handsai", configHandler.DeleteHandsAIConfig)
 
 	taskHandler := &handlers.TaskHandler{}
 	api.Get("/tasks", taskHandler.GetTasks)

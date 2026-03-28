@@ -65,3 +65,11 @@ type LLMProvider struct {
 	IsActive     bool   `json:"is_active" gorm:"default:true"`
 	IsDefault    bool   `json:"is_default" gorm:"default:false"`
 }
+
+// HandsAIConfig stores the connection settings for the real-world tool execution engine
+type HandsAIConfig struct {
+	gorm.Model
+	Username string `json:"username" gorm:"uniqueIndex"`
+	URL      string `json:"url"`
+	Token    string `json:"token"` // Encrypted with AES-256 via DB_ENCRYPTION_KEY
+}

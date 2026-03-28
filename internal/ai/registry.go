@@ -33,6 +33,11 @@ func (r *ToolRegistry) Register(def ToolDef) {
 	r.tools[def.Name] = def
 }
 
+// Clear removes all tools from the registry (used before a fresh sync).
+func (r *ToolRegistry) Clear() {
+	r.tools = make(map[string]ToolDef)
+}
+
 func (r *ToolRegistry) Get(name string) (ToolDef, bool) {
 	t, ok := r.tools[name]
 	return t, ok

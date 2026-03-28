@@ -51,5 +51,6 @@ func autoMigrate(db *gorm.DB) error {
 		&ChatMessage{},
 		&PendingAction{},
 		&LLMProvider{},
+		&HandsAIConfig{},
 	)
 }

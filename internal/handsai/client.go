@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -46,6 +47,7 @@ type Client struct {
 	cfg         Config
 	reqID       int64
 	permHandler PermissionHandler
+	mu          sync.RWMutex
 }
 
 // PermissionHandler intercepta llamadas para validar permisos.
@@ -81,19 +83,40 @@ func NewClient(cfg Config, permHandler PermissionHandler) *Client {
 	}
 }
 
+// UpdateConfig updates the client's configuration in a thread-safe way.
+func (c *Client) UpdateConfig(baseURL, token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cfg.BaseURL = baseURL
+	c.cfg.Token = token
+}
+
+// IsConfigured returns true if the base URL and token are set.
+func (c *Client) IsConfigured() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.cfg.BaseURL != "" && c.cfg.Token != ""
+}
+
 // GetTools obtiene la lista dinámica de herramientas de la base del backend Java.
 func (c *Client) GetTools(ctx context.Context) (json.RawMessage, error) {
+	c.mu.RLock()
+	baseURL := c.cfg.BaseURL
+	token := c.cfg.Token
+	httpClient := c.cfg.HTTPClient
+	c.mu.RUnlock()
+
 	// HandsAI expone GET /mcp/tools/list
-	req, err := http.NewRequestWithContext(ctx, "GET", c.cfg.BaseURL+"/tools/list", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/tools/list", nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	if c.cfg.Token != "" {
-		req.Header.Set("X-HandsAI-Token", c.cfg.Token)
+	if token != "" {
+		req.Header.Set("X-HandsAI-Token", token)
 	}
 
-	resp, err := c.cfg.HTTPClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)
 	}
@@ -159,17 +182,23 @@ func (c *Client) CallTool(ctx context.Context, name string, args map[string]inte
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.cfg.BaseURL+"/tools/call", bytes.NewBuffer(reqBytes))
+	c.mu.RLock()
+	httpClient := c.cfg.HTTPClient
+	token := c.cfg.Token
+	baseURL := c.cfg.BaseURL
+	c.mu.RUnlock()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/tools/call", bytes.NewBuffer(reqBytes))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	if c.cfg.Token != "" {
-		req.Header.Set("X-HandsAI-Token", c.cfg.Token)
+	if token != "" {
+		req.Header.Set("X-HandsAI-Token", token)
 	}
 
-	resp, err := c.cfg.HTTPClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)
 	}

@@ -26,8 +26,13 @@ func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler 
 		HandsAI:  handsai.NewClient(handsaiCfg, permHandler),
 		Registry: NewToolRegistry(),
 	}
+	b.registerNativeTools()
+	return b
+}
 
-	// Registro de Herramientas Nativas (Go)
+// registerNativeTools re-registers all built-in (Go) tools in the registry.
+// Called on startup and on every SyncTools to avoid losing native tools after a clear.
+func (b *Brain) registerNativeTools() {
 	b.Registry.Register(ToolDef{
 		Name:        "schedule_task",
 		Description: "Programa una tarea recurrente (@hourly, * * * * *, etc.) que invocará otras herramientas de forma autónoma.",
@@ -46,15 +51,26 @@ func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler 
 			return []byte(fmt.Sprintf(`{"status":"success","task_id":%d}`, newTask.ID)), nil
 		},
 	})
-
-	return b
 }
 
-// SyncTools fetches tools from HandsAI and registers them in the local Registry
+// SyncTools fetches tools from HandsAI and registers them in the local Registry.
+// It returns nil if the sync should proceed gracefully even if tools are unavailable.
 func (b *Brain) SyncTools(ctx context.Context) error {
+	// 1. Limpiar el registry y volver a registrar las tools nativas.
+	// Esto garantiza que no queden herramientas "fantasma" de una sesión previa de HandsAI.
+	b.Registry.Clear()
+	b.registerNativeTools()
+
+	// 2. Si HandsAI no está configurado o no está disponible, no continuamos.
+	if b.HandsAI == nil || !b.HandsAI.IsConfigured() {
+		log.Printf("⚠️ SyncTools: HandsAI not configured, skipping tool sync.")
+		return nil
+	}
+
 	handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to fetch tools from HandsAI: %w", err)
+		log.Printf("❌ Failed to fetch tools from HandsAI: %v", err)
+		return nil // Don't return error to caller, just log it.
 	}
 
 	var mcpResponse struct {
@@ -74,7 +90,8 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 		if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
 			mcpResponse.Tools = directArray
 		} else {
-			return fmt.Errorf("failed to parse MCP tools (tried object and array): %w. Body: %s", err, string(handsaiToolsRaw))
+			log.Printf("❌ SyncTools: Failed to parse MCP tools (tried object and array): %v. Body: %s", err, string(handsaiToolsRaw))
+			return nil
 		}
 	}
 
@@ -82,7 +99,6 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 		origName := mt.Name
 
 		// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
-		// Las operaciones de LECTURA (get, list, search, read, ver, buscar) son automáticas.
 		isSensitive := false
 		lowerName := strings.ToLower(origName)
 

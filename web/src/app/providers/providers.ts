@@ -27,13 +27,33 @@ export class Providers implements OnInit {
     default_model: 'llama-3.3-70b-versatile'
   };
 
+  handsaiConfig = signal({ url: '', token: '' });
+  
   async ngOnInit() {
     await this.loadProviders();
+    await this.loadHandsAIConfig();
   }
 
   async loadProviders() {
     const p = await this.api.getProviders();
     this.providers.set(p);
+  }
+
+  async loadHandsAIConfig() {
+    const config = await this.api.getHandsAIConfig();
+    this.handsaiConfig.set(config);
+  }
+
+  async saveHandsAIConfig() {
+    await this.api.updateHandsAIConfig(this.handsaiConfig());
+    alert('Configuración de HandsAI guardada correctamente.');
+    await this.loadHandsAIConfig();
+  }
+
+  async deleteHandsAIConfig() {
+    if (!confirm('¿Eliminar la configuración de HandsAI? Las herramientas dejarán de estar disponibles hasta que vuelvas a configurarlo.')) return;
+    await this.api.deleteHandsAIConfig();
+    this.handsaiConfig.set({ url: '', token: '' });
   }
 
   async onSaveProvider() {

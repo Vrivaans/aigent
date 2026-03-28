@@ -45,15 +45,29 @@
       } @else if (currentTab === 'providers') {
       <app-providers></app-providers>
       } @else if (currentTab === 'tools') {
-      <div class="tools-list">
-        @for (tool of tools(); track tool.name) {
-        <div class="tool-item">
-          <div class="tool-name">⚙️ {{ tool.name }}</div>
-          <div class="tool-desc">{{ tool.description }}</div>
+      <div class="tools-panel">
+        <div class="tools-header">
+          <div>
+            <span class="tools-count">{{ tools().length }} herramienta{{ tools().length !== 1 ? 's' : '' }} activa{{ tools().length !== 1 ? 's' : '' }}</span>
+          </div>
+          <button class="btn-refresh" (click)="refreshTools()" [disabled]="toolsLoading()">
+            @if (toolsLoading()) {
+              <span class="spinner">⏳</span> Sincronizando...
+            } @else {
+              🔄 Refrescar
+            }
+          </button>
         </div>
-        } @empty {
-        <div class="no-tools">No hay herramientas activas.</div>
-        }
+        <div class="tools-list">
+          @for (tool of tools(); track tool.name) {
+          <div class="tool-item">
+            <div class="tool-name">⚙️ {{ tool.name }}</div>
+            <div class="tool-desc">{{ tool.description }}</div>
+          </div>
+          } @empty {
+          <div class="no-tools">No hay herramientas activas. Configura HandsAI en Providers para activarlas.</div>
+          }
+        </div>
       </div>
       }
     </div>

@@ -23,6 +23,7 @@ export class App implements OnInit {
   sessions = signal<Session[]>([]);
   activeSessionId = signal<number | null>(null);
   tools = signal<any[]>([]);
+  toolsLoading = signal(false);
 
   async ngOnInit() {
     if (this.auth.isLoggedIn()) {
@@ -46,7 +47,16 @@ export class App implements OnInit {
 
   async loadTools() {
     const t = await this.api.getActiveTools();
-    this.tools.set(t);
+    this.tools.set(t ?? []);
+  }
+
+  async refreshTools() {
+    this.toolsLoading.set(true);
+    try {
+      await this.loadTools();
+    } finally {
+      this.toolsLoading.set(false);
+    }
   }
 
   async loadSessions() {

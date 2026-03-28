@@ -189,4 +189,27 @@ export class ApiService {
       headers: this.headers 
     }).then(res => res.json());
   }
+
+  // HandsAI Config
+  async getHandsAIConfig(): Promise<{ url: string; token: string }> {
+    const res = await fetch(`${this.baseUrl}/config/handsai`, { headers: this.headers });
+    return res.json();
+  }
+
+  async updateHandsAIConfig(config: { url: string; token: string }): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/config/handsai`, {
+      method: 'PATCH',
+      headers: this.headers,
+      body: JSON.stringify(config)
+    });
+    return res.json();
+  }
+
+  async deleteHandsAIConfig(): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/config/handsai`, {
+      method: 'DELETE',
+      headers: this.headers
+    });
+    return res.json();
+  }
 }
