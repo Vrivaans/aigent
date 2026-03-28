@@ -42,12 +42,11 @@ type Task struct {
 
 // Rule represents behavioral constraints or configuration injected into OpenRouter Prompts
 type Rule struct {
-	ID         uint      `gorm:"primarykey" json:"id"`
-	AgentID    *uint     `json:"agent_id"`
-	Agent      *Agent    `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"agent,omitempty"`
-	Category   string    `gorm:"size:100;not null" json:"category"`
-	Content    string    `gorm:"type:text;not null" json:"content"`
-	Importance int       `gorm:"default:1" json:"importance"`
+	ID         uint    `gorm:"primarykey" json:"id"`
+	Agents     []Agent `gorm:"many2many:rule_agents;" json:"agents"`
+	Category   string  `gorm:"size:100;not null" json:"category"`
+	Content    string  `gorm:"type:text;not null" json:"content"`
+	Importance int     `gorm:"default:1" json:"importance"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

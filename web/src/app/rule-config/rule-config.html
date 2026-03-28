@@ -3,23 +3,11 @@
   <p class="desc">Define el contexto permanente que el AIgent debe obedecer.</p>
 
   <div class="add-box">
-    <div class="inline-fields">
-      <select 
-        class="agent-select"
-        [ngModel]="newAgentId()" 
-        (ngModelChange)="newAgentId.set($event)">
-        <option [ngValue]="null">🌐 Regla Global (Todos los agentes)</option>
-        @for (agent of agents(); track agent.id) {
-          <option [ngValue]="agent.id">🤖 Solo para: {{ agent.name }}</option>
-        }
-      </select>
-      
-      <input 
-        type="text" 
-        placeholder="Categoría (ej: Idioma)" 
-        [ngModel]="newCategory()"
-        (ngModelChange)="newCategory.set($event)">
-    </div>
+    <input 
+      type="text" 
+      placeholder="Categoría (ej: Idioma)" 
+      [ngModel]="newCategory()"
+      (ngModelChange)="newCategory.set($event)">
       
     <textarea 
       placeholder="Descripción (ej: Responder siempre en español)" 
@@ -27,6 +15,27 @@
       (ngModelChange)="newContent.set($event)"
       rows="2">
     </textarea>
+
+    <div class="agent-scope-section">
+      <span class="scope-label">Alcance</span>
+      <div class="agent-chips">
+        @for (agent of agents(); track agent.id) {
+          <button 
+            class="chip"
+            [class.selected]="isAgentSelected()(agent.id)"
+            (click)="toggleAgent(agent.id)"
+            type="button">
+            {{ agent.name }}
+          </button>
+        }
+        @if (agents().length === 0) {
+          <span class="scope-empty">Cargando agentes...</span>
+        }
+      </div>
+      @if (selectedAgentIds().size === 0) {
+        <span class="scope-hint">🌐 Sin selección = Regla Global (todos los agentes)</span>
+      }
+    </div>
     
     <button (click)="createRule()" [disabled]="!newCategory() || !newContent()">
       Agregar Regla
@@ -38,8 +47,10 @@
       <div class="rule-card">
         <div class="header">
           <div class="badges">
-            @if (rule.agent_id) {
-              <span class="agent-badge specific">🤖 {{ rule.agent?.name || 'Agente' }}</span>
+            @if (rule.agents && rule.agents.length > 0) {
+              @for (agent of rule.agents; track agent.id) {
+                <span class="agent-badge specific">🤖 {{ agent.name }}</span>
+              }
             } @else {
               <span class="agent-badge global">🌐 Global</span>
             }

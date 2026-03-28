@@ -19,8 +19,7 @@ export interface Session {
 
 export interface Rule {
   id: number;
-  agent_id?: number | null;
-  agent?: Agent;
+  agents?: Agent[];
   category: string;
   content: string;
   importance: number;

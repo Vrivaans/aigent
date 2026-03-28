@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, computed } from '@angular/core';
 import { ApiService, Rule, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -17,7 +17,9 @@ export class RuleConfig implements OnInit {
   
   newCategory = signal('');
   newContent = signal('');
-  newAgentId = signal<number | null>(null);
+  selectedAgentIds = signal<Set<number>>(new Set());
+
+  isAgentSelected = computed(() => (id: number) => this.selectedAgentIds().has(id));
 
   async ngOnInit() {
     this.loadRules();
@@ -34,19 +36,35 @@ export class RuleConfig implements OnInit {
     this.agents.set(a);
   }
 
+  toggleAgent(id: number) {
+    const current = new Set(this.selectedAgentIds());
+    if (current.has(id)) {
+      current.delete(id);
+    } else {
+      current.add(id);
+    }
+    this.selectedAgentIds.set(current);
+  }
+
+  getAgentNames(rule: Rule): string {
+    return rule.agents?.map(a => a.name).join(', ') || '';
+  }
+
   async createRule() {
     if (!this.newCategory() || !this.newContent()) return;
     
+    const agentIds = Array.from(this.selectedAgentIds());
+
     await this.api.createRule({
-      agent_id: this.newAgentId(),
+      agent_ids: agentIds,
       category: this.newCategory(),
       content: this.newContent(),
       importance: 1
-    });
+    } as any);
     
     this.newCategory.set('');
     this.newContent.set('');
-    this.newAgentId.set(null);
+    this.selectedAgentIds.set(new Set());
     this.loadRules();
   }
 

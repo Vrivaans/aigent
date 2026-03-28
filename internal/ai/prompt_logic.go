@@ -325,14 +325,20 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 	log.Printf("🌐 Provider: %s | Model: %s | URL: %s", provider.Name, defaultModel, provider.BaseURL)
 
 	// 1. Obtener reglas dinámicas (Globales + Específicas del Agente)
+	// Globales = reglas sin ninguna entrada en rule_agents
+	// Específicas = reglas que tienen una entrada en rule_agents para este agente
 	var rules []database.Rule
-	if err := database.DB.Where("agent_id IS NULL OR agent_id = ?", session.AgentID).Order("importance desc").Find(&rules).Error; err != nil {
+	if err := database.DB.
+		Preload("Agents").
+		Where(`id NOT IN (SELECT rule_id FROM rule_agents) OR id IN (SELECT rule_id FROM rule_agents WHERE agent_id = ?)`, session.AgentID).
+		Order("importance desc").
+		Find(&rules).Error; err != nil {
 		log.Printf("Warning: Failed to fetch rules: %v", err)
 	}
 	var rulesText string
 	for _, r := range rules {
 		agentScope := "GLOBAL"
-		if r.AgentID != nil {
+		if len(r.Agents) > 0 {
 			agentScope = "ESPECÍFICA"
 		}
 		rulesText += fmt.Sprintf("- [%s] (%s) %s\n", r.Category, agentScope, r.Content)
