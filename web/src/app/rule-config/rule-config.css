@@ -173,10 +173,10 @@
 }
 
 .chip.selected {
-  background: #7c3aed;
-  border-color: #7c3aed;
+  background: #16a34a;
+  border-color: #16a34a;
   color: #fff;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
   font-weight: 600;
 }
 
