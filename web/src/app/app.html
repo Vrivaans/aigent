@@ -136,8 +136,8 @@
     </header>
 
     <div class="view-content">
-      @if (currentTab === 'chats') {
-      <app-chat [sessionId]="activeSessionId()"></app-chat>
+      @if (currentTab === 'chats' && activeSession()) {
+      <app-chat [session]="activeSession()!" (agentChanged)="loadSessions()"></app-chat>
       } @else if (currentTab === 'dashboard') {
       <div class="feature-view">
         <app-dashboard></app-dashboard>

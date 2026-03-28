@@ -1,4 +1,12 @@
 <div class="chat-container">
+  <div class="chat-agent-selector-bar">
+    <div class="selector-label">🧠 Contexto de Ejecución:</div>
+    <select class="agent-dropdown" [ngModel]="session.agent_id" (ngModelChange)="onAgentChange($event)">
+      @for (agent of agents(); track agent.id) {
+        <option [ngValue]="agent.id">{{ agent.name }}</option>
+      }
+    </select>
+  </div>
   
   <div class="messages" #scrollContainer>
     @if (messages().length === 0) {

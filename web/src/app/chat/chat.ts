@@ -1,5 +1,5 @@
-import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { ApiService, ChatMessage } from '../api.service';
+import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
+import { ApiService, ChatMessage, Session, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -18,28 +18,45 @@ export interface ChatMessageUI extends ChatMessage {
   templateUrl: './chat.html',
   styleUrl: './chat.css'
 })
-export class Chat implements OnChanges, AfterViewChecked {
+export class Chat implements OnInit, OnChanges, AfterViewChecked {
   private api = inject(ApiService);
   
-  @Input() sessionId?: number | null;
+  @Input({ required: true }) session!: Session;
+  @Output() agentChanged = new EventEmitter<void>();
   
   messages = signal<ChatMessageUI[]>([]);
   inputText = signal('');
   isThinking = signal(false);
+  
+  agents = signal<Agent[]>([]);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
+  async ngOnInit() {
+    this.agents.set(await this.api.getAgents());
+  }
+
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['sessionId'] && this.sessionId) {
+    if (changes['session'] && this.session?.id) {
       this.loadHistory();
     }
   }
 
   async loadHistory() {
-    if (!this.sessionId) return;
-    const history = await this.api.getChatHistory(this.sessionId);
+    if (!this.session?.id) return;
+    const history = await this.api.getChatHistory(this.session.id);
     this.messages.set(history);
     this.scrollToBottom();
+  }
+
+  async onAgentChange(newAgentId: number) {
+    if (!this.session?.id) return;
+    try {
+      await this.api.updateSessionAgent(this.session.id, newAgentId);
+      this.agentChanged.emit();
+    } catch (e) {
+      console.error('Failed to change agent', e);
+    }
   }
 
   ngAfterViewChecked() {
@@ -55,7 +72,7 @@ export class Chat implements OnChanges, AfterViewChecked {
   }
 
   async sendMessage() {
-    if (!this.sessionId) return;
+    if (!this.session?.id) return;
     const text = this.inputText().trim();
     if (!text) return;
 
@@ -73,7 +90,7 @@ export class Chat implements OnChanges, AfterViewChecked {
     this.scrollToBottom();
 
     try {
-      const res = await this.api.sendChatMessage(this.sessionId, text);
+      const res = await this.api.sendChatMessage(this.session.id, text);
       this.messages.update(m => [...m, {
         id: Date.now() + 1,
         role: 'assistant',
@@ -100,11 +117,11 @@ export class Chat implements OnChanges, AfterViewChecked {
   }
 
   async approveAction(msg: ChatMessageUI) {
-    if (this.isThinking() || !this.sessionId || !msg.pending_action_id) return;
+    if (this.isThinking() || !this.session?.id || !msg.pending_action_id) return;
     
     this.isThinking.set(true);
     try {
-      await this.api.confirmAction(this.sessionId, msg.pending_action_id, true);
+      await this.api.confirmAction(this.session.id, msg.pending_action_id, true);
       msg.confirmed = true;
       msg.requires_confirmation = false;
       await this.loadHistory();
@@ -124,11 +141,11 @@ export class Chat implements OnChanges, AfterViewChecked {
   }
 
   async rejectAction(msg: ChatMessageUI) {
-    if (this.isThinking() || !this.sessionId || !msg.pending_action_id) return;
+    if (this.isThinking() || !this.session?.id || !msg.pending_action_id) return;
     
     this.isThinking.set(true);
     try {
-      await this.api.confirmAction(this.sessionId, msg.pending_action_id, false);
+      await this.api.confirmAction(this.session.id, msg.pending_action_id, false);
       msg.rejected = true;
       msg.requires_confirmation = false;
       await this.loadHistory();

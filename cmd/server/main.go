@@ -120,6 +120,7 @@ func main() {
 	api.Get("/sessions", chatHandler.GetSessions)
 	api.Post("/sessions", chatHandler.CreateSession)
 	api.Delete("/sessions/:id", chatHandler.DeleteSession)
+	api.Patch("/sessions/:id/agent", chatHandler.UpdateSessionAgent)
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)

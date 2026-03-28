@@ -310,19 +310,45 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 // GetSessions devuelve todas las sesiones ordenadas
 func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
 	var sessions []database.Session
-	database.DB.Order("updated_at desc").Find(&sessions)
+	database.DB.Preload("Agent").Order("updated_at desc").Find(&sessions)
 	return c.JSON(sessions)
 }
 
-// CreateSession crea una nueva sesión de chat
+// CreateSession crea una nueva sesión de chat mapeada por default al Agent 1 (General)
 func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
 	session := database.Session{
 		Title: "Nueva conversación",
+		AgentID: 1, // Por defecto al Agente General
 	}
 	if err := database.DB.Create(&session).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create session"})
 	}
 	return c.JSON(session)
+}
+
+// UpdateSessionAgent permite a un usuario cambiar el agente de una sesión al vuelo
+func (h *ChatHandler) UpdateSessionAgent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	
+	var req struct {
+		AgentID uint `json:"agent_id"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	var session database.Session
+	if err := database.DB.First(&session, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	}
+
+	session.AgentID = req.AgentID
+	if err := database.DB.Save(&session).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update session agent"})
+	}
+
+	return c.JSON(fiber.Map{"status": "updated", "agent_id": session.AgentID})
 }
 
 // DeleteSession borra una sesión y sus datos asociados (Hard Delete)

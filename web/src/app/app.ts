@@ -25,6 +25,8 @@ export class App implements OnInit {
   currentTab: Tab = 'chats';
   sessions = signal<Session[]>([]);
   activeSessionId = signal<number | null>(null);
+  activeSession = computed(() => this.sessions().find(s => s.id === this.activeSessionId()));
+
   tools = signal<any[]>([]);
   toolsLoading = signal(false);
   toolSearchQuery = signal('');

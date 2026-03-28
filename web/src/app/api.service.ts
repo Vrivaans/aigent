@@ -11,6 +11,8 @@ export interface ChatMessage {
 export interface Session {
   id: number;
   title: string;
+  agent_id?: number;
+  agent?: Agent;
   created_at: string;
   updated_at: string;
 }
@@ -106,6 +108,16 @@ export class ApiService {
       method: 'DELETE',
       headers: this.headers 
     });
+  }
+
+  async updateSessionAgent(sessionId: number, agentId: number): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/agent`, {
+      method: 'PATCH',
+      headers: this.headers,
+      body: JSON.stringify({ agent_id: agentId })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
   async getChatHistory(sessionId: number): Promise<ChatMessage[]> {

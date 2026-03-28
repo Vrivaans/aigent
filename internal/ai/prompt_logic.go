@@ -278,7 +278,7 @@ func sanitizeRecursive(val interface{}, argMap map[string]string) interface{} {
 func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chatHistory []database.ChatMessage, newUserMsg string) (*ChoiceMessage, []database.ChatMessage, error) {
 	// 0. Obtener Sesión para saber el Agente asociado
 	var session database.Session
-	if err := database.DB.Preload("Agent").Preload("Agent.LLMProvider").First(&session, sessionID).Error; err != nil {
+	if err := database.DB.Preload("Agent").Preload("Agent.LLMProvider").Preload("Agent.Tools").First(&session, sessionID).Error; err != nil {
 		return nil, nil, fmt.Errorf("no se encontró la sesión: %w", err)
 	}
 
@@ -354,9 +354,27 @@ Instrucciones Críticas:
 	}
 
 	// 3. Preparar listado de herramientas y mapeo sanitizado -> original
+	// 3a. Obtener qué tools están autorizadas explícitamente para este agente
+	allowedTools := make(map[string]bool)
+	if session.Agent != nil {
+		for _, at := range session.Agent.Tools {
+			allowedTools[at.ToolName] = true
+		}
+	}
+
 	sanitizedToOriginal := make(map[string]string)
 	var openRouterTools []Tool
 	for _, rt := range b.Registry.List() {
+		// Filtrar solo las herramientas permitidas
+		if session.Agent != nil && len(session.Agent.Tools) > 0 {
+			if !allowedTools[rt.Name] {
+				continue // Ignorar herramientas que no están seleccionadas en el Agente
+			}
+		} else if session.Agent != nil && !session.Agent.IsDefault && len(session.Agent.Tools) == 0 {
+			// Si el Agente fue creado, pero se le desactivaron todas las tools explícitamente.
+			continue 
+		}
+
 		shortName := sanitizeName(rt.Name)
 		sanitizedToOriginal[shortName] = rt.Name
 
