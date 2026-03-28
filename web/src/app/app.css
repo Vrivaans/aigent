@@ -48,8 +48,8 @@ body {
 }
 
 .sidebar-header {
-  height: var(--header-height);
-  padding: 0 20px;
+  height: 80px; /* Increased for more space */
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -57,10 +57,11 @@ body {
 }
 
 .sidebar-header h1 {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: #fff;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .sidebar-header h1 span {
@@ -72,10 +73,18 @@ body {
   margin-left: 4px;
 }
 
+.logo-area {
+  display: flex;
+  flex-direction: column;
+}
+
 .subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
 }
 
 .mobile-close-btn {
@@ -123,13 +132,51 @@ body {
 .session-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 12px;
   border-radius: 8px;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
+  position: relative;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.session-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delete-session-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.session-item:hover .delete-session-btn {
+  opacity: 1;
+}
+
+.delete-session-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
 }
 
 .session-item:hover {

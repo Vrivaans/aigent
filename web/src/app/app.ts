@@ -92,5 +92,27 @@ export class App implements OnInit {
     this.isMenuOpen.set(false);
     if (window.innerWidth < 768) this.isSidebarOpen.set(false);
   }
+
+  async deleteSession(id: number, event: Event) {
+    event.stopPropagation(); // Evitar que se seleccione el chat al borrarlo
+    if (!confirm('Seguro que querés eliminar?')) return;
+
+    try {
+      await this.api.deleteSession(id);
+      await this.loadSessions();
+
+      // Si borramos el activo, seleccionar otro
+      if (this.activeSessionId() === id) {
+        if (this.sessions().length > 0) {
+          this.activeSessionId.set(this.sessions()[0].id);
+        } else {
+          await this.createNewSession();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete session', err);
+      alert('Error al eliminar la conversación');
+    }
+  }
 }
 

@@ -11,6 +11,7 @@ import (
 	"aigent/internal/database"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 type ChatHandler struct {
@@ -322,4 +323,35 @@ func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create session"})
 	}
 	return c.JSON(session)
+}
+
+// DeleteSession borra una sesión y sus datos asociados (Hard Delete)
+func (h *ChatHandler) DeleteSession(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// Usar Transacción para asegurar que todo se borre o nada
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Borrar mensajes (Hard Delete)
+		if err := tx.Unscoped().Where("session_id = ?", id).Delete(&database.ChatMessage{}).Error; err != nil {
+			return err
+		}
+
+		// 2. Borrar acciones pendientes (Hard Delete)
+		if err := tx.Unscoped().Where("session_id = ?", id).Delete(&database.PendingAction{}).Error; err != nil {
+			return err
+		}
+
+		// 3. Borrar la sesión (Hard Delete)
+		if err := tx.Unscoped().Delete(&database.Session{}, id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete session: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"status": "deleted"})
 }

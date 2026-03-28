@@ -75,6 +75,13 @@ export class ApiService {
     }).then(res => res.json());
   }
 
+  async deleteSession(sessionId: number): Promise<void> {
+    await fetch(`${this.baseUrl}/sessions/${sessionId}`, { 
+      method: 'DELETE',
+      headers: this.headers 
+    });
+  }
+
   async getChatHistory(sessionId: number): Promise<ChatMessage[]> {
     return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
       headers: this.headers
