@@ -102,7 +102,7 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 ---
 
 ## 📽️ Demo y Video
-*(Enlaza aquí tu video de presentación de YouTube/Loom)*
+*(https://youtu.be/N7zXwUHNL5k)*
 
 **⚠️ Nota sobre la elección del modelo**
 > El rendimiento de AIgent depende directamente de las capacidades de razonamiento
