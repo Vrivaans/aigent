@@ -338,3 +338,38 @@ textarea {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* --- MOBILE RESPONSIVENESS for CHAT --- */
+@media (max-width: 768px) {
+  .messages {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .input-area {
+    padding: 16px;
+    background: var(--bg-color); /* Remove gradient for cleaner mobile look */
+  }
+
+  .input-wrapper {
+    padding: 8px 12px;
+  }
+
+  textarea {
+    font-size: 14px;
+  }
+
+  .footer-tip {
+    display: none; /* Hide keyboard tips on touch devices */
+  }
+
+  .message .avatar {
+    min-width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+}

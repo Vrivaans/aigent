@@ -388,3 +388,58 @@
   border-color: rgba(239, 68, 68, 0.4);
   transform: translateY(-2px);
 }
+
+/* --- MOBILE RESPONSIVENESS for PROVIDERS --- */
+@media (max-width: 768px) {
+  .providers-container {
+    padding: 1.5rem 1rem;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .add-card {
+    padding: 1.5rem;
+    border-radius: 16px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn-test, .btn-submit {
+    width: 100%;
+  }
+
+  .providers-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .handsai-card .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .handsai-card .card-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-danger-outline {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .handsai-card .btn-primary {
+    width: 100%;
+  }
+}

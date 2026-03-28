@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chat } from './chat/chat';
 import { Dashboard } from './dashboard/dashboard';
@@ -24,6 +24,19 @@ export class App implements OnInit {
   activeSessionId = signal<number | null>(null);
   tools = signal<any[]>([]);
   toolsLoading = signal(false);
+  toolSearchQuery = signal('');
+  
+  filteredTools = computed(() => {
+    const query = this.toolSearchQuery().toLowerCase().trim();
+    if (!query) return this.tools();
+    return this.tools().filter(t => 
+      t.name.toLowerCase().includes(query) || 
+      t.description.toLowerCase().includes(query)
+    );
+  });
+
+  isMenuOpen = signal(false);
+  isSidebarOpen = signal(true);
 
   async ngOnInit() {
     if (this.auth.isLoggedIn()) {
@@ -69,11 +82,15 @@ export class App implements OnInit {
     await this.loadSessions();
     this.activeSessionId.set(newSession.id);
     this.currentTab = 'chats';
+    this.isMenuOpen.set(false);
+    if (window.innerWidth < 768) this.isSidebarOpen.set(false);
   }
 
   selectSession(id: number) {
     this.activeSessionId.set(id);
     this.currentTab = 'chats';
+    this.isMenuOpen.set(false);
+    if (window.innerWidth < 768) this.isSidebarOpen.set(false);
   }
 }
 
