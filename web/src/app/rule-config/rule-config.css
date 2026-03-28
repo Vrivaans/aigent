@@ -173,11 +173,11 @@
 }
 
 .chip.selected {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
-  font-weight: 600;
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.35) !important;
+  font-weight: 700 !important;
 }
 
 .scope-hint {
