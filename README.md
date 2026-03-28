@@ -27,7 +27,7 @@ inyecciones de prompt.
 ### 🧠 Capa de orquestación: AIgent
 AIgent actúa como el cerebro agéntico que opera sobre HandsAI. No solo ejecuta
 herramientas: encadena operaciones complejas entre sistemas distintos
-(ej: Odoo → Trello → Bluesky), gestiona las API Keys de los modelos de forma
+(ej: Odoo → Trello → Bluesky), gestiona las API Keys y Tokens de forma
 cifrada con AES-256-GCM, y nunca se detiene ante una confirmación sensible gracias
 al **Loop Resume** — un mecanismo que reanuda automáticamente el hilo de
 razonamiento del agente tras la aprobación humana.
@@ -44,9 +44,10 @@ razonamiento del agente tras la aprobación humana.
 
 ## 🌟 Características Principales
 
-- **🛡️ Seguridad**: Almacenamiento de API Keys cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
+- **🛡️ Seguridad**: Almacenamiento de API Keys y Tokens del Bridge cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
+- **⚙️ Configuración Dinámica**: Gestión de conexiones a proveedores (Groq, OpenRouter) y puentes (HandsAI) directamente desde la UI. Los cambios se aplican en caliente sin reiniciar el servidor.
 - **🔄 Resiliencia Agéntica (Loop Resume)**: El sistema nunca se detiene. Tras una confirmación de acción sensible, el agente reanuda automáticamente su hilo de pensamiento para completar flujos complejos (ej. Odoo -> Trello) sin intervención adicional.
-- **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas MCP, permitiendo automatizar flujos reales de negocio.
+- **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas MCP, permitiendo automatizar flujos reales de negocio con sincronización bajo demanda.
 - **🎨 UX/UI**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
 - **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
 
@@ -93,9 +94,10 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 
 ## 📖 Cómo Funciona
 
-1. **Configura tu Cerebro**: Ve a la pestaña "Modelos IA" y añade tu proveedor favorito (Groq, Gemini, etc.). AIgent probará la conexión y guardará la llave de forma cifrada.
-2. **Establece Reglas**: AIgent aprende cómo trabajar. Puedes definir reglas como *"Sé siempre conciso"* o *"Valida el ID de Odoo antes de crear nada"*.
-3. **Automatiza**: Pide cosas complejas: *"Crea una tarea en Trello en el tablero de Hackatón, y luego regístrala también en el CRM de Odoo"*. Observa cómo AIgent encadena las herramientas y te pide confirmación solo para lo más crítico.
+1. **Configura tu Cerebro**: Ve a la pestaña "Proveedores de LLM" y añade tu proveedor favorito (Groq, Gemini, etc.). AIgent probará la conexión y guardará la llave de forma cifrada.
+2. **Conecta tus Manos**: En la misma sección, configura la URL y el Token de tu bridge **HandsAI**. Esto habilitará instantáneamente la ejecución de herramientas reales.
+3. **Establece Reglas**: AIgent aprende cómo trabajar. Puedes definir reglas como *"Sé siempre conciso"* o *"Valida el ID de Odoo antes de crear nada"*.
+4. **Automatiza**: Pide cosas complejas: *"Crea una tarea en Trello en el tablero de Hackatón, y luego regístrala también en el CRM de Odoo"*. Observa cómo AIgent encadena las herramientas, te pide confirmación solo para lo más crítico y sincroniza las capacidades en tiempo real.
 
 ---
 
