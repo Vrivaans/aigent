@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -32,7 +33,15 @@ func ConnectDB(cfg Config) error {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return fmt.Errorf("failed to connect to local database: %w", err)
+		fallback := os.Getenv("DATABASE_URL")
+		if fallback == "" {
+			return fmt.Errorf("failed to connect to local database: %w", err)
+		}
+		log.Printf("Primary DB connection failed, retrying with DATABASE_URL: %v", err)
+		db, err = gorm.Open(postgres.Open(fallback), &gorm.Config{})
+		if err != nil {
+			return fmt.Errorf("failed to connect with DATABASE_URL: %w", err)
+		}
 	}
 
 	DB = db
