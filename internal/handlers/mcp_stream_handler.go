@@ -2,34 +2,33 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"strings"
 
 	"aigent/internal/ai"
 	"aigent/internal/database"
-	"aigent/internal/mcpstdio"
+	"aigent/internal/mcpstream"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
-// McpStdioConfigHandler CRUD + prueba de conexión para servidores MCP stdio.
-type McpStdioConfigHandler struct {
+// McpStreamConfigHandler CRUD + prueba para servidores MCP HTTP streamable (SSE).
+type McpStreamConfigHandler struct {
 	Brain   *ai.Brain
-	Manager *mcpstdio.Manager
+	Manager *mcpstream.Manager
 }
 
-type mcpStdioRequest struct {
-	Alias   string            `json:"alias"`
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env"`
-	Enabled *bool             `json:"enabled"`
+type mcpStreamRequest struct {
+	Alias                string            `json:"alias"`
+	BaseURL              string            `json:"base_url"`
+	Headers              map[string]string `json:"headers"`
+	DisableStandaloneSSE *bool             `json:"disable_standalone_sse"`
+	Enabled              *bool             `json:"enabled"`
 }
 
-func (h *McpStdioConfigHandler) triggerReloadAndSync() {
+func (h *McpStreamConfigHandler) triggerReloadAndSync() {
 	if h.Manager == nil || h.Brain == nil {
 		return
 	}
@@ -40,64 +39,52 @@ func (h *McpStdioConfigHandler) triggerReloadAndSync() {
 	}()
 }
 
-func (h *McpStdioConfigHandler) List(c *fiber.Ctx) error {
+func (h *McpStreamConfigHandler) List(c *fiber.Ctx) error {
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 	if len(masterKey) != 32 {
 		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
 	}
-	var rows []database.McpStdioServer
+	var rows []database.McpStreamServer
 	if err := database.DB.Order("id asc").Find(&rows).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	out := make([]fiber.Map, 0, len(rows))
 	for _, s := range rows {
-		args, _ := mcpstdio.ParseArgsJSON(s.ArgsJSON)
-		envMasked := map[string]string{}
-		if s.EnvCipher != "" {
-			if env, err := mcpstdio.DecryptEnvCipher(s.EnvCipher, masterKey); err == nil {
-				for k := range env {
-					envMasked[k] = "********"
+		headersMasked := map[string]string{}
+		if s.HeadersCipher != "" {
+			if hdr, err := mcpstream.DecryptHeadersCipher(s.HeadersCipher, masterKey); err == nil {
+				for k := range hdr {
+					headersMasked[k] = "********"
 				}
 			}
 		}
 		out = append(out, fiber.Map{
-			"id":         s.ID,
-			"alias":      s.Alias,
-			"command":    s.Command,
-			"args":       args,
-			"env":        envMasked,
-			"enabled":    s.Enabled,
-			"created_at": s.CreatedAt,
-			"updated_at": s.UpdatedAt,
+			"id":                     s.ID,
+			"alias":                  s.Alias,
+			"base_url":               s.BaseURL,
+			"headers":                headersMasked,
+			"disable_standalone_sse": s.DisableStandaloneSSE,
+			"enabled":                s.Enabled,
+			"created_at":             s.CreatedAt,
+			"updated_at":             s.UpdatedAt,
 		})
 	}
 	return c.JSON(out)
 }
 
-func (h *McpStdioConfigHandler) Create(c *fiber.Ctx) error {
+func (h *McpStreamConfigHandler) Create(c *fiber.Ctx) error {
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 	if len(masterKey) != 32 {
 		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
 	}
-	var req mcpStdioRequest
+	var req mcpStreamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
 	req.Alias = strings.TrimSpace(req.Alias)
-	if req.Alias == "" || strings.TrimSpace(req.Command) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "alias and command are required"})
-	}
-	enabled := true
-	if req.Enabled != nil {
-		enabled = *req.Enabled
-	}
-	argsJSON, err := json.Marshal(req.Args)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid args"})
-	}
-	cipher, err := mcpstdio.EncryptEnvCipher(req.Env, masterKey)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to encrypt env"})
+	req.BaseURL = strings.TrimSpace(req.BaseURL)
+	if req.Alias == "" || req.BaseURL == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "alias and base_url are required"})
 	}
 	taken, err := database.IsMcpAliasTaken(req.Alias, 0, 0)
 	if err != nil {
@@ -106,12 +93,24 @@ func (h *McpStdioConfigHandler) Create(c *fiber.Ctx) error {
 	if taken {
 		return c.Status(409).JSON(fiber.Map{"error": "alias already exists"})
 	}
-	row := database.McpStdioServer{
-		Alias:     req.Alias,
-		Command:   strings.TrimSpace(req.Command),
-		ArgsJSON:  argsJSON,
-		EnvCipher: cipher,
-		Enabled:   enabled,
+	enabled := true
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
+	disableSSE := false
+	if req.DisableStandaloneSSE != nil {
+		disableSSE = *req.DisableStandaloneSSE
+	}
+	cipher, err := mcpstream.EncryptHeadersCipher(req.Headers, masterKey)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to encrypt headers"})
+	}
+	row := database.McpStreamServer{
+		Alias:                req.Alias,
+		BaseURL:              req.BaseURL,
+		HeadersCipher:        cipher,
+		DisableStandaloneSSE: disableSSE,
+		Enabled:              enabled,
 	}
 	if err := database.DB.Create(&row).Error; err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE") {
@@ -123,25 +122,25 @@ func (h *McpStdioConfigHandler) Create(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "created", "id": row.ID})
 }
 
-func (h *McpStdioConfigHandler) Update(c *fiber.Ctx) error {
+func (h *McpStreamConfigHandler) Update(c *fiber.Ctx) error {
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 	if len(masterKey) != 32 {
 		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
 	}
 	id := c.Params("id")
-	var cur database.McpStdioServer
+	var cur database.McpStreamServer
 	if err := database.DB.First(&cur, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(404).JSON(fiber.Map{"error": "not found"})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	var req mcpStdioRequest
+	var req mcpStreamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
 	if a := strings.TrimSpace(req.Alias); a != "" {
-		taken, err := database.IsMcpAliasTaken(a, cur.ID, 0)
+		taken, err := database.IsMcpAliasTaken(a, 0, cur.ID)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -150,26 +149,22 @@ func (h *McpStdioConfigHandler) Update(c *fiber.Ctx) error {
 		}
 		cur.Alias = a
 	}
-	if strings.TrimSpace(req.Command) != "" {
-		cur.Command = strings.TrimSpace(req.Command)
+	if strings.TrimSpace(req.BaseURL) != "" {
+		cur.BaseURL = strings.TrimSpace(req.BaseURL)
 	}
-	if req.Args != nil {
-		b, err := json.Marshal(req.Args)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "invalid args"})
-		}
-		cur.ArgsJSON = b
+	if req.DisableStandaloneSSE != nil {
+		cur.DisableStandaloneSSE = *req.DisableStandaloneSSE
 	}
 	if req.Enabled != nil {
 		cur.Enabled = *req.Enabled
 	}
-	if req.Env != nil {
-		oldMap, _ := mcpstdio.DecryptEnvCipher(cur.EnvCipher, masterKey)
+	if req.Headers != nil {
+		oldMap, _ := mcpstream.DecryptHeadersCipher(cur.HeadersCipher, masterKey)
 		if oldMap == nil {
 			oldMap = map[string]string{}
 		}
 		merged := make(map[string]string)
-		for k, v := range req.Env {
+		for k, v := range req.Headers {
 			if v == "********" {
 				if ov, ok := oldMap[k]; ok {
 					merged[k] = ov
@@ -178,11 +173,11 @@ func (h *McpStdioConfigHandler) Update(c *fiber.Ctx) error {
 				merged[k] = v
 			}
 		}
-		cipher, err := mcpstdio.EncryptEnvCipher(merged, masterKey)
+		cipher, err := mcpstream.EncryptHeadersCipher(merged, masterKey)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "failed to encrypt env"})
+			return c.Status(500).JSON(fiber.Map{"error": "failed to encrypt headers"})
 		}
-		cur.EnvCipher = cipher
+		cur.HeadersCipher = cipher
 	}
 	if err := database.DB.Save(&cur).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -191,9 +186,9 @@ func (h *McpStdioConfigHandler) Update(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "updated"})
 }
 
-func (h *McpStdioConfigHandler) Delete(c *fiber.Ctx) error {
+func (h *McpStreamConfigHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
-	res := database.DB.Delete(&database.McpStdioServer{}, id)
+	res := database.DB.Delete(&database.McpStreamServer{}, id)
 	if res.Error != nil {
 		return c.Status(500).JSON(fiber.Map{"error": res.Error.Error()})
 	}
@@ -204,44 +199,45 @@ func (h *McpStdioConfigHandler) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 
-// TestDryRun body: command, args, env — sin persistir.
-func (h *McpStdioConfigHandler) TestDryRun(c *fiber.Ctx) error {
-	var req mcpStdioRequest
+// TestDryRun prueba URL + headers sin persistir.
+func (h *McpStreamConfigHandler) TestDryRun(c *fiber.Ctx) error {
+	var req mcpStreamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
-	if strings.TrimSpace(req.Command) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "command is required"})
+	if strings.TrimSpace(req.BaseURL) == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "base_url is required"})
 	}
-	names, err := mcpstdio.TestConnection(c.Context(), strings.TrimSpace(req.Command), req.Args, req.Env)
+	disableSSE := false
+	if req.DisableStandaloneSSE != nil {
+		disableSSE = *req.DisableStandaloneSSE
+	}
+	names, err := mcpstream.TestConnection(c.Context(), strings.TrimSpace(req.BaseURL), req.Headers, disableSSE)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error(), "tools": nil})
 	}
 	return c.JSON(fiber.Map{"ok": true, "tools": names})
 }
 
-func (h *McpStdioConfigHandler) TestSaved(c *fiber.Ctx) error {
+// TestSaved prueba la fila guardada.
+func (h *McpStreamConfigHandler) TestSaved(c *fiber.Ctx) error {
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 	if len(masterKey) != 32 {
 		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
 	}
 	id := c.Params("id")
-	var row database.McpStdioServer
+	var row database.McpStreamServer
 	if err := database.DB.First(&row, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(404).JSON(fiber.Map{"error": "not found"})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	args, err := mcpstdio.ParseArgsJSON(row.ArgsJSON)
+	headers, err := mcpstream.DecryptHeadersCipher(row.HeadersCipher, masterKey)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid stored args"})
+		return c.Status(500).JSON(fiber.Map{"error": "headers decrypt failed"})
 	}
-	env, err := mcpstdio.DecryptEnvCipher(row.EnvCipher, masterKey)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "env decrypt failed"})
-	}
-	names, err := mcpstdio.TestConnection(c.Context(), row.Command, args, env)
+	names, err := mcpstream.TestConnection(c.Context(), row.BaseURL, headers, row.DisableStandaloneSSE)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error(), "tools": nil})
 	}

@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService, LLMProvider, McpStdioServer } from '../api.service';
+import { ApiService, LLMProvider, McpStdioServer, McpStreamServer } from '../api.service';
 
 @Component({
   selector: 'app-providers',
@@ -47,11 +47,31 @@ export class Providers implements OnInit {
   };
   mcpTestMsg = signal<string | null>(null);
   mcpTesting = signal(false);
-  
+
+  mcpStreamServers = signal<McpStreamServer[]>([]);
+  showMcpStreamModal = signal(false);
+  mcpStreamEditingId = signal<number | null>(null);
+  mcpStreamForm: {
+    alias: string;
+    baseUrl: string;
+    headersText: string;
+    disableStandaloneSSE: boolean;
+    enabled: boolean;
+  } = {
+    alias: '',
+    baseUrl: '',
+    headersText: '',
+    disableStandaloneSSE: false,
+    enabled: true
+  };
+  mcpStreamTestMsg = signal<string | null>(null);
+  mcpStreamTesting = signal(false);
+
   async ngOnInit() {
     await this.loadProviders();
     await this.loadHandsAIConfig();
     await this.loadMcpStdio();
+    await this.loadMcpStream();
   }
 
   async loadProviders() {
@@ -71,6 +91,36 @@ export class Providers implements OnInit {
     } catch {
       this.mcpStdioServers.set([]);
     }
+  }
+
+  async loadMcpStream() {
+    try {
+      const list = await this.api.listMcpStreamServers();
+      this.mcpStreamServers.set(list);
+    } catch {
+      this.mcpStreamServers.set([]);
+    }
+  }
+
+  headersMapToText(h: Record<string, string> | undefined): string {
+    if (!h || !Object.keys(h).length) return '';
+    return Object.entries(h)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n');
+  }
+
+  parseHeadersText(text: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const line of text.split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      const i = t.indexOf(':');
+      if (i <= 0) continue;
+      const k = t.slice(0, i).trim();
+      const v = t.slice(i + 1).trim();
+      if (k) out[k] = v;
+    }
+    return out;
   }
 
   envMapToText(env: Record<string, string> | undefined): string {
@@ -211,6 +261,121 @@ export class Providers implements OnInit {
       this.mcpTestMsg.set(e?.message || 'Error');
     } finally {
       this.mcpTesting.set(false);
+    }
+  }
+
+  openNewMcpStream() {
+    this.mcpStreamEditingId.set(null);
+    this.mcpStreamTestMsg.set(null);
+    this.mcpStreamForm = {
+      alias: '',
+      baseUrl: 'https://',
+      headersText: '',
+      disableStandaloneSSE: false,
+      enabled: true
+    };
+    this.showMcpStreamModal.set(true);
+  }
+
+  editMcpStream(s: McpStreamServer) {
+    this.mcpStreamEditingId.set(s.id);
+    this.mcpStreamTestMsg.set(null);
+    this.mcpStreamForm = {
+      alias: s.alias,
+      baseUrl: s.base_url,
+      headersText: this.headersMapToText(s.headers),
+      disableStandaloneSSE: s.disable_standalone_sse,
+      enabled: s.enabled
+    };
+    this.showMcpStreamModal.set(true);
+  }
+
+  closeMcpStreamModal() {
+    this.showMcpStreamModal.set(false);
+    this.mcpStreamEditingId.set(null);
+    this.mcpStreamTestMsg.set(null);
+  }
+
+  async saveMcpStream() {
+    const alias = this.mcpStreamForm.alias.trim();
+    const baseUrl = this.mcpStreamForm.baseUrl.trim();
+    if (!alias || !baseUrl) {
+      alert('Alias y URL base son obligatorios.');
+      return;
+    }
+    const headers = this.parseHeadersText(this.mcpStreamForm.headersText);
+    try {
+      const id = this.mcpStreamEditingId();
+      if (id != null) {
+        await this.api.updateMcpStreamServer(id, {
+          alias,
+          base_url: baseUrl,
+          headers,
+          disable_standalone_sse: this.mcpStreamForm.disableStandaloneSSE,
+          enabled: this.mcpStreamForm.enabled
+        });
+      } else {
+        await this.api.createMcpStreamServer({
+          alias,
+          base_url: baseUrl,
+          headers,
+          disable_standalone_sse: this.mcpStreamForm.disableStandaloneSSE,
+          enabled: this.mcpStreamForm.enabled
+        });
+      }
+      await this.loadMcpStream();
+      this.closeMcpStreamModal();
+    } catch (e: any) {
+      alert(e?.message || 'Error al guardar');
+    }
+  }
+
+  async deleteMcpStream(s: McpStreamServer, ev: Event) {
+    ev.stopPropagation();
+    if (!confirm(`¿Eliminar servidor MCP remoto «${s.alias}»?`)) return;
+    try {
+      await this.api.deleteMcpStreamServer(s.id);
+      await this.loadMcpStream();
+    } catch (e: any) {
+      alert(e?.message || 'Error al eliminar');
+    }
+  }
+
+  async testMcpStreamDryRun() {
+    const baseUrl = this.mcpStreamForm.baseUrl.trim();
+    if (!baseUrl) {
+      alert('Indica la URL base del servidor MCP.');
+      return;
+    }
+    this.mcpStreamTesting.set(true);
+    this.mcpStreamTestMsg.set(null);
+    try {
+      const headers = this.parseHeadersText(this.mcpStreamForm.headersText);
+      const r = await this.api.testMcpStreamDryRun({
+        base_url: baseUrl,
+        headers,
+        disable_standalone_sse: this.mcpStreamForm.disableStandaloneSSE
+      });
+      this.mcpStreamTestMsg.set(`OK: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
+    } catch (e: any) {
+      this.mcpStreamTestMsg.set(e?.message || 'Error');
+    } finally {
+      this.mcpStreamTesting.set(false);
+    }
+  }
+
+  async testMcpStreamSaved() {
+    const id = this.mcpStreamEditingId();
+    if (id == null) return;
+    this.mcpStreamTesting.set(true);
+    this.mcpStreamTestMsg.set(null);
+    try {
+      const r = await this.api.testMcpStreamSaved(id);
+      this.mcpStreamTestMsg.set(`OK [${r.alias}]: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
+    } catch (e: any) {
+      this.mcpStreamTestMsg.set(e?.message || 'Error');
+    } finally {
+      this.mcpStreamTesting.set(false);
     }
   }
 

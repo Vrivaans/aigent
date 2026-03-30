@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"aigent/internal/mcpcommon"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -76,7 +78,7 @@ func (s *Session) CallTool(ctx context.Context, name string, args map[string]int
 	if err != nil {
 		return nil, err
 	}
-	return CallToolResultToJSON(res)
+	return mcpcommon.CallToolResultToJSON(res)
 }
 
 // Close cierra la sesión y termina el subproceso.

@@ -1,4 +1,4 @@
-package mcpstdio
+package mcpcommon
 
 import (
 	"encoding/json"

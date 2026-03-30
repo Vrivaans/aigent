@@ -12,6 +12,7 @@ import (
 	"aigent/internal/handlers"
 	"aigent/internal/handsai"
 	"aigent/internal/mcpstdio"
+	"aigent/internal/mcpstream"
 	"aigent/internal/scheduler"
 	"aigent/internal/utils"
 
@@ -83,6 +84,11 @@ func main() {
 	mcpStdioMgr.ReloadFromDB(context.Background())
 	defer mcpStdioMgr.CloseAll()
 
+	mcpStreamMgr := mcpstream.NewManager()
+	brain.McpStream = mcpStreamMgr
+	mcpStreamMgr.ReloadFromDB(context.Background())
+	defer mcpStreamMgr.CloseAll()
+
 	// 4. Levantar Cron Worker
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -100,6 +106,7 @@ func main() {
 
 	api.Get("/debug/tools", func(c *fiber.Ctx) error {
 		reqCtx := c.Context()
+		brain.ReloadMCPIntegrations(reqCtx)
 		_ = brain.SyncTools(reqCtx)
 
 		var regList []fiber.Map
@@ -146,6 +153,28 @@ func main() {
 			}
 		}
 
+		var streamDbg []fiber.Map
+		if brain.McpStream != nil {
+			for _, e := range brain.McpStream.ListEntries() {
+				entry := fiber.Map{
+					"alias":      e.Alias,
+					"server_id":  e.ID,
+					"connected":  e.Session != nil,
+					"tool_count": 0,
+					"list_error": "",
+				}
+				if e.Session != nil {
+					tools, err := e.Session.ListTools(reqCtx)
+					if err != nil {
+						entry["list_error"] = err.Error()
+					} else {
+						entry["tool_count"] = len(tools)
+					}
+				}
+				streamDbg = append(streamDbg, entry)
+			}
+		}
+
 		return c.JSON(fiber.Map{
 			"status":         "ok",
 			"registry_tools": regList,
@@ -153,7 +182,8 @@ func main() {
 				"raw":   handsaiRaw,
 				"error": handsaiErr,
 			},
-			"mcp_stdio": stdioDbg,
+			"mcp_stdio":  stdioDbg,
+			"mcp_stream": streamDbg,
 		})
 	})
 
@@ -161,7 +191,9 @@ func main() {
 	api.Use(auth.NewAuthMiddleware())
 
 	api.Get("/active-tools", func(c *fiber.Ctx) error {
-		_ = brain.SyncTools(c.Context())
+		ctx := c.Context()
+		brain.ReloadMCPIntegrations(ctx)
+		_ = brain.SyncTools(ctx)
 		return c.JSON(brain.Registry.List())
 	})
 	chatHandler := &handlers.ChatHandler{Brain: brain}
@@ -204,6 +236,14 @@ func main() {
 	api.Patch("/config/mcp-stdio/:id", mcpStdioHandler.Update)
 	api.Delete("/config/mcp-stdio/:id", mcpStdioHandler.Delete)
 	api.Post("/config/mcp-stdio/:id/test", mcpStdioHandler.TestSaved)
+
+	mcpStreamHandler := &handlers.McpStreamConfigHandler{Brain: brain, Manager: mcpStreamMgr}
+	api.Get("/config/mcp-stream", mcpStreamHandler.List)
+	api.Post("/config/mcp-stream", mcpStreamHandler.Create)
+	api.Post("/config/mcp-stream/test", mcpStreamHandler.TestDryRun)
+	api.Patch("/config/mcp-stream/:id", mcpStreamHandler.Update)
+	api.Delete("/config/mcp-stream/:id", mcpStreamHandler.Delete)
+	api.Post("/config/mcp-stream/:id/test", mcpStreamHandler.TestSaved)
 
 	taskHandler := &handlers.TaskHandler{}
 	api.Get("/tasks", taskHandler.GetTasks)

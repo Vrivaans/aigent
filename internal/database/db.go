@@ -76,6 +76,7 @@ func autoMigrate(db *gorm.DB) error {
 		&PendingAction{},
 		&HandsAIConfig{},
 		&McpStdioServer{},
+		&McpStreamServer{},
 	)
 }
 

@@ -119,3 +119,16 @@ type McpStdioServer struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
+
+// McpStreamServer define un servidor MCP remoto (HTTP streamable / SSE).
+type McpStreamServer struct {
+	ID                   uint           `gorm:"primarykey" json:"id"`
+	Alias                string         `gorm:"size:64;not null;uniqueIndex" json:"alias"`
+	BaseURL              string         `gorm:"size:2048;not null" json:"base_url"`
+	HeadersCipher        string         `gorm:"type:text" json:"-"` // JSON map cifrado (Authorization, etc.)
+	DisableStandaloneSSE bool           `gorm:"default:false" json:"disable_standalone_sse"`
+	Enabled              bool           `gorm:"default:true" json:"enabled"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}

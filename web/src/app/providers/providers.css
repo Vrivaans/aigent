@@ -444,9 +444,14 @@
   }
 }
 
-/* MCP stdio */
-.mcp-stdio-section .section-header .btn-primary {
+/* MCP stdio / stream */
+.mcp-stdio-section .section-header .btn-primary,
+.mcp-stream-section .section-header .btn-primary {
   margin-top: 0.75rem;
+}
+
+.mcp-stream-section {
+  margin-top: 2rem;
 }
 
 .mcp-security-note,
