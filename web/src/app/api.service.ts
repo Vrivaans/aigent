@@ -61,6 +61,17 @@ export interface LLMProvider {
   is_default: boolean;
 }
 
+export interface McpStdioServer {
+  id: number;
+  alias: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private baseUrl = 'http://localhost:3000/api';
@@ -276,5 +287,71 @@ export class ApiService {
       headers: this.headers
     });
     return res.json();
+  }
+
+  async listMcpStdioServers(): Promise<McpStdioServer[]> {
+    return this.request('/config/mcp-stdio');
+  }
+
+  async createMcpStdioServer(body: {
+    alias: string;
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+    enabled?: boolean;
+  }): Promise<{ status: string; id: number }> {
+    return this.request('/config/mcp-stdio', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async updateMcpStdioServer(
+    id: number,
+    body: Partial<{
+      alias: string;
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      enabled: boolean;
+    }>
+  ): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stdio/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  async deleteMcpStdioServer(id: number): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stdio/${id}`, { method: 'DELETE' });
+  }
+
+  async testMcpStdioDryRun(body: {
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+  }): Promise<{ ok: boolean; tools: string[]; error?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stdio/test`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify(body)
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
+  }
+
+  async testMcpStdioSaved(id: number): Promise<{ ok: boolean; tools: string[]; alias?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stdio/${id}/test`, {
+      method: 'POST',
+      headers: this.headers
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
   }
 }

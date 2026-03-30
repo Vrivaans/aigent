@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"os"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"aigent/internal/database"
 	"aigent/internal/handlers"
 	"aigent/internal/handsai"
+	"aigent/internal/mcpstdio"
 	"aigent/internal/scheduler"
 	"aigent/internal/utils"
 
@@ -78,6 +78,11 @@ func main() {
 		nil,
 	)
 
+	mcpStdioMgr := mcpstdio.NewManager()
+	brain.McpStdio = mcpStdioMgr
+	mcpStdioMgr.ReloadFromDB(context.Background())
+	defer mcpStdioMgr.CloseAll()
+
 	// 4. Levantar Cron Worker
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -94,18 +99,61 @@ func main() {
 	api.Post("/login", handlers.HandleLogin)
 
 	api.Get("/debug/tools", func(c *fiber.Ctx) error {
-		raw, err := brain.HandsAI.GetTools(c.Context())
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
+		reqCtx := c.Context()
+		_ = brain.SyncTools(reqCtx)
+
+		var regList []fiber.Map
+		for _, t := range brain.Registry.List() {
+			regList = append(regList, fiber.Map{
+				"name":        t.Name,
+				"description": t.Description,
+				"sensitive":   t.Sensitive,
 			})
 		}
-		var parsed interface{}
-		json.Unmarshal(raw, &parsed)
+
+		handsaiRaw := ""
+		handsaiErr := ""
+		if brain.HandsAI != nil && brain.HandsAI.IsConfigured() {
+			raw, err := brain.HandsAI.GetTools(reqCtx)
+			if err != nil {
+				handsaiErr = err.Error()
+			} else {
+				handsaiRaw = string(raw)
+			}
+		} else {
+			handsaiErr = "handsai not configured"
+		}
+
+		var stdioDbg []fiber.Map
+		if brain.McpStdio != nil {
+			for _, e := range brain.McpStdio.ListEntries() {
+				entry := fiber.Map{
+					"alias":      e.Alias,
+					"server_id":  e.ID,
+					"connected":  e.Session != nil,
+					"tool_count": 0,
+					"list_error": "",
+				}
+				if e.Session != nil {
+					tools, err := e.Session.ListTools(reqCtx)
+					if err != nil {
+						entry["list_error"] = err.Error()
+					} else {
+						entry["tool_count"] = len(tools)
+					}
+				}
+				stdioDbg = append(stdioDbg, entry)
+			}
+		}
+
 		return c.JSON(fiber.Map{
-			"status": "ok",
-			"raw":    string(raw),
-			"parsed": parsed,
+			"status":         "ok",
+			"registry_tools": regList,
+			"handsai": fiber.Map{
+				"raw":   handsaiRaw,
+				"error": handsaiErr,
+			},
+			"mcp_stdio": stdioDbg,
 		})
 	})
 
@@ -148,6 +196,14 @@ func main() {
 	api.Get("/config/handsai", configHandler.GetHandsAIConfig)
 	api.Patch("/config/handsai", configHandler.UpdateHandsAIConfig)
 	api.Delete("/config/handsai", configHandler.DeleteHandsAIConfig)
+
+	mcpStdioHandler := &handlers.McpStdioConfigHandler{Brain: brain, Manager: mcpStdioMgr}
+	api.Get("/config/mcp-stdio", mcpStdioHandler.List)
+	api.Post("/config/mcp-stdio", mcpStdioHandler.Create)
+	api.Post("/config/mcp-stdio/test", mcpStdioHandler.TestDryRun)
+	api.Patch("/config/mcp-stdio/:id", mcpStdioHandler.Update)
+	api.Delete("/config/mcp-stdio/:id", mcpStdioHandler.Delete)
+	api.Post("/config/mcp-stdio/:id/test", mcpStdioHandler.TestSaved)
 
 	taskHandler := &handlers.TaskHandler{}
 	api.Get("/tasks", taskHandler.GetTasks)

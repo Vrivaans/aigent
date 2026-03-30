@@ -112,6 +112,79 @@
     </div>
   </div>
 
+  <!-- MCP stdio (filesystem, Playwright, etc.) -->
+  <div class="handsai-section mcp-stdio-section">
+    <div class="section-header">
+      <h2>MCP local (stdio)</h2>
+      <p>
+        Un proceso por servidor: <code>npx</code>, argumentos y variables de entorno opcionales.
+        Las herramientas se exponen al modelo con prefijo <code>alias_</code> (p. ej. <code>fs_read_file</code>).
+      </p>
+      <button class="btn-primary" type="button" (click)="openNewMcp()">+ Añadir servidor MCP</button>
+    </div>
+    <p class="mcp-security-note">
+      <strong>Seguridad:</strong> el proceso corre con el mismo usuario que el backend. Revisa rutas permitidas del servidor MCP
+      (p. ej. filesystem) y ten <strong>Node/npx en el PATH</strong> del host.
+    </p>
+    <p class="mcp-help-examples">
+      Ejemplos: <code>npx -y @modelcontextprotocol/server-filesystem /ruta/permitida</code> ·
+      <code>npx -y @playwright/mcp@latest</code> (un argumento por línea: <code>-y</code>, paquete, etc.)
+    </p>
+    <div class="mcp-server-list" *ngIf="mcpStdioServers().length">
+      <div class="mcp-server-row" *ngFor="let s of mcpStdioServers()" (click)="editMcp(s)">
+        <div class="mcp-server-main">
+          <span class="mcp-alias">{{ s.alias }}</span>
+          <span class="mcp-cmd">{{ s.command }} {{ (s.args || []).join(' ') }}</span>
+          <span class="badge" *ngIf="!s.enabled">Desactivado</span>
+        </div>
+        <button class="btn-danger" type="button" (click)="deleteMcp(s, $event)" title="Eliminar">🗑️</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showMcpModal()" (click)="closeMcpModal()">
+    <div class="add-card mcp-modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ mcpEditingId() != null ? 'Editar servidor MCP' : 'Nuevo servidor MCP' }}</h3>
+        <button class="btn-close" type="button" (click)="closeMcpModal()">×</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Alias (único, corto)</label>
+          <input [(ngModel)]="mcpForm.alias" placeholder="fs, pw, …" [disabled]="mcpEditingId() != null" />
+        </div>
+        <div class="form-group">
+          <label>Comando</label>
+          <input [(ngModel)]="mcpForm.command" placeholder="npx" />
+        </div>
+        <div class="form-group full-width">
+          <label>Argumentos (una línea por argumento)</label>
+          <textarea rows="5" [(ngModel)]="mcpForm.argsText" placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;/ruta"></textarea>
+        </div>
+        <div class="form-group full-width">
+          <label>Variables de entorno (KEY=valor por línea; dejar <code>********</code> para conservar el valor guardado)</label>
+          <textarea rows="4" [(ngModel)]="mcpForm.envText" placeholder="API_KEY=secreto"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" [(ngModel)]="mcpForm.enabled" />
+            Habilitado
+          </label>
+        </div>
+      </div>
+      <div class="mcp-test-msg" *ngIf="mcpTestMsg()">{{ mcpTestMsg() }}</div>
+      <div class="form-actions">
+        <button class="btn-submit" type="button" (click)="saveMcp()">Guardar</button>
+        <button class="btn-test" type="button" (click)="testMcpDryRun()" [disabled]="mcpTesting()">
+          {{ mcpTesting() ? '…' : '🧪 Probar (sin guardar)' }}
+        </button>
+        <button class="btn-test" type="button" *ngIf="mcpEditingId() != null" (click)="testMcpSaved()" [disabled]="mcpTesting()">
+          Probar guardado
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="empty-state" *ngIf="providers().length === 0 && !showAddForm()">
     <div class="icon">🤖</div>
     <h2>No hay proveedores registrados</h2>

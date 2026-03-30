@@ -3,28 +3,37 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 
 	"aigent/internal/database"
 	"aigent/internal/handsai"
+	"aigent/internal/mcpstdio"
 	"aigent/internal/utils"
 	"os"
 )
 
 // Brain es el orquestador principal que une el LLM (OpenRouter) con el motor de acciones (HandsAI)
 type Brain struct {
-	LLM      *OpenRouterClient
-	HandsAI  *handsai.Client
-	Registry *ToolRegistry
+	LLM        *OpenRouterClient
+	HandsAI    *handsai.Client
+	Registry   *ToolRegistry
+	McpStdio   *mcpstdio.Manager
+	toolPermit handsai.PermissionHandler
 }
 
 func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler handsai.PermissionHandler) *Brain {
+	ph := permHandler
+	if ph == nil {
+		ph = handsai.DefaultPermissionHandler
+	}
 	b := &Brain{
-		LLM:      NewClient(llmKey, llmBaseURL),
-		HandsAI:  handsai.NewClient(handsaiCfg, permHandler),
-		Registry: NewToolRegistry(),
+		LLM:        NewClient(llmKey, llmBaseURL),
+		HandsAI:    handsai.NewClient(handsaiCfg, ph),
+		Registry:   NewToolRegistry(),
+		toolPermit: ph,
 	}
 	b.registerNativeTools()
 	return b
@@ -61,87 +70,153 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 	b.Registry.Clear()
 	b.registerNativeTools()
 
-	// 2. Si HandsAI no está configurado o no está disponible, no continuamos.
+	// 2. Registrar tools de HandsAI si está configurado. Si falla, seguimos con stdio.
 	if b.HandsAI == nil || !b.HandsAI.IsConfigured() {
-		log.Printf("⚠️ SyncTools: HandsAI not configured, skipping tool sync.")
-		return nil
-	}
-
-	handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
-	if err != nil {
-		log.Printf("❌ Failed to fetch tools from HandsAI: %v", err)
-		return nil // Don't return error to caller, just log it.
-	}
-
-	var mcpResponse struct {
-		Tools []struct {
-			Name        string          `json:"name"`
-			Description string          `json:"description"`
-			InputSchema json.RawMessage `json:"inputSchema"`
-		} `json:"tools"`
-	}
-	if err := json.Unmarshal(handsaiToolsRaw, &mcpResponse); err != nil {
-		// Algunos bridges devuelven la lista directo como array
-		var directArray []struct {
-			Name        string          `json:"name"`
-			Description string          `json:"description"`
-			InputSchema json.RawMessage `json:"inputSchema"`
-		}
-		if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
-			mcpResponse.Tools = directArray
+		log.Printf("⚠️ SyncTools: HandsAI not configured, skipping HandsAI tools.")
+	} else {
+		handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
+		if err != nil {
+			log.Printf("❌ Failed to fetch tools from HandsAI: %v", err)
 		} else {
-			log.Printf("❌ SyncTools: Failed to parse MCP tools (tried object and array): %v. Body: %s", err, string(handsaiToolsRaw))
-			return nil
-		}
-	}
-
-	for _, mt := range mcpResponse.Tools {
-		origName := mt.Name
-
-		// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
-		isSensitive := false
-		lowerName := strings.ToLower(origName)
-
-		// 1. Si el nombre contiene un verbo de lectura, nunca es sensible
-		readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
-		isReadOnly := false
-		for _, rv := range readVerbs {
-			if strings.Contains(lowerName, rv) {
-				isReadOnly = true
-				break
+			var mcpResponse struct {
+				Tools []struct {
+					Name        string          `json:"name"`
+					Description string          `json:"description"`
+					InputSchema json.RawMessage `json:"inputSchema"`
+				} `json:"tools"`
 			}
-		}
-
-		if !isReadOnly {
-			// 2. Si no es lectura, verificar si es una operación de escritura
-			writeVerbs := []string{
-				"create", "delete", "update", "post", "publicar", "social_post",
-				"save", "move", "add", "approve", "send", "dar_like",
-				"schedule", "moltbook_create", "moltbook_verify",
-				"jules_create", "jules_approve", "odoo_crm_create",
-				"odoo_crm_update", "odoo_project_task_create",
-			}
-			for _, wv := range writeVerbs {
-				if strings.Contains(lowerName, wv) {
-					isSensitive = true
-					break
+			if err := json.Unmarshal(handsaiToolsRaw, &mcpResponse); err != nil {
+				// Algunos bridges devuelven la lista directo como array
+				var directArray []struct {
+					Name        string          `json:"name"`
+					Description string          `json:"description"`
+					InputSchema json.RawMessage `json:"inputSchema"`
+				}
+				if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
+					mcpResponse.Tools = directArray
+				} else {
+					log.Printf("❌ SyncTools: Failed to parse MCP tools (tried object and array): %v. Body: %s", err, string(handsaiToolsRaw))
 				}
 			}
+			for _, mt := range mcpResponse.Tools {
+				origName := mt.Name
+
+				// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
+				isSensitive := false
+				lowerName := strings.ToLower(origName)
+
+				// 1. Si el nombre contiene un verbo de lectura, nunca es sensible
+				readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
+				isReadOnly := false
+				for _, rv := range readVerbs {
+					if strings.Contains(lowerName, rv) {
+						isReadOnly = true
+						break
+					}
+				}
+
+				if !isReadOnly {
+					// 2. Si no es lectura, verificar si es una operación de escritura
+					writeVerbs := []string{
+						"create", "delete", "update", "post", "publicar", "social_post",
+						"save", "move", "add", "approve", "send", "dar_like",
+						"schedule", "moltbook_create", "moltbook_verify",
+						"jules_create", "jules_approve", "odoo_crm_create",
+						"odoo_crm_update", "odoo_project_task_create",
+					}
+					for _, wv := range writeVerbs {
+						if strings.Contains(lowerName, wv) {
+							isSensitive = true
+							break
+						}
+					}
+				}
+
+				// Sanitizar el esquema de entrada (recursivamente)
+				sanitizedSchema, argMap := sanitizeJSONSchema(mt.InputSchema)
+
+				b.Registry.Register(ToolDef{
+					Name:        origName,
+					Description: mt.Description,
+					Parameters:  sanitizedSchema,
+					ArgMapping:  argMap,
+					Sensitive:   isSensitive,
+					Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
+						return b.HandsAI.CallTool(ctx, origName, args)
+					},
+				})
+			}
 		}
+	}
 
-		// Sanitizar el esquema de entrada (recursivamente)
-		sanitizedSchema, argMap := sanitizeJSONSchema(mt.InputSchema)
+	// 3. Servidores MCP stdio locales: nombres en registry con prefijo alias_
+	if b.McpStdio != nil {
+		for _, ent := range b.McpStdio.ListEntries() {
+			mcpTools, err := ent.Session.ListTools(ctx)
+			if err != nil {
+				log.Printf("❌ SyncTools: MCP stdio [%s] list tools failed: %v", ent.Alias, err)
+				continue
+			}
+			for _, mt := range mcpTools {
+				if mt == nil {
+					continue
+				}
+				origName := mt.Name
+				schemaBytes := json.RawMessage(`{"type":"object","properties":{}}`)
+				if mt.InputSchema != nil {
+					if b, err := json.Marshal(mt.InputSchema); err == nil {
+						schemaBytes = b
+					}
+				}
 
-		b.Registry.Register(ToolDef{
-			Name:        origName,
-			Description: mt.Description,
-			Parameters:  sanitizedSchema,
-			ArgMapping:  argMap,
-			Sensitive:   isSensitive,
-			Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
-				return b.HandsAI.CallTool(ctx, origName, args)
-			},
-		})
+				isSensitive := false
+				lowerName := strings.ToLower(origName)
+				readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
+				isReadOnly := false
+				for _, rv := range readVerbs {
+					if strings.Contains(lowerName, rv) {
+						isReadOnly = true
+						break
+					}
+				}
+				if !isReadOnly {
+					writeVerbs := []string{
+						"create", "delete", "update", "post", "publicar", "social_post",
+						"save", "move", "add", "approve", "send", "dar_like",
+						"schedule", "moltbook_create", "moltbook_verify",
+						"jules_create", "jules_approve", "odoo_crm_create",
+						"odoo_crm_update", "odoo_project_task_create",
+						"write",
+					}
+					for _, wv := range writeVerbs {
+						if strings.Contains(lowerName, wv) {
+							isSensitive = true
+							break
+						}
+					}
+				}
+
+				sanitizedSchema, argMap := sanitizeJSONSchema(schemaBytes)
+				regName := sanitizeName(ent.Alias) + "_" + sanitizeName(origName)
+				sessCopy := ent.Session
+				mcpToolNameCopy := origName
+				regNameCopy := regName
+
+				b.Registry.Register(ToolDef{
+					Name:        regNameCopy,
+					Description: mt.Description,
+					Parameters:  sanitizedSchema,
+					ArgMapping:  argMap,
+					Sensitive:   isSensitive,
+					Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
+						if b.toolPermit != nil && !b.toolPermit(ctx, regNameCopy, args) {
+							return nil, errors.New("tool execution denied by user/policy")
+						}
+						return sessCopy.CallTool(ctx, mcpToolNameCopy, args)
+					},
+				})
+			}
+		}
 	}
 	return nil
 }
