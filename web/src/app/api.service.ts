@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+import { environment } from '../environments/environment';
+
 export interface ChatMessage {
   id: number;
   role: string;
@@ -63,7 +65,7 @@ export interface LLMProvider {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private baseUrl = 'http://localhost:3000/api';
+  private readonly baseUrl = environment.apiBaseUrl;
 
   private get headers() {
     const token = localStorage.getItem('aigent_token');
@@ -98,16 +100,16 @@ export class ApiService {
   }
 
   async createSession(): Promise<Session> {
-    return fetch(`${this.baseUrl}/sessions`, { 
+    return fetch(`${this.baseUrl}/sessions`, {
       method: 'POST',
-      headers: this.headers 
+      headers: this.headers
     }).then(res => res.json());
   }
 
   async deleteSession(sessionId: number): Promise<void> {
-    await fetch(`${this.baseUrl}/sessions/${sessionId}`, { 
+    await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
       method: 'DELETE',
-      headers: this.headers 
+      headers: this.headers
     });
   }
 
@@ -128,10 +130,10 @@ export class ApiService {
   }
 
   async sendChatMessage(sessionId: number, message: string): Promise<{
-    response: string, 
-    tool_calls: any[], 
-    requires_confirmation?: boolean, 
-    pending_action_id?: number, 
+    response: string,
+    tool_calls: any[],
+    requires_confirmation?: boolean,
+    pending_action_id?: number,
     waiting_tool?: any
   }> {
     return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
@@ -233,14 +235,14 @@ export class ApiService {
   }
 
   async deleteProvider(id: number): Promise<void> {
-    await fetch(`${this.baseUrl}/providers/${id}`, { 
+    await fetch(`${this.baseUrl}/providers/${id}`, {
       method: 'DELETE',
-      headers: this.headers 
+      headers: this.headers
     });
   }
 
   async testProvider(config: any): Promise<{ ok: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/providers/test`, { 
+    const res = await fetch(`${this.baseUrl}/providers/test`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(config)
@@ -249,9 +251,9 @@ export class ApiService {
   }
 
   async deleteTask(id: number) {
-    return fetch(`${this.baseUrl}/tasks/${id}`, { 
+    return fetch(`${this.baseUrl}/tasks/${id}`, {
       method: 'DELETE',
-      headers: this.headers 
+      headers: this.headers
     }).then(res => res.json());
   }
 

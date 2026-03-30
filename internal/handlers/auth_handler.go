@@ -27,19 +27,13 @@ func HandleLogin(c *fiber.Ctx) error {
 	adminUser := os.Getenv("ADMIN_USERNAME")
 	adminPass := os.Getenv("ADMIN_PASSWORD")
 
-	// Debug temporal: quitar o sanitizar antes de producción estable
-	log.Printf("[login] env ADMIN_USERNAME=%q (len=%d) ADMIN_PASSWORD=%q (len=%d)",
-		adminUser, len(adminUser), adminPass, len(adminPass))
-	log.Printf("[login] req username=%q (len=%d) password=%q (len=%d)",
-		req.Username, len(req.Username), req.Password, len(req.Password))
-	log.Printf("[login] trim compare: user match=%v pass match=%v",
-		strings.TrimSpace(req.Username) == strings.TrimSpace(adminUser),
-		strings.TrimSpace(req.Password) == strings.TrimSpace(adminPass))
-	log.Printf("[login] strict compare: user match=%v pass match=%v",
-		req.Username == adminUser, req.Password == adminPass)
+	trimUserOK := strings.TrimSpace(req.Username) == strings.TrimSpace(adminUser)
+	trimPassOK := strings.TrimSpace(req.Password) == strings.TrimSpace(adminPass)
 
 	if req.Username != adminUser || req.Password != adminPass {
-		log.Printf("[login] rejected: invalid credentials (ver respuesta 401)")
+		log.Printf("[login] rejected: strict user=%v pass=%v trim user=%v pass=%v lens env(usr,pwd)=%d,%d req(usr,pwd)=%d,%d",
+			req.Username == adminUser, req.Password == adminPass, trimUserOK, trimPassOK,
+			len(adminUser), len(adminPass), len(req.Username), len(req.Password))
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid username or password",
 		})
@@ -53,7 +47,7 @@ func HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("[login] ok: token issued for user=%q", req.Username)
+	log.Printf("[login] success: token issued (user len=%d)", len(req.Username))
 
 	return c.JSON(fiber.Map{
 		"token": token,
