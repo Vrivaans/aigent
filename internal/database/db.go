@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -20,28 +21,61 @@ type Config struct {
 	SSLMode  string
 }
 
+// validatePostgresURI catches incomplete URIs like postgresql://user:pass (no @host).
+// Keyword DSNs (host=... user=...) are left unchanged.
+func validatePostgresURI(s string) error {
+	lower := strings.ToLower(s)
+	if !strings.HasPrefix(lower, "postgres://") && !strings.HasPrefix(lower, "postgresql://") {
+		return nil
+	}
+	idx := strings.Index(s, "://")
+	if idx < 0 {
+		return nil
+	}
+	afterScheme := s[idx+3:]
+	if !strings.Contains(afterScheme, "@") {
+		return fmt.Errorf(
+			`invalid DATABASE_URL: URI must include "@hostname" after user and password (e.g. postgresql://user:pass@db-host:5432/dbname); ` +
+				`if the password contains ":" or "@", percent-encode those characters in the userinfo part`,
+		)
+	}
+	return nil
+}
+
 // ConnectDB initilizes the standard postgres connection using GORM
 func ConnectDB(cfg Config) error {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable" // Default para desarrollo local
 	}
 
-	dsn := fmt.Sprintf(
+	dsnFromEnv := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	dsnFromParts := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		fallback := os.Getenv("DATABASE_URL")
-		if fallback == "" {
-			return fmt.Errorf("failed to connect to local database: %w", err)
+	var db *gorm.DB
+	var err error
+
+	if dsnFromEnv != "" {
+		if verr := validatePostgresURI(dsnFromEnv); verr != nil {
+			log.Printf("DATABASE_URL: %v — using DB_* variables instead", verr)
+			dsnFromEnv = ""
 		}
-		log.Printf("Primary DB connection failed, retrying with DATABASE_URL: %v", err)
-		db, err = gorm.Open(postgres.Open(fallback), &gorm.Config{})
+	}
+
+	if dsnFromEnv != "" {
+		db, err = gorm.Open(postgres.Open(dsnFromEnv), &gorm.Config{})
 		if err != nil {
-			return fmt.Errorf("failed to connect with DATABASE_URL: %w", err)
+			log.Printf("DATABASE_URL failed (%v), falling back to DB_* variables", err)
+			db, err = gorm.Open(postgres.Open(dsnFromParts), &gorm.Config{})
 		}
+	} else {
+		db, err = gorm.Open(postgres.Open(dsnFromParts), &gorm.Config{})
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	DB = db
