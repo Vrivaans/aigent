@@ -51,6 +51,8 @@ razonamiento del agente tras la aprobación humana.
 - **🌟 Agentes Especializados**: Ya no dependés de un único bot monolítico. Podés crear múltiples Agentes con identidades propias, eligiendo qué herramientas exactas pueden acceder y con qué modelo o proveedor (Groq, OpenRouter) procesarán la información. Esto salva masivamente los costos limitando el uso de `Input Tokens` y mejora el enfoque (reduciendo alucinaciones).
 - **🎨 UX/UI**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
 - **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
+- **🔁 Fallback automático entre proveedores LLM**: Si la inferencia falla por cuota, rate limit, modelo no disponible u otros errores recuperables, el backend prueba **otros proveedores activos** en orden hasta que uno responda. Si el cambio tiene éxito, la sesión queda usando ese proveedor y el usuario ve un aviso en el chat.
+- **🔌 MCP stdio y MCP stream (HTTP / SSE)**: Además de **HandsAI**, podés registrar servidores MCP **locales** (proceso por stdin/stdout) y **remotos** (URL HTTP con transporte streamable, típicamente SSE). Las herramientas se exponen al agente con un prefijo por alias y se sincronizan junto al resto del catálogo.
 
 ## 🏗️ Decisiones de Arquitectura
 
@@ -59,6 +61,46 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 1.  **¿Por qué Go?**: Se eligió Go por su baja latencia y su mínima huella de memoria en comparación con otros lenguajes como Java. Esto permite que el **90% de los recursos del VPS** se dediquen exclusivamente al razonamiento del agente y al procesamiento pesado de herramientas mediante HandsAI.
 2.  **Seguridad Proactiva (AES-256-GCM)**: Dado que manejamos identidades y credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano, ni siquiera en variables de entorno fijas después de su configuración inicial.
 3.  **Resiliencia en el Chain-of-Thought**: Implementamos una lógica de "Loop Resume" que detecta estados de pausa y reanuda la inferencia tras la aprobación humana. Esto garantiza que procesos complejos (ej: "Crear en Odoo -> Crear en Trello") no se pierdan en el tiempo.
+
+---
+
+## 🔁 Resiliencia del proveedor LLM (fallback)
+
+Durante cada llamada al modelo, AIgent construye una **lista ordenada de candidatos**:
+
+1. **Override de la sesión** (si el usuario eligió otro proveedor/modelo para esa conversación).
+2. **Proveedor del agente** activo en el chat.
+3. **Proveedor marcado como default** en la pestaña de proveedores.
+
+El primero que aplique es el **preferido**; el resto de proveedores **activos** se añaden como respaldo (priorizando el que también esté marcado como default entre los secundarios).
+
+Si la API del preferido devuelve un error considerado **recuperable** (por ejemplo: cuota insuficiente, rate limit `429`, modelo no encontrado, clave inválida, `401`/`403`, etc.), el sistema **reintenta la misma petición** con el siguiente candidato, y así sucesivamente. Cuando un fallback **funciona**:
+
+- Se **persiste** en la base de datos un override de proveedor para esa sesión (y se limpia el override de modelo si había uno), de modo que los siguientes mensajes sigan usando el proveedor que respondió bien.
+- El frontend puede mostrar un mensaje del tipo *provider_fallback* indicando el cambio (proveedor y modelo anteriores → nuevos).
+
+Si el error **no** se considera recuperable, no hay cadena de fallback: se devuelve el error al usuario. Así se evita enmascarar fallos de validación o de red que no tienen sentido “saltar” a otro LLM.
+
+---
+
+## 🔌 Servidores MCP además de HandsAI
+
+HandsAI sigue siendo la capa principal para APIs REST registradas, pero AIgent integra también **Model Context Protocol** de dos formas:
+
+### MCP stdio (proceso local)
+
+- Configurás un **comando**, **argumentos** y **variables de entorno** (los secretos sensibles se guardan cifrados en base de datos).
+- El servidor arranca como subproceso y habla MCP por **stdin/stdout**.
+- Desde la UI/API: rutas bajo `/api/config/mcp-stdio` (listar, crear, editar, borrar y **probar conexión**).
+
+### MCP stream / HTTP (remoto, SSE)
+
+- Configurás una **URL base** y **cabeceras HTTP** opcionales (también con campos sensibles cifrados).
+- El cliente usa el transporte **HTTP streamable** habitual de MCP (muchas implementaciones usan **SSE**).
+- Opción `disable_standalone_sse` para entornos donde el servidor no expone SSE “standalone” y hay que ajustar el comportamiento del cliente.
+- Rutas API: `/api/config/mcp-stream` con las mismas operaciones CRUD y test que stdio.
+
+En ambos casos, tras guardar o actualizar una entrada, el backend **recarga integraciones** y **vuelve a sincronizar** el registro de herramientas para que el agente vea los nombres y esquemas actualizados. Las tools de MCP suelen aparecer con un **prefijo por alias** (p. ej. `mi_servidor_nombre_tool`) para no chocar con HandsAI ni entre servidores.
 
 ---
 
@@ -95,10 +137,11 @@ En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en 
 
 ## 📖 Cómo Funciona
 
-1. **Configura tu Cerebro**: Ve a la pestaña "Proveedores de LLM" y añade tu proveedor favorito (Groq, Gemini, etc.). AIgent probará la conexión y guardará la llave de forma cifrada.
-2. **Conecta tus Manos**: En la misma sección, configura la URL y el Token de tu bridge **HandsAI**. Esto habilitará instantáneamente la ejecución de herramientas reales.
+1. **Configura tu Cerebro**: Ve a la pestaña "Proveedores de LLM" y añade **varios** proveedores si querés redundancia: el primero que corresponda al agente o al default se usa, y el resto actúa como **fallback** automático si el primero falla por cuota, modelo no disponible, etc. AIgent probará la conexión y guardará las llaves cifradas.
+2. **Conecta tus Manos**: En la misma sección, configura la URL y el Token de tu bridge **HandsAI**. Opcionalmente, en **MCP stdio** y **MCP stream**, registrá servidores adicionales (CLI locales o endpoints remotos) para ampliar el catálogo de herramientas.
 3. **Establece Reglas**: AIgent aprende cómo trabajar. Puedes definir reglas como *"Sé siempre conciso"* o *"Valida el ID de Odoo antes de crear nada"*.
-4. **Automatiza**: Pide cosas complejas: *"Crea una tarea en Trello en el tablero de Hackatón, y luego regístrala también en el CRM de Odoo"*. Observa cómo AIgent encadena las herramientas, te pide confirmación solo para lo más crítico y sincroniza las capacidades en tiempo real.
+4. **Agentes y herramientas**: En "Agentes" definís qué modelo/proveedor usa cada personalidad y qué subconjunto de tools puede invocar; en el chat podés **volver al default del agente** si aplicaste un override o un fallback.
+5. **Automatiza**: Pide cosas complejas: *"Crea una tarea en Trello en el tablero de Hackatón, y luego regístrala también en el CRM de Odoo"*. Observa cómo AIgent encadena las herramientas, te pide confirmación solo para lo más crítico y sincroniza las capacidades en tiempo real.
 
 ---
 
