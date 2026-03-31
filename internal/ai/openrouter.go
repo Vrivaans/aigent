@@ -70,11 +70,21 @@ type Choice struct {
 }
 
 type ChoiceMessage struct {
-	Role                 string     `json:"role"`
-	Content              string     `json:"content"`
-	ToolCalls            []ToolCall `json:"tool_calls,omitempty"`
-	RequiresConfirmation bool       `json:"requires_confirmation,omitempty"`
-	WaitingToolCall      *ToolCall  `json:"waiting_tool_call,omitempty"`
+	Role                 string              `json:"role"`
+	Content              string              `json:"content"`
+	ToolCalls            []ToolCall          `json:"tool_calls,omitempty"`
+	RequiresConfirmation bool                `json:"requires_confirmation,omitempty"`
+	WaitingToolCall      *ToolCall           `json:"waiting_tool_call,omitempty"`
+	ProviderSwitched     bool                `json:"provider_switched,omitempty"`
+	ProviderSwitch       *ProviderSwitchInfo `json:"provider_switch,omitempty"`
+}
+
+type ProviderSwitchInfo struct {
+	Reason       string `json:"reason"`
+	FromProvider string `json:"from_provider"`
+	FromModel    string `json:"from_model"`
+	ToProvider   string `json:"to_provider"`
+	ToModel      string `json:"to_model"`
 }
 
 type ToolCall struct {

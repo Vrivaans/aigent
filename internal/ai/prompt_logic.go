@@ -34,6 +34,82 @@ type mcpExecutable interface {
 	CallTool(ctx context.Context, name string, args map[string]interface{}) (json.RawMessage, error)
 }
 
+func isRecoverableProviderError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	needles := []string{
+		"insufficient",
+		"insufficient_quota",
+		"quota",
+		"credit",
+		"credits",
+		"payment required",
+		"429",
+		"rate limit",
+		"model_not_found",
+		"not_found_error",
+		"does not exist",
+		"you do not have access to it",
+		"401",
+		"403",
+		"unauthorized",
+		"invalid api key",
+		"authentication",
+	}
+	for _, n := range needles {
+		if strings.Contains(lower, n) {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Brain) resolveProviderCandidates(session *database.Session) ([]database.LLMProvider, int, error) {
+	var preferred database.LLMProvider
+	preferredSet := false
+
+	if session.LLMProviderOverrideID != nil {
+		if err := database.DB.Where("id = ? AND is_active = ?", *session.LLMProviderOverrideID, true).First(&preferred).Error; err == nil {
+			preferredSet = true
+		}
+	}
+
+	if !preferredSet && session.Agent != nil && session.Agent.LLMProviderID != nil {
+		if session.Agent.LLMProvider.ID != 0 && session.Agent.LLMProvider.IsActive {
+			preferred = session.Agent.LLMProvider
+			preferredSet = true
+		} else if err := database.DB.Where("id = ? AND is_active = ?", *session.Agent.LLMProviderID, true).First(&preferred).Error; err == nil {
+			preferredSet = true
+		}
+	}
+
+	if !preferredSet {
+		if err := database.DB.Where("is_default = ? AND is_active = ?", true, true).First(&preferred).Error; err == nil {
+			preferredSet = true
+		}
+	}
+
+	if !preferredSet {
+		agentName := "desconocido"
+		if session.Agent != nil {
+			agentName = session.Agent.Name
+		}
+		return nil, 0, fmt.Errorf("El agente '%s' no tiene un modelo específico, y no hay un proveedor global por defecto. Configura uno en la pestaña Agentes o Proveedores", agentName)
+	}
+
+	var others []database.LLMProvider
+	if err := database.DB.Where("is_active = ? AND id <> ?", true, preferred.ID).Order("is_default desc, id asc").Find(&others).Error; err != nil {
+		return nil, 0, err
+	}
+
+	candidates := make([]database.LLMProvider, 0, len(others)+1)
+	candidates = append(candidates, preferred)
+	candidates = append(candidates, others...)
+	return candidates, 0, nil
+}
+
 // ReloadMCPIntegrations reconecta servidores MCP desde la BD (stdio + stream).
 func (b *Brain) ReloadMCPIntegrations(ctx context.Context) {
 	if b.McpStdio != nil {
@@ -388,47 +464,21 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 		return nil, nil, fmt.Errorf("no se encontró la sesión: %w", err)
 	}
 
-	var provider database.LLMProvider
-	useDefault := true
-
-	if session.Agent != nil && session.Agent.LLMProviderID != nil {
-		if session.Agent.LLMProvider.ID != 0 {
-			provider = session.Agent.LLMProvider
-			useDefault = false
-		} else {
-			// fallback in case preload didn't work properly
-			if err := database.DB.First(&provider, *session.Agent.LLMProviderID).Error; err == nil {
-				useDefault = false
-			} else {
-				log.Printf("⚠️ Provider ID %d not found for Agent %s. Falling back to default.", *session.Agent.LLMProviderID, session.Agent.Name)
-			}
-		}
-	}
-
-	if useDefault {
-		if err := database.DB.Where("is_default = ? AND is_active = ?", true, true).First(&provider).Error; err != nil {
-			agentName := "desconocido"
-			if session.Agent != nil {
-				agentName = session.Agent.Name
-			}
-			return nil, nil, fmt.Errorf("El agente '%s' no tiene un modelo específico, y no hay un proveedor global por defecto. Configura uno en la pestaña Agentes o Proveedores", agentName)
-		}
-	}
-
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	apiKey, err := utils.Decrypt(provider.APIKey, masterKey)
+	providerCandidates, activeProviderIdx, err := b.resolveProviderCandidates(&session)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", provider.Name, err)
+		return nil, nil, err
 	}
+	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 
-	// Cliente LLM local — seguro para concurrencia, no comparte estado con b.LLM
-	llmClient := NewClient(apiKey, provider.BaseURL)
-
-	defaultModel := provider.DefaultModel
+	currentProvider := providerCandidates[activeProviderIdx]
+	defaultModel := currentProvider.DefaultModel
+	if session.LLMModelOverride != "" {
+		defaultModel = session.LLMModelOverride
+	}
 	if defaultModel == "" {
 		defaultModel = "meta-llama/llama-3.3-70b-instruct"
 	}
-	log.Printf("🌐 Provider: %s | Model: %s | URL: %s", provider.Name, defaultModel, provider.BaseURL)
+	log.Printf("🌐 Provider inicial: %s | Model: %s | URL: %s", currentProvider.Name, defaultModel, currentProvider.BaseURL)
 
 	// 1. Obtener reglas dinámicas (Globales + Específicas del Agente)
 	// Globales = reglas sin ninguna entrada en rule_agents
@@ -584,16 +634,94 @@ Instrucciones Críticas:
 		}
 		log.Printf("📚 [Iter %d] Context: %v", i+1, ctxSummary)
 
+		activeProvider := providerCandidates[activeProviderIdx]
+		activeModel := activeProvider.DefaultModel
+		if session.LLMModelOverride != "" {
+			activeModel = session.LLMModelOverride
+		}
+		if activeModel == "" {
+			activeModel = "meta-llama/llama-3.3-70b-instruct"
+		}
+		req.Model = activeModel
+		var switchNotice *ProviderSwitchInfo
+
+		apiKey, decErr := utils.Decrypt(activeProvider.APIKey, masterKey)
+		if decErr != nil {
+			return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", activeProvider.Name, decErr)
+		}
+		llmClient := NewClient(apiKey, activeProvider.BaseURL)
 		resp, err := llmClient.CreateChatCompletion(ctx, req)
 		if err != nil {
-			log.Printf("❌ LLM API Error (%s): %v", provider.Name, err)
-			return nil, nil, fmt.Errorf("llm inference failed: %w", err)
+			log.Printf("❌ LLM API Error (%s): %v", activeProvider.Name, err)
+			if !isRecoverableProviderError(err) {
+				return nil, nil, fmt.Errorf("llm inference failed: %w", err)
+			}
+
+			fromProvider := activeProvider.Name
+			fromModel := activeModel
+			fallbackWorked := false
+			var lastErr error = err
+
+			for nextIdx := activeProviderIdx + 1; nextIdx < len(providerCandidates); nextIdx++ {
+				nextProvider := providerCandidates[nextIdx]
+				nextModel := nextProvider.DefaultModel
+				if nextModel == "" {
+					nextModel = "meta-llama/llama-3.3-70b-instruct"
+				}
+
+				nextKey, decErr2 := utils.Decrypt(nextProvider.APIKey, masterKey)
+				if decErr2 != nil {
+					lastErr = fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", nextProvider.Name, decErr2)
+					log.Printf("❌ %v", lastErr)
+					continue
+				}
+
+				nextClient := NewClient(nextKey, nextProvider.BaseURL)
+				req.Model = nextModel
+				resp, err = nextClient.CreateChatCompletion(ctx, req)
+				if err != nil {
+					lastErr = err
+					log.Printf("❌ LLM API Error en fallback (%s): %v", nextProvider.Name, err)
+					if !isRecoverableProviderError(err) {
+						return nil, nil, fmt.Errorf("llm inference failed tras fallback (%s): %w", nextProvider.Name, err)
+					}
+					continue
+				}
+
+				// Persistimos el override SOLO si el fallback tuvo éxito.
+				activeProviderIdx = nextIdx
+				session.LLMProviderOverrideID = &nextProvider.ID
+				session.LLMModelOverride = ""
+				_ = database.DB.Model(&database.Session{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
+					"llm_provider_override_id": nextProvider.ID,
+					"llm_model_override":       "",
+				}).Error
+
+				switchNotice = &ProviderSwitchInfo{
+					Reason:       "provider_fallback",
+					FromProvider: fromProvider,
+					FromModel:    fromModel,
+					ToProvider:   nextProvider.Name,
+					ToModel:      nextModel,
+				}
+				log.Printf("🔁 Fallback automático aplicado: %s/%s -> %s/%s", fromProvider, fromModel, nextProvider.Name, nextModel)
+				fallbackWorked = true
+				break
+			}
+
+			if !fallbackWorked {
+				return nil, nil, fmt.Errorf("llm inference failed tras fallback: %w", lastErr)
+			}
 		}
 		if resp == nil || len(resp.Choices) == 0 {
 			return nil, nil, fmt.Errorf("no response from llm")
 		}
 
 		msg := resp.Choices[0].Message
+		if switchNotice != nil {
+			msg.ProviderSwitched = true
+			msg.ProviderSwitch = switchNotice
+		}
 		log.Printf("📩 LLM response: content=%d chars, tool_calls=%d", len(msg.Content), len(msg.ToolCalls))
 
 		// ── CASO A: Sin herramientas → respuesta final del usuario ──────────────

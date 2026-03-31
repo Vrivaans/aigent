@@ -53,6 +53,25 @@
             <p class="msg-text">{{ msg.content }}</p>
           }
 
+          @if (msg.provider_switched && msg.provider_switch) {
+            <div class="provider-switch-card">
+              <div class="switch-title">🔁 Cambio automático de provider/modelo</div>
+              <div class="switch-body">
+                Se cambió de <strong>{{ msg.provider_switch.from_provider }}</strong> ({{ msg.provider_switch.from_model }})
+                a <strong>{{ msg.provider_switch.to_provider }}</strong> ({{ msg.provider_switch.to_model }})
+                por falta de créditos/cuota.
+              </div>
+              <div class="switch-actions">
+                <button
+                  class="btn-reject"
+                  [disabled]="isThinking() || msg.provider_switch_reset_done"
+                  (click)="resetProviderOverride(msg)">
+                  {{ msg.provider_switch_reset_done ? 'Default restaurado' : 'Volver al default del agente' }}
+                </button>
+              </div>
+            </div>
+          }
+
           @if (msg.requires_confirmation && !msg.confirmed && !msg.rejected) {
             <div class="confirmation-card">
               <div class="conf-header">

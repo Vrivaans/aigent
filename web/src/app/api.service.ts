@@ -64,6 +64,14 @@ export interface LLMProvider {
   is_default: boolean;
 }
 
+export interface ProviderSwitchInfo {
+  reason: string;
+  from_provider: string;
+  from_model: string;
+  to_provider: string;
+  to_model: string;
+}
+
 export interface McpStdioServer {
   id: number;
   alias: string;
@@ -162,11 +170,15 @@ export class ApiService {
   }
 
   async sendChatMessage(sessionId: number, message: string): Promise<{
-    response: string,
-    tool_calls: any[],
-    requires_confirmation?: boolean,
-    pending_action_id?: number,
-    waiting_tool?: any
+    status?: string;
+    error?: string;
+    response: string;
+    tool_calls: any[];
+    requires_confirmation?: boolean;
+    pending_action_id?: number;
+    waiting_tool?: any;
+    provider_switched?: boolean;
+    provider_switch?: ProviderSwitchInfo;
   }> {
     const res = await this.fetchApi(`/sessions/${sessionId}/chat`, {
       method: 'POST',
@@ -183,6 +195,17 @@ export class ApiService {
     const res = await this.fetchApi(`/sessions/${sessionId}/confirm/${pendingId}`, {
       method: 'POST',
       body: JSON.stringify({ approved })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Server error');
+    }
+    return data;
+  }
+
+  async resetSessionLLMOverride(sessionId: number): Promise<{ status: string }> {
+    const res = await this.fetchApi(`/sessions/${sessionId}/llm/reset`, {
+      method: 'PATCH'
     });
     const data = await res.json();
     if (!res.ok) {
