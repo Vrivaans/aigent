@@ -9,15 +9,15 @@ import (
 
 // Agent represents a specialized AI persona with its own model and toolset
 type Agent struct {
-	ID            uint         `gorm:"primarykey" json:"id"`
-	Name          string       `gorm:"size:255;not null" json:"name"`
-	Description   string       `gorm:"type:text" json:"description"`
-	LLMProviderID *uint        `json:"llm_provider_id"`
-	LLMProvider   LLMProvider  `gorm:"foreignKey:LLMProviderID" json:"llm_provider"`
-	Tools         []AgentTool  `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"tools"`
-	IsDefault     bool         `gorm:"default:false" json:"is_default"`
-	CreatedAt     time.Time    `json:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at"`
+	ID            uint        `gorm:"primarykey" json:"id"`
+	Name          string      `gorm:"size:255;not null" json:"name"`
+	Description   string      `gorm:"type:text" json:"description"`
+	LLMProviderID *uint       `json:"llm_provider_id"`
+	LLMProvider   LLMProvider `gorm:"foreignKey:LLMProviderID" json:"llm_provider"`
+	Tools         []AgentTool `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"tools"`
+	IsDefault     bool        `gorm:"default:false" json:"is_default"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 // AgentTool links an agent to a specific HandsAI tool name
@@ -42,22 +42,25 @@ type Task struct {
 
 // Rule represents behavioral constraints or configuration injected into OpenRouter Prompts
 type Rule struct {
-	ID         uint    `gorm:"primarykey" json:"id"`
-	Agents     []Agent `gorm:"many2many:rule_agents;" json:"agents"`
-	Category   string  `gorm:"size:100;not null" json:"category"`
-	Content    string  `gorm:"type:text;not null" json:"content"`
-	Importance int     `gorm:"default:1" json:"importance"`
+	ID         uint      `gorm:"primarykey" json:"id"`
+	Agents     []Agent   `gorm:"many2many:rule_agents;" json:"agents"`
+	Category   string    `gorm:"size:100;not null" json:"category"`
+	Content    string    `gorm:"type:text;not null" json:"content"`
+	Importance int       `gorm:"default:1" json:"importance"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type Session struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	Title     string    `gorm:"size:255;not null" json:"title"`
-	AgentID   uint      `gorm:"not null;default:1" json:"agent_id"`
-	Agent     *Agent    `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                    uint         `gorm:"primarykey" json:"id"`
+	Title                 string       `gorm:"size:255;not null" json:"title"`
+	AgentID               uint         `gorm:"not null;default:1" json:"agent_id"`
+	Agent                 *Agent       `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
+	LLMProviderOverrideID *uint        `json:"llm_provider_override_id,omitempty"`
+	LLMProviderOverride   *LLMProvider `gorm:"foreignKey:LLMProviderOverrideID" json:"llm_provider_override,omitempty"`
+	LLMModelOverride      string       `gorm:"size:255" json:"llm_model_override,omitempty"`
+	CreatedAt             time.Time    `json:"created_at"`
+	UpdatedAt             time.Time    `json:"updated_at"`
 }
 
 // ChatMessage represents the conversation history between User and AIgent
@@ -87,7 +90,7 @@ type LLMProvider struct {
 	ID           uint           `gorm:"primarykey" json:"id"`
 	Name         string         `json:"name" gorm:"unique"`
 	BaseURL      string         `json:"base_url"`
-	APIKey       string         `json:"api_key"`       // Encrypted
+	APIKey       string         `json:"api_key"` // Encrypted
 	DefaultModel string         `json:"default_model"`
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
 	IsDefault    bool           `json:"is_default" gorm:"default:false"`

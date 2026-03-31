@@ -22,6 +22,8 @@ type ChatRequest struct {
 	Message string `json:"message"`
 }
 
+type ResetLLMOverrideRequest struct{}
+
 func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
 
@@ -65,7 +67,26 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 
 	respMsg, intermediates, err := h.Brain.ProcessChatInteraction(ctx, session.ID, history, req.Message)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		errText := err.Error()
+		sysMsg := database.ChatMessage{
+			SessionID: session.ID,
+			Role:      "system",
+			Content:   "❌ Error: " + errText,
+		}
+		if saveErr := database.DB.Create(&sysMsg).Error; saveErr != nil {
+			log.Printf("⚠️ Failed to persist chat error message: %v", saveErr)
+		}
+		return c.JSON(fiber.Map{
+			"status":                "error",
+			"error":                 errText,
+			"response":              "",
+			"tool_calls":            []interface{}{},
+			"requires_confirmation": false,
+			"pending_action_id":     0,
+			"waiting_tool":          nil,
+			"provider_switched":     false,
+			"provider_switch":       nil,
+		})
 	}
 
 	// 4. Persistir mensajes intermedios (tool_calls y resultados) acumulados por el Brain
@@ -108,6 +129,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		"requires_confirmation": respMsg.RequiresConfirmation,
 		"pending_action_id":     pendingID,
 		"waiting_tool":          respMsg.WaitingToolCall,
+		"provider_switched":     respMsg.ProviderSwitched,
+		"provider_switch":       respMsg.ProviderSwitch,
 	})
 }
 
@@ -148,7 +171,17 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	// pero el Registry usa el nombre original del MCP (puede tener guiones).
 	tDef, exists := h.Brain.Registry.GetBySanitized(pending.ToolName)
 	if !exists {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Tool no longer registered: " + pending.ToolName})
+		errText := "Tool no longer registered: " + pending.ToolName
+		sysMsg := database.ChatMessage{
+			SessionID: pending.SessionID,
+			Role:      "system",
+			Content:   "❌ Error: " + errText,
+		}
+		_ = database.DB.Create(&sysMsg).Error
+		return c.JSON(fiber.Map{
+			"status": "error",
+			"error":  errText,
+		})
 	}
 
 	// Mapeamos argumentos sanitizados a originales (como en ProcessChatInteraction)
@@ -164,7 +197,6 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 
 	result, err := tDef.Execute(ctx, finalArgs)
 	if err != nil {
-		// Log the error to DB so LLM knows it failed, then return 500 to frontend
 		errResMsg := database.ChatMessage{
 			SessionID:  pending.SessionID,
 			Role:       "tool",
@@ -172,10 +204,19 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 			ToolCallID: pending.ToolCallID,
 		}
 		database.DB.Create(&errResMsg)
+		sysMsg := database.ChatMessage{
+			SessionID: pending.SessionID,
+			Role:      "system",
+			Content:   "❌ Error al ejecutar la herramienta: " + err.Error(),
+		}
+		database.DB.Create(&sysMsg)
 		pending.Status = "REJECTED"
 		database.DB.Save(&pending)
 
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.JSON(fiber.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
 	}
 
 	pending.Status = "APPROVED"
@@ -202,10 +243,21 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	msg, toSave, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, history, "")
 	if err != nil {
 		log.Printf("⚠️ Error re-inferring after confirm: %v", err)
+		errText := err.Error()
+		sysMsg := database.ChatMessage{
+			SessionID: pending.SessionID,
+			Role:      "system",
+			Content:   "❌ Error (re-inferencia tras confirmar): " + errText,
+		}
+		if saveErr := database.DB.Create(&sysMsg).Error; saveErr != nil {
+			log.Printf("⚠️ Failed to persist reinference error: %v", saveErr)
+		}
 		return c.JSON(fiber.Map{
-			"status":   "approved",
-			"result":   string(result),
-			"response": "Ejecutado, pero falló la re-inferencia: " + err.Error(),
+			"status":     "error",
+			"error":      errText,
+			"result":     string(result),
+			"response":   "",
+			"pending_id": 0,
 		})
 	}
 
@@ -254,7 +306,6 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		"pending_id": nextPendingID,
 	})
 }
-
 
 type ChatMessageResponse struct {
 	database.ChatMessage
@@ -317,7 +368,7 @@ func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
 // CreateSession crea una nueva sesión de chat mapeada por default al Agent 1 (General)
 func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
 	session := database.Session{
-		Title: "Nueva conversación",
+		Title:   "Nueva conversación",
 		AgentID: 1, // Por defecto al Agente General
 	}
 	if err := database.DB.Create(&session).Error; err != nil {
@@ -329,11 +380,11 @@ func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
 // UpdateSessionAgent permite a un usuario cambiar el agente de una sesión al vuelo
 func (h *ChatHandler) UpdateSessionAgent(c *fiber.Ctx) error {
 	id := c.Params("id")
-	
+
 	var req struct {
 		AgentID uint `json:"agent_id"`
 	}
-	
+
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
@@ -349,6 +400,25 @@ func (h *ChatHandler) UpdateSessionAgent(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "updated", "agent_id": session.AgentID})
+}
+
+// ResetSessionLLMOverride vuelve al provider/modelo por defecto del agente.
+func (h *ChatHandler) ResetSessionLLMOverride(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var session database.Session
+	if err := database.DB.First(&session, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	}
+
+	if err := database.DB.Model(&database.Session{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
+		"llm_provider_override_id": nil,
+		"llm_model_override":       "",
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to reset LLM override"})
+	}
+
+	return c.JSON(fiber.Map{"status": "reset"})
 }
 
 // DeleteSession borra una sesión y sus datos asociados (Hard Delete)

@@ -1,5 +1,5 @@
 import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
-import { ApiService, ChatMessage, Session, Agent } from '../api.service';
+import { ApiService, ChatMessage, Session, Agent, ProviderSwitchInfo } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -9,6 +9,9 @@ export interface ChatMessageUI extends ChatMessage {
   waiting_tool?: any;
   confirmed?: boolean;
   rejected?: boolean;
+  provider_switched?: boolean;
+  provider_switch?: ProviderSwitchInfo;
+  provider_switch_reset_done?: boolean;
 }
 
 @Component({
@@ -91,6 +94,10 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
 
     try {
       const res = await this.api.sendChatMessage(this.session.id, text);
+      if (res.status === 'error') {
+        await this.loadHistory();
+        return;
+      }
       this.messages.update(m => [...m, {
         id: Date.now() + 1,
         role: 'assistant',
@@ -99,7 +106,9 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
         tool_calls: res.tool_calls,
         requires_confirmation: res.requires_confirmation,
         pending_action_id: res.pending_action_id,
-        waiting_tool: res.waiting_tool
+        waiting_tool: res.waiting_tool,
+        provider_switched: res.provider_switched,
+        provider_switch: res.provider_switch
       }]);
       this.scrollToBottom();
     } catch (e) {
@@ -117,12 +126,43 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     }
   }
 
+  async resetProviderOverride(msg: ChatMessageUI) {
+    if (!this.session?.id || this.isThinking() || msg.provider_switch_reset_done) return;
+    this.isThinking.set(true);
+    try {
+      await this.api.resetSessionLLMOverride(this.session.id);
+      msg.provider_switch_reset_done = true;
+      this.messages.update(m => [...m, {
+        id: Date.now(),
+        role: 'system',
+        content: '✅ Se restauró el provider/modelo default del agente para esta conversación.',
+        created_at: new Date().toISOString()
+      }]);
+      this.scrollToBottom();
+    } catch (e: any) {
+      this.messages.update(m => [...m, {
+        id: Date.now(),
+        role: 'system',
+        content: `❌ No se pudo restaurar el default del agente: ${e?.message || 'Error desconocido'}`,
+        created_at: new Date().toISOString()
+      }]);
+      this.scrollToBottom();
+    } finally {
+      this.isThinking.set(false);
+    }
+  }
+
   async approveAction(msg: ChatMessageUI) {
     if (this.isThinking() || !this.session?.id || !msg.pending_action_id) return;
     
     this.isThinking.set(true);
     try {
-      await this.api.confirmAction(this.session.id, msg.pending_action_id, true);
+      const res = await this.api.confirmAction(this.session.id, msg.pending_action_id, true);
+      if (res?.status === 'error') {
+        msg.requires_confirmation = false;
+        await this.loadHistory();
+        return;
+      }
       msg.confirmed = true;
       msg.requires_confirmation = false;
       await this.loadHistory();
