@@ -6,6 +6,58 @@
 
 **AIgent** es un operador  diseñado para actuar como un puente seguro y resiliente entre el usuario y sus herramientas de trabajo (operando las tools de HandsAI principalmente). A diferencia de los chatbots tradicionales, AIgent no solo habla: **ejecuta**. El propósito es que el agente pueda operar herramientas de forma autónoma y segura, y que esas herramientas sean software de terceros.
 
+---
+
+## 🎬 Demo y capturas
+
+| | |
+|:--|:--|
+| **Video (YouTube)** | [Demo en vivo — ejecución de herramientas en tiempo real](https://youtu.be/N7zXwUHNL5k) |
+
+### Interfaz y flujo principal
+
+#### Chat: el agente ejecuta herramientas en tiempo real (filesystem)
+
+![Chat: el agente puede operar el filesystem](docs/img/vista%20chat%20puede%20operar%20filesystem.png)
+
+#### Agentes especializados
+
+![Vista de agentes](docs/img/vista%20de%20agentes.png)
+
+#### Reglas para el comportamiento del agente
+
+![Vista de reglas](docs/img/vista%20de%20reglas%20para%20agentes.png)
+
+#### Proveedores de LLM
+
+![Vista de proveedores LLM](docs/img/vista%20de%20proveedores%20llm.png)
+
+#### Catálogo de herramientas
+
+![Vista del catálogo de tools](docs/img/vista%20de%20tools.png)
+
+### Integración MCP (stdio y HTTP streamable)
+
+#### Nuevo servidor MCP stdio registrado y detectado
+
+![Nuevo servidor MCP stdio detectado](docs/img/vista%20nuevo%20servidor%20mcp%20stdio%20-%20detectado.png)
+
+#### Detección del servidor MCP stdio
+
+![Detección del MCP server stdio](docs/img/vista%20detecta%20el%20mcp%20server%20stdio.png)
+
+#### Tools del MCP stdio (ejemplo: filesystem)
+
+![Tools MCP stdio — filesystem](docs/img/vista%20detecta%20tools%20mcp%20stdio%20-%20filesystem.png)
+
+#### Servidor MCP streamable (HTTP)
+
+![Detección MCP server streamable HTTP](docs/img/vista%20detecta%20mcp%20server%20streamable%20http.png)
+
+#### MCP streamable HTTP con Playwright
+
+![MCP streamable HTTP — Playwright](docs/img/vista%20detecta%20mcp%20stremablehttp%20-%20playwright.png)
+
 ## 💡 El problema que resuelve
 
 La mayoría de los agentes de IA saben *hablar*, pero no saben *hacer*.
@@ -145,10 +197,7 @@ En ambos casos, tras guardar o actualizar una entrada, el backend **recarga inte
 
 ---
 
-## 📽️ Demo y Video
-*(https://youtu.be/N7zXwUHNL5k)*
-
-**⚠️ Nota sobre la elección del modelo**
+## ⚠️ Nota sobre la elección del modelo
 > El rendimiento de AIgent depende directamente de las capacidades de razonamiento
 > del modelo configurado. Los modelos **menores de 100B parámetros** funcionan bien
 > para tareas simples y consultas directas, pero pueden tener dificultades para
