@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 
 import { environment } from '../environments/environment';
+import { AuthService } from './auth/auth.service';
 
 export interface ChatMessage {
   id: number;
@@ -66,6 +67,7 @@ export interface LLMProvider {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly baseUrl = environment.apiBaseUrl;
+  private readonly auth = inject(AuthService);
 
   private get headers() {
     const token = localStorage.getItem('aigent_token');
@@ -75,48 +77,57 @@ export class ApiService {
     };
   }
 
+  /**
+   * Peticiones autenticadas. Si `isLogin` es true, un 401 no cierra sesión (credenciales incorrectas).
+   */
+  private async fetchApi(path: string, init: RequestInit = {}, isLogin = false): Promise<Response> {
+    const headers = isLogin
+      ? { 'Content-Type': 'application/json', ...init.headers as Record<string, string> }
+      : { ...this.headers, ...init.headers };
+    const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+    if (!isLogin && res.status === 401) {
+      this.auth.logout();
+    }
+    return res;
+  }
+
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const res = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: { ...this.headers, ...options.headers }
-    });
+    const res = await this.fetchApi(endpoint, options, false);
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   }
 
   async login(username: string, password: string): Promise<{ token: string }> {
-    const res = await fetch(`${this.baseUrl}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
+    const res = await this.fetchApi(
+      '/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      },
+      true
+    );
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
     return data;
   }
 
   async getSessions(): Promise<Session[]> {
-    return fetch(`${this.baseUrl}/sessions`, { headers: this.headers }).then(res => res.json());
+    const res = await this.fetchApi('/sessions');
+    return res.json();
   }
 
   async createSession(): Promise<Session> {
-    return fetch(`${this.baseUrl}/sessions`, {
-      method: 'POST',
-      headers: this.headers
-    }).then(res => res.json());
+    const res = await this.fetchApi('/sessions', { method: 'POST' });
+    return res.json();
   }
 
   async deleteSession(sessionId: number): Promise<void> {
-    await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
+    await this.fetchApi(`/sessions/${sessionId}`, { method: 'DELETE' });
   }
 
   async updateSessionAgent(sessionId: number, agentId: number): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/agent`, {
+    const res = await this.fetchApi(`/sessions/${sessionId}/agent`, {
       method: 'PATCH',
-      headers: this.headers,
       body: JSON.stringify({ agent_id: agentId })
     });
     if (!res.ok) throw new Error(await res.text());
@@ -124,9 +135,8 @@ export class ApiService {
   }
 
   async getChatHistory(sessionId: number): Promise<ChatMessage[]> {
-    return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
-      headers: this.headers
-    }).then(res => res.json());
+    const res = await this.fetchApi(`/sessions/${sessionId}/chat`);
+    return res.json();
   }
 
   async sendChatMessage(sessionId: number, message: string): Promise<{
@@ -136,17 +146,20 @@ export class ApiService {
     pending_action_id?: number,
     waiting_tool?: any
   }> {
-    return fetch(`${this.baseUrl}/sessions/${sessionId}/chat`, {
+    const res = await this.fetchApi(`/sessions/${sessionId}/chat`, {
       method: 'POST',
-      headers: this.headers,
       body: JSON.stringify({ message })
-    }).then(res => res.json());
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Error del servidor');
+    }
+    return data;
   }
 
   async confirmAction(sessionId: number, pendingId: number, approved: boolean): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/confirm/${pendingId}`, {
+    const res = await this.fetchApi(`/sessions/${sessionId}/confirm/${pendingId}`, {
       method: 'POST',
-      headers: this.headers,
       body: JSON.stringify({ approved })
     });
     const data = await res.json();
@@ -157,15 +170,16 @@ export class ApiService {
   }
 
   async getRules(): Promise<Rule[]> {
-    return fetch(`${this.baseUrl}/rules`, { headers: this.headers }).then(res => res.json());
+    const res = await this.fetchApi('/rules');
+    return res.json();
   }
 
   async createRule(rule: Partial<Rule>): Promise<Rule> {
-    return fetch(`${this.baseUrl}/rules`, {
+    const res = await this.fetchApi('/rules', {
       method: 'POST',
-      headers: this.headers,
       body: JSON.stringify(rule)
-    }).then(res => res.json());
+    });
+    return res.json();
   }
 
   async deleteRule(id: number) {
@@ -210,73 +224,58 @@ export class ApiService {
   }
 
   async createProvider(provider: Partial<LLMProvider>): Promise<LLMProvider> {
-    const res = await fetch(`${this.baseUrl}/providers`, {
+    const res = await this.fetchApi('/providers', {
       method: 'POST',
-      headers: this.headers,
       body: JSON.stringify(provider)
     });
     return res.json();
   }
 
   async updateProvider(id: number, provider: Partial<LLMProvider>): Promise<LLMProvider> {
-    const res = await fetch(`${this.baseUrl}/providers/${id}`, {
+    const res = await this.fetchApi(`/providers/${id}`, {
       method: 'PATCH',
-      headers: this.headers,
       body: JSON.stringify(provider)
     });
     return res.json();
   }
 
   async setDefaultProvider(id: number): Promise<void> {
-    await fetch(`${this.baseUrl}/providers/${id}/set-default`, {
-      method: 'PATCH',
-      headers: this.headers
-    });
+    await this.fetchApi(`/providers/${id}/set-default`, { method: 'PATCH' });
   }
 
   async deleteProvider(id: number): Promise<void> {
-    await fetch(`${this.baseUrl}/providers/${id}`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
+    await this.fetchApi(`/providers/${id}`, { method: 'DELETE' });
   }
 
   async testProvider(config: any): Promise<{ ok: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/providers/test`, {
+    const res = await this.fetchApi('/providers/test', {
       method: 'POST',
-      headers: this.headers,
       body: JSON.stringify(config)
     });
     return res.json();
   }
 
   async deleteTask(id: number) {
-    return fetch(`${this.baseUrl}/tasks/${id}`, {
-      method: 'DELETE',
-      headers: this.headers
-    }).then(res => res.json());
+    const res = await this.fetchApi(`/tasks/${id}`, { method: 'DELETE' });
+    return res.json();
   }
 
   // HandsAI Config
   async getHandsAIConfig(): Promise<{ url: string; token: string }> {
-    const res = await fetch(`${this.baseUrl}/config/handsai`, { headers: this.headers });
+    const res = await this.fetchApi('/config/handsai');
     return res.json();
   }
 
   async updateHandsAIConfig(config: { url: string; token: string }): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/config/handsai`, {
+    const res = await this.fetchApi('/config/handsai', {
       method: 'PATCH',
-      headers: this.headers,
       body: JSON.stringify(config)
     });
     return res.json();
   }
 
   async deleteHandsAIConfig(): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/config/handsai`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
+    const res = await this.fetchApi('/config/handsai', { method: 'DELETE' });
     return res.json();
   }
 }

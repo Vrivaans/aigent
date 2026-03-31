@@ -48,7 +48,7 @@
 
   <!-- Lista de Proveedores -->
   <div class="providers-grid">
-    <div class="provider-card" *ngFor="let p of providers()" 
+    <div class="provider-card" *ngFor="let p of providers()"
          [class.is-default]="p.is_default"
          (click)="editProvider(p)">
       <div class="card-header">
@@ -58,7 +58,7 @@
         </div>
         <div class="status-indicator" [class.active]="p.is_active"></div>
       </div>
-      
+
       <div class="details">
         <div class="detail-row">
           <span class="label">Modelo</span>
@@ -71,8 +71,8 @@
       </div>
 
       <div class="card-actions">
-        <button class="btn-secondary" 
-                *ngIf="!p.is_default" 
+        <button class="btn-secondary"
+                *ngIf="!p.is_default"
                 (click)="setAsDefault(p.id, $event)">
           Establecer como Default
         </button>
@@ -93,7 +93,7 @@
     <div class="handsai-card">
       <div class="form-grid">
         <div class="form-group">
-          <label>URL del Bridge (Vite/Java)</label>
+          <label>URL de HandsAI</label>
           <input [(ngModel)]="handsaiConfig().url" placeholder="http://localhost:8080/mcp" />
         </div>
         <div class="form-group">

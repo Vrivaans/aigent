@@ -104,10 +104,11 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       this.scrollToBottom();
     } catch (e) {
       console.error(e);
+      const detail = e instanceof Error ? e.message : 'Error desconocido';
       this.messages.update(m => [...m, {
         id: Date.now() + 1,
         role: 'system',
-        content: 'Hubo un error de conexión con el AIgent Core.',
+        content: `❌ Error: ${detail}`,
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
