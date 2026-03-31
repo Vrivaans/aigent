@@ -118,6 +118,8 @@ func autoMigrate(db *gorm.DB) error {
 		&ChatMessage{},
 		&PendingAction{},
 		&HandsAIConfig{},
+		&McpStdioServer{},
+		&McpStreamServer{},
 	)
 }
 

@@ -64,6 +64,28 @@ export interface LLMProvider {
   is_default: boolean;
 }
 
+export interface McpStdioServer {
+  id: number;
+  alias: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface McpStreamServer {
+  id: number;
+  alias: string;
+  base_url: string;
+  headers: Record<string, string>;
+  disable_standalone_sse: boolean;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly baseUrl = environment.apiBaseUrl;
@@ -277,5 +299,137 @@ export class ApiService {
   async deleteHandsAIConfig(): Promise<any> {
     const res = await this.fetchApi('/config/handsai', { method: 'DELETE' });
     return res.json();
+  }
+
+  async listMcpStdioServers(): Promise<McpStdioServer[]> {
+    return this.request('/config/mcp-stdio');
+  }
+
+  async createMcpStdioServer(body: {
+    alias: string;
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+    enabled?: boolean;
+  }): Promise<{ status: string; id: number }> {
+    return this.request('/config/mcp-stdio', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async updateMcpStdioServer(
+    id: number,
+    body: Partial<{
+      alias: string;
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      enabled: boolean;
+    }>
+  ): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stdio/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  async deleteMcpStdioServer(id: number): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stdio/${id}`, { method: 'DELETE' });
+  }
+
+  async testMcpStdioDryRun(body: {
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+  }): Promise<{ ok: boolean; tools: string[]; error?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stdio/test`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify(body)
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
+  }
+
+  async testMcpStdioSaved(id: number): Promise<{ ok: boolean; tools: string[]; alias?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stdio/${id}/test`, {
+      method: 'POST',
+      headers: this.headers
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
+  }
+
+  async listMcpStreamServers(): Promise<McpStreamServer[]> {
+    return this.request('/config/mcp-stream');
+  }
+
+  async createMcpStreamServer(body: {
+    alias: string;
+    base_url: string;
+    headers?: Record<string, string>;
+    disable_standalone_sse?: boolean;
+    enabled?: boolean;
+  }): Promise<{ status: string; id: number }> {
+    return this.request('/config/mcp-stream', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async updateMcpStreamServer(
+    id: number,
+    body: Partial<{
+      alias: string;
+      base_url: string;
+      headers: Record<string, string>;
+      disable_standalone_sse: boolean;
+      enabled: boolean;
+    }>
+  ): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stream/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  async deleteMcpStreamServer(id: number): Promise<{ status: string }> {
+    return this.request(`/config/mcp-stream/${id}`, { method: 'DELETE' });
+  }
+
+  async testMcpStreamDryRun(body: {
+    base_url: string;
+    headers?: Record<string, string>;
+    disable_standalone_sse?: boolean;
+  }): Promise<{ ok: boolean; tools: string[]; error?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stream/test`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify(body)
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
+  }
+
+  async testMcpStreamSaved(id: number): Promise<{ ok: boolean; tools: string[]; alias?: string }> {
+    const res = await fetch(`${this.baseUrl}/config/mcp-stream/${id}/test`, {
+      method: 'POST',
+      headers: this.headers
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) throw new Error(data.error || 'Test failed');
+    return data;
   }
 }

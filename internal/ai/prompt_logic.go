@@ -3,28 +3,57 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"aigent/internal/database"
 	"aigent/internal/handsai"
+	"aigent/internal/mcpstdio"
+	"aigent/internal/mcpstream"
 	"aigent/internal/utils"
-	"os"
+
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Brain es el orquestador principal que une el LLM (OpenRouter) con el motor de acciones (HandsAI)
 type Brain struct {
-	LLM      *OpenRouterClient
-	HandsAI  *handsai.Client
-	Registry *ToolRegistry
+	LLM        *OpenRouterClient
+	HandsAI    *handsai.Client
+	Registry   *ToolRegistry
+	McpStdio   *mcpstdio.Manager
+	McpStream  *mcpstream.Manager
+	toolPermit handsai.PermissionHandler
+}
+
+// mcpExecutable abstrae sesiones MCP stdio y stream (mismos métodos hacia el agente).
+type mcpExecutable interface {
+	ListTools(ctx context.Context) ([]*mcpsdk.Tool, error)
+	CallTool(ctx context.Context, name string, args map[string]interface{}) (json.RawMessage, error)
+}
+
+// ReloadMCPIntegrations reconecta servidores MCP desde la BD (stdio + stream).
+func (b *Brain) ReloadMCPIntegrations(ctx context.Context) {
+	if b.McpStdio != nil {
+		b.McpStdio.ReloadFromDB(ctx)
+	}
+	if b.McpStream != nil {
+		b.McpStream.ReloadFromDB(ctx)
+	}
 }
 
 func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler handsai.PermissionHandler) *Brain {
+	ph := permHandler
+	if ph == nil {
+		ph = handsai.DefaultPermissionHandler
+	}
 	b := &Brain{
-		LLM:      NewClient(llmKey, llmBaseURL),
-		HandsAI:  handsai.NewClient(handsaiCfg, permHandler),
-		Registry: NewToolRegistry(),
+		LLM:        NewClient(llmKey, llmBaseURL),
+		HandsAI:    handsai.NewClient(handsaiCfg, ph),
+		Registry:   NewToolRegistry(),
+		toolPermit: ph,
 	}
 	b.registerNativeTools()
 	return b
@@ -61,48 +90,121 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 	b.Registry.Clear()
 	b.registerNativeTools()
 
-	// 2. Si HandsAI no está configurado o no está disponible, no continuamos.
+	// 2. Registrar tools de HandsAI si está configurado. Si falla, seguimos con stdio.
 	if b.HandsAI == nil || !b.HandsAI.IsConfigured() {
-		log.Printf("⚠️ SyncTools: HandsAI not configured, skipping tool sync.")
-		return nil
-	}
-
-	handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
-	if err != nil {
-		log.Printf("❌ Failed to fetch tools from HandsAI: %v", err)
-		return nil // Don't return error to caller, just log it.
-	}
-
-	var mcpResponse struct {
-		Tools []struct {
-			Name        string          `json:"name"`
-			Description string          `json:"description"`
-			InputSchema json.RawMessage `json:"inputSchema"`
-		} `json:"tools"`
-	}
-	if err := json.Unmarshal(handsaiToolsRaw, &mcpResponse); err != nil {
-		// Algunos bridges devuelven la lista directo como array
-		var directArray []struct {
-			Name        string          `json:"name"`
-			Description string          `json:"description"`
-			InputSchema json.RawMessage `json:"inputSchema"`
-		}
-		if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
-			mcpResponse.Tools = directArray
+		log.Printf("⚠️ SyncTools: HandsAI not configured, skipping HandsAI tools.")
+	} else {
+		handsaiToolsRaw, err := b.HandsAI.GetTools(ctx)
+		if err != nil {
+			log.Printf("❌ Failed to fetch tools from HandsAI: %v", err)
 		} else {
-			log.Printf("❌ SyncTools: Failed to parse MCP tools (tried object and array): %v. Body: %s", err, string(handsaiToolsRaw))
-			return nil
+			var mcpResponse struct {
+				Tools []struct {
+					Name        string          `json:"name"`
+					Description string          `json:"description"`
+					InputSchema json.RawMessage `json:"inputSchema"`
+				} `json:"tools"`
+			}
+			if err := json.Unmarshal(handsaiToolsRaw, &mcpResponse); err != nil {
+				// Algunos bridges devuelven la lista directo como array
+				var directArray []struct {
+					Name        string          `json:"name"`
+					Description string          `json:"description"`
+					InputSchema json.RawMessage `json:"inputSchema"`
+				}
+				if errArray := json.Unmarshal(handsaiToolsRaw, &directArray); errArray == nil {
+					mcpResponse.Tools = directArray
+				} else {
+					log.Printf("❌ SyncTools: Failed to parse MCP tools (tried object and array): %v. Body: %s", err, string(handsaiToolsRaw))
+				}
+			}
+			for _, mt := range mcpResponse.Tools {
+				origName := mt.Name
+
+				// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
+				isSensitive := false
+				lowerName := strings.ToLower(origName)
+
+				// 1. Si el nombre contiene un verbo de lectura, nunca es sensible
+				readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
+				isReadOnly := false
+				for _, rv := range readVerbs {
+					if strings.Contains(lowerName, rv) {
+						isReadOnly = true
+						break
+					}
+				}
+
+				if !isReadOnly {
+					// 2. Si no es lectura, verificar si es una operación de escritura
+					writeVerbs := []string{
+						"create", "delete", "update", "post", "publicar", "social_post",
+						"save", "move", "add", "approve", "send", "dar_like",
+						"schedule", "moltbook_create", "moltbook_verify",
+						"jules_create", "jules_approve", "odoo_crm_create",
+						"odoo_crm_update", "odoo_project_task_create",
+					}
+					for _, wv := range writeVerbs {
+						if strings.Contains(lowerName, wv) {
+							isSensitive = true
+							break
+						}
+					}
+				}
+
+				// Sanitizar el esquema de entrada (recursivamente)
+				sanitizedSchema, argMap := sanitizeJSONSchema(mt.InputSchema)
+
+				b.Registry.Register(ToolDef{
+					Name:        origName,
+					Description: mt.Description,
+					Parameters:  sanitizedSchema,
+					ArgMapping:  argMap,
+					Sensitive:   isSensitive,
+					Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
+						return b.HandsAI.CallTool(ctx, origName, args)
+					},
+				})
+			}
 		}
 	}
 
-	for _, mt := range mcpResponse.Tools {
-		origName := mt.Name
+	// 3. Servidores MCP stdio locales: nombres en registry con prefijo alias_
+	if b.McpStdio != nil {
+		for _, ent := range b.McpStdio.ListEntries() {
+			b.registerMcpAliasTools(ctx, "stdio", ent.Alias, ent.Session)
+		}
+	}
 
-		// Clasificación de sensibilidad: solo operaciones de escritura/destructivas requieren confirmación.
+	// 4. Servidores MCP remotos (HTTP streamable / SSE)
+	if b.McpStream != nil {
+		for _, ent := range b.McpStream.ListEntries() {
+			b.registerMcpAliasTools(ctx, "stream", ent.Alias, ent.Session)
+		}
+	}
+	return nil
+}
+
+func (b *Brain) registerMcpAliasTools(ctx context.Context, kind, alias string, sess mcpExecutable) {
+	mcpTools, err := sess.ListTools(ctx)
+	if err != nil {
+		log.Printf("❌ SyncTools: MCP %s [%s] list tools failed: %v", kind, alias, err)
+		return
+	}
+	for _, mt := range mcpTools {
+		if mt == nil {
+			continue
+		}
+		origName := mt.Name
+		schemaBytes := json.RawMessage(`{"type":"object","properties":{}}`)
+		if mt.InputSchema != nil {
+			if sb, err := json.Marshal(mt.InputSchema); err == nil {
+				schemaBytes = sb
+			}
+		}
+
 		isSensitive := false
 		lowerName := strings.ToLower(origName)
-
-		// 1. Si el nombre contiene un verbo de lectura, nunca es sensible
 		readVerbs := []string{"get", "list", "read", "search", "ver", "buscar", "view", "fetch", "home", "notificacion"}
 		isReadOnly := false
 		for _, rv := range readVerbs {
@@ -111,15 +213,14 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 				break
 			}
 		}
-
 		if !isReadOnly {
-			// 2. Si no es lectura, verificar si es una operación de escritura
 			writeVerbs := []string{
 				"create", "delete", "update", "post", "publicar", "social_post",
 				"save", "move", "add", "approve", "send", "dar_like",
 				"schedule", "moltbook_create", "moltbook_verify",
 				"jules_create", "jules_approve", "odoo_crm_create",
 				"odoo_crm_update", "odoo_project_task_create",
+				"write",
 			}
 			for _, wv := range writeVerbs {
 				if strings.Contains(lowerName, wv) {
@@ -129,21 +230,26 @@ func (b *Brain) SyncTools(ctx context.Context) error {
 			}
 		}
 
-		// Sanitizar el esquema de entrada (recursivamente)
-		sanitizedSchema, argMap := sanitizeJSONSchema(mt.InputSchema)
+		sanitizedSchema, argMap := sanitizeJSONSchema(schemaBytes)
+		regName := sanitizeName(alias) + "_" + sanitizeName(origName)
+		sessCopy := sess
+		mcpToolNameCopy := origName
+		regNameCopy := regName
 
 		b.Registry.Register(ToolDef{
-			Name:        origName,
+			Name:        regNameCopy,
 			Description: mt.Description,
 			Parameters:  sanitizedSchema,
 			ArgMapping:  argMap,
 			Sensitive:   isSensitive,
 			Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
-				return b.HandsAI.CallTool(ctx, origName, args)
+				if b.toolPermit != nil && !b.toolPermit(ctx, regNameCopy, args) {
+					return nil, errors.New("tool execution denied by user/policy")
+				}
+				return sessCopy.CallTool(ctx, mcpToolNameCopy, args)
 			},
 		})
 	}
-	return nil
 }
 
 func sanitizeJSONSchema(raw json.RawMessage) (json.RawMessage, map[string]string) {
@@ -382,7 +488,7 @@ Instrucciones Críticas:
 			}
 		} else if session.Agent != nil && !session.Agent.IsDefault && len(session.Agent.Tools) == 0 {
 			// Si el Agente fue creado, pero se le desactivaron todas las tools explícitamente.
-			continue 
+			continue
 		}
 
 		shortName := sanitizeName(rt.Name)
