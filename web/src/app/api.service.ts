@@ -35,6 +35,8 @@ export interface Agent {
   llm_provider_id: number;
   llm_provider?: LLMProvider;
   tools?: AgentTool[];
+  /** En listados el backend envía solo el conteo, no el array `tools`. */
+  tools_count?: number;
   is_default: boolean;
   created_at?: string;
 }
@@ -236,12 +238,18 @@ export class ApiService {
     return this.request('/admin/agents');
   }
 
+  async getAgent(id: number): Promise<Agent> {
+    return this.request(`/admin/agents/${id}`);
+  }
+
   async getProviders(): Promise<LLMProvider[]> {
     return this.request('/providers');
   }
 
-  async getActiveTools(): Promise<any[]> {
-    return this.request('/active-tools');
+  /** Lista tools del registry. Con `refresh` reconecta MCP y vuelve a sincronizar (lento). */
+  async getActiveTools(refresh = false): Promise<any[]> {
+    const q = refresh ? '?refresh=true' : '';
+    return this.request(`/active-tools${q}`);
   }
 
   async createAgent(data: any): Promise<Agent> {

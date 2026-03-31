@@ -71,7 +71,8 @@ export class App implements OnInit {
   async refreshTools() {
     this.toolsLoading.set(true);
     try {
-      await this.loadTools();
+      const t = await this.api.getActiveTools(true);
+      this.tools.set(t ?? []);
     } finally {
       this.toolsLoading.set(false);
     }

@@ -85,17 +85,24 @@ export class AgentsComponent implements OnInit {
     this.showModal.set(true);
   }
 
-  openEditModal(agent: Agent) {
+  async openEditModal(agent: Agent) {
     this.isEditing.set(true);
     this.toolSearchQuery.set('');
-    this.currentAgent = {
-      id: agent.id,
-      name: agent.name,
-      description: agent.description,
-      llm_provider_id: agent.llm_provider_id,
-      tools: agent.tools?.map(t => t.tool_name) || []
-    };
-    this.showModal.set(true);
+    try {
+      const full = await this.api.getAgent(agent.id);
+      this.currentAgent = {
+        id: full.id,
+        name: full.name,
+        description: full.description,
+        llm_provider_id: full.llm_provider_id,
+        tools: full.tools?.map(t => t.tool_name) || []
+      };
+      this.showModal.set(true);
+    } catch (e) {
+      console.error('No se pudo cargar el agente:', e);
+      alert('No se pudo cargar la configuración del agente.');
+      this.isEditing.set(false);
+    }
   }
 
   toggleTool(toolName: string) {

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"aigent/internal/ai"
 	"aigent/internal/auth"
@@ -88,6 +89,13 @@ func main() {
 	brain.McpStream = mcpStreamMgr
 	mcpStreamMgr.ReloadFromDB(context.Background())
 	defer mcpStreamMgr.CloseAll()
+
+	initCtx, initCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	brain.ReloadMCPIntegrations(initCtx)
+	if err := brain.SyncTools(initCtx); err != nil {
+		log.Printf("⚠️ Initial SyncTools: %v", err)
+	}
+	initCancel()
 
 	// 4. Levantar Cron Worker
 	ctx, cancel := context.WithCancel(context.Background())
@@ -192,8 +200,10 @@ func main() {
 
 	api.Get("/active-tools", func(c *fiber.Ctx) error {
 		ctx := c.Context()
-		brain.ReloadMCPIntegrations(ctx)
-		_ = brain.SyncTools(ctx)
+		if c.Query("refresh") == "true" || c.Query("sync") == "true" {
+			brain.ReloadMCPIntegrations(ctx)
+			_ = brain.SyncTools(ctx)
+		}
 		return c.JSON(brain.Registry.List())
 	})
 	chatHandler := &handlers.ChatHandler{Brain: brain}
@@ -220,6 +230,7 @@ func main() {
 
 	// Agent management
 	admin.Get("/agents", agentHandler.GetAgents)
+	admin.Get("/agents/:id", agentHandler.GetAgent)
 	admin.Post("/agents", agentHandler.CreateAgent)
 	admin.Put("/agents/:id", agentHandler.UpdateAgent)
 	admin.Delete("/agents/:id", agentHandler.DeleteAgent)

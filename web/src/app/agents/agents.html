@@ -29,7 +29,7 @@
         </div>
         <div class="agent-meta">
           <span class="meta-label">Herramientas:</span>
-          <span class="meta-value">{{ agent.tools?.length || 0 }} activas</span>
+          <span class="meta-value">{{ agent.tools_count ?? agent.tools?.length ?? 0 }} activas</span>
         </div>
       </div>
       <div class="agent-footer">
