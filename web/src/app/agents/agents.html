@@ -95,7 +95,7 @@
             @for (tool of filteredTools(); track tool.name) {
             <div class="tool-chip" [class.selected]="isToolSelected(tool.name)" (click)="toggleTool(tool.name)">
               <span class="chip-icon">{{ isToolSelected(tool.name) ? '✅' : '⚙️' }}</span>
-              <span class="chip-name">{{ tool.name }}</span>
+              <span class="chip-name" [attr.title]="tool.name">{{ tool.name }}</span>
             </div>
             } @empty {
             <div class="no-tools-available">No se encontraron herramientas.</div>

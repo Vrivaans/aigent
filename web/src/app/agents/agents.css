@@ -245,7 +245,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-chip .chip-icon {
+  flex-shrink: 0;
 }
 
 .tool-chip:hover { 
@@ -259,7 +265,16 @@
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
 }
 
-.tool-chip .chip-name { font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); }
+.tool-chip .chip-name {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tool-chip.selected .chip-name { color: #fff; font-weight: 600; }
 
 .modal-footer {
