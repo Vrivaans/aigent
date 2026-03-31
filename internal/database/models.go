@@ -14,7 +14,8 @@ type Agent struct {
 	Description   string      `gorm:"type:text" json:"description"`
 	LLMProviderID *uint       `json:"llm_provider_id"`
 	LLMProvider   LLMProvider `gorm:"foreignKey:LLMProviderID" json:"llm_provider"`
-	Tools         []AgentTool `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"tools"`
+	Tools         []AgentTool `gorm:"foreignKey:AgentID;constraint:OnDelete:CASCADE;" json:"tools,omitempty"`
+	ToolsCount    int         `gorm:"-" json:"tools_count,omitempty"`
 	IsDefault     bool        `gorm:"default:false" json:"is_default"`
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`

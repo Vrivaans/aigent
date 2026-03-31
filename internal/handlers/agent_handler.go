@@ -17,10 +17,44 @@ type CreateAgentRequest struct {
 
 func (h *AgentHandler) GetAgents(c *fiber.Ctx) error {
 	var agents []database.Agent
-	if err := database.DB.Preload("Tools").Preload("LLMProvider").Order("id asc").Find(&agents).Error; err != nil {
+	if err := database.DB.Preload("LLMProvider").Order("id asc").Find(&agents).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	if len(agents) == 0 {
+		return c.JSON(agents)
+	}
+	ids := make([]uint, len(agents))
+	for i := range agents {
+		ids[i] = agents[i].ID
+	}
+	var rows []struct {
+		AgentID uint  `gorm:"column:agent_id"`
+		Cnt     int64 `gorm:"column:cnt"`
+	}
+	if err := database.DB.Model(&database.AgentTool{}).
+		Select("agent_id, count(*) as cnt").
+		Where("agent_id IN ?", ids).
+		Group("agent_id").
+		Scan(&rows).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	byID := make(map[uint]int64, len(rows))
+	for _, r := range rows {
+		byID[r.AgentID] = r.Cnt
+	}
+	for i := range agents {
+		agents[i].ToolsCount = int(byID[agents[i].ID])
+	}
 	return c.JSON(agents)
+}
+
+func (h *AgentHandler) GetAgent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var agent database.Agent
+	if err := database.DB.Preload("Tools").Preload("LLMProvider").First(&agent, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Agent not found"})
+	}
+	return c.JSON(agent)
 }
 
 func (h *AgentHandler) CreateAgent(c *fiber.Ctx) error {
