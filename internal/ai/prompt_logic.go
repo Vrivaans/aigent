@@ -531,13 +531,17 @@ Instrucciones Críticas:
 	sanitizedToOriginal := make(map[string]string)
 	var openRouterTools []Tool
 	for _, rt := range b.Registry.List() {
-		// Filtrar solo las herramientas permitidas
-		if session.Agent != nil && len(session.Agent.Tools) > 0 {
+		switch {
+		case session.Agent == nil:
+			// Sin agente asociado: exponer todo el registry
+		case session.Agent.IsDefault:
+			// Agente General: siempre todas las herramientas del registry
+		case len(session.Agent.Tools) > 0:
 			if !allowedTools[rt.Name] {
-				continue // Ignorar herramientas que no están seleccionadas en el Agente
+				continue
 			}
-		} else if session.Agent != nil && !session.Agent.IsDefault && len(session.Agent.Tools) == 0 {
-			// Si el Agente fue creado, pero se le desactivaron todas las tools explícitamente.
+		default:
+			// Agente personalizado sin tools seleccionadas: ninguna
 			continue
 		}
 

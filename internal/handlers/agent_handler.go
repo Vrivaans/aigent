@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"aigent/internal/ai"
 	"aigent/internal/database"
+
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
-type AgentHandler struct{}
+type AgentHandler struct {
+	Brain *ai.Brain
+}
 
 type CreateAgentRequest struct {
 	Name          string   `json:"name"`
@@ -44,6 +48,9 @@ func (h *AgentHandler) GetAgents(c *fiber.Ctx) error {
 	}
 	for i := range agents {
 		agents[i].ToolsCount = int(byID[agents[i].ID])
+		if agents[i].IsDefault && h.Brain != nil {
+			agents[i].ToolsCount = len(h.Brain.Registry.List())
+		}
 	}
 	return c.JSON(agents)
 }
@@ -120,6 +127,11 @@ func (h *AgentHandler) UpdateAgent(c *fiber.Ctx) error {
 		
 		if err := tx.Save(&agent).Error; err != nil {
 			return err
+		}
+
+		// El agente General (IsDefault) no persiste selección: siempre usa todas las tools del registry.
+		if agent.IsDefault {
+			return tx.Where("agent_id = ?", agent.ID).Delete(&database.AgentTool{}).Error
 		}
 
 		// Update tools: Delete old and insert new

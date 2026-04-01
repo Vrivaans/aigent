@@ -29,7 +29,13 @@
         </div>
         <div class="agent-meta">
           <span class="meta-label">Herramientas:</span>
-          <span class="meta-value">{{ agent.tools_count ?? agent.tools?.length ?? 0 }} activas</span>
+          <span class="meta-value">
+            @if (agent.id === 1) {
+              {{ agent.tools_count ?? availableTools().length }} (todas las disponibles)
+            } @else {
+              {{ agent.tools_count ?? agent.tools?.length ?? 0 }} activas
+            }
+          </span>
         </div>
       </div>
       <div class="agent-footer">
@@ -77,6 +83,16 @@
           </select>
         </div>
 
+        @if (currentAgent.id === 1) {
+        <div class="form-group">
+          <label>Herramientas</label>
+          <p class="field-help" style="margin-bottom: 0;">
+            El agente General incluye automáticamente todas las herramientas del sistema (actualmente
+            <strong>{{ availableTools().length }}</strong>). Al agregar MCP o sincronizar tools, no hace falta
+            configurar nada aquí.
+          </p>
+        </div>
+        } @else {
         <div class="form-group">
           <label style="display: flex; justify-content: space-between; align-items: center;">
             <span>Herramientas Habilitadas ({{ currentAgent.tools.length }} seleccionadas)</span>
@@ -102,6 +118,7 @@
             }
           </div>
         </div>
+        }
       </div>
 
       <div class="modal-footer">

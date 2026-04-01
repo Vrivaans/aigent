@@ -217,7 +217,7 @@ func main() {
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 
 	// LLM Provider Management
-	agentHandler := &handlers.AgentHandler{}
+	agentHandler := &handlers.AgentHandler{Brain: brain}
 	admin := api.Group("/admin")
 
 	api.Get("/providers", handlers.HandleListProviders)

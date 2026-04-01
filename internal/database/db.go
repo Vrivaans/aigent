@@ -107,6 +107,14 @@ func autoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	// El General no guarda filas en agent_tools: el acceso es siempre al registry completo.
+	if err := db.Where("agent_id = ?", 1).Delete(&AgentTool{}).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&Agent{}).Where("id = ?", 1).Update("is_default", true).Error; err != nil {
+		return err
+	}
+
 	// Sincronizar secuencia de IDs de PostgreSQL (vital si se insertó con ID explícito 1)
 	db.Exec(`SELECT setval('agents_id_seq', (SELECT COALESCE(MAX(id), 1) FROM agents));`)
 
