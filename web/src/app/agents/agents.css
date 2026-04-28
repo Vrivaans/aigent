@@ -17,27 +17,28 @@
 
 .view-title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 400;
+  color: var(--text-main);
 }
 
 .view-desc {
   margin: 8px 0 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
 .btn-create {
-  background: #3b82f6;
-  color: white;
+  background: var(--accent);
+  color: #111;
   border: none;
   padding: 10px 20px;
   border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(200, 240, 74, 0.22);
 }
 
 .btn-create:hover {
@@ -54,6 +55,7 @@
 
 .agent-card {
   background: rgba(255, 255, 255, 0.03);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
@@ -71,8 +73,8 @@
 }
 
 .agent-card.is-default {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(200, 240, 74, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(200, 240, 74, 0.34);
 }
 
 .agent-header {
@@ -96,7 +98,7 @@
   text-transform: uppercase;
 }
 
-.badge-default { background: #3b82f6; color: white; }
+.badge-default { background: var(--accent); color: #111; }
 .badge-custom { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); }
 
 .agent-name {
@@ -113,8 +115,8 @@
   margin-top: 4px;
 }
 
-.meta-label { color: rgba(255, 255, 255, 0.4); }
-.meta-value { color: #fff; font-weight: 500; }
+.meta-label { color: var(--text-muted); }
+.meta-value { color: var(--text-main); font-weight: 500; }
 
 .agent-footer {
   margin-top: 10px;
@@ -151,6 +153,7 @@
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -294,13 +297,13 @@
 .btn-cancel:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
 
 .btn-save {
-  background: #3b82f6; border: none; color: white;
+  background: var(--accent); border: none; color: #111;
   padding: 12px 32px; border-radius: 14px; cursor: pointer; font-weight: 600;
   transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 4px 12px rgba(200, 240, 74, 0.2);
 }
 
-.btn-save:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3); }
+.btn-save:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(200, 240, 74, 0.28); }
 
 .no-tools-available {
   grid-column: 1 / -1;

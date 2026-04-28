@@ -1,16 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-color: #0d1117;
-  --panel-bg: #161b22;
-  --panel-border: #30363d;
-  --text-main: #c9d1d9;
-  --text-muted: #8b949e;
-  --accent: #58a6ff;
-  --accent-hover: #1f6feb;
-  --success: #2ea043;
-  --danger: #da3633;
-  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --border: #222222;
+  --accent: #c8f04a;
+  --accent2: #4af0c8;
+  --text: #f0f0ec;
+  --muted: #666660;
+  --danger: #f04a4a;
+  --success: #4af0c8;
+
+  /* Compatibilidad con estilos existentes */
+  --bg-color: var(--bg);
+  --panel-bg: var(--surface);
+  --panel-border: var(--border);
+  --text-main: var(--text);
+  --text-muted: var(--muted);
+  --accent-hover: #b6e037;
+  --font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -20,12 +31,34 @@
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 12% 6%, rgba(200, 240, 74, 0.08), transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(74, 240, 200, 0.06), transparent 42%);
+  z-index: -2;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.35px, transparent 0.35px);
+  background-size: 3px 3px;
+  opacity: 0.14;
+  z-index: -1;
 }
 
 button {
@@ -52,9 +85,9 @@ input, textarea {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--panel-border);
+  background: #2b2b2b;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #3a3a3a;
 }
