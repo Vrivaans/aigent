@@ -1,6 +1,52 @@
 <div class="tasks-container">
   <h3>Tareas Programadas</h3>
-  <p class="desc">Cron jobs generados por AIgent en el backend de Go.</p>
+  <p class="desc">Cron jobs creados por el agente o manualmente desde esta vista.</p>
+
+  <form class="task-form" (ngSubmit)="createTask()">
+    <div class="form-header">
+      <div>
+        <span class="section-label">Nueva task</span>
+        <h4>Programar herramienta</h4>
+      </div>
+      <button type="submit" [disabled]="isSaving() || !newTask.name || !newTask.tool_name">
+        {{ isSaving() ? 'Creando...' : '+ Crear task' }}
+      </button>
+    </div>
+
+    @if (error()) {
+      <div class="form-error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label>
+        Nombre
+        <input name="name" [(ngModel)]="newTask.name" placeholder="Ej: Revisar monedas cada hora" required>
+      </label>
+
+      <label>
+        Frecuencia
+        <select name="cron_expression" [(ngModel)]="newTask.cron_expression">
+          <option value="@hourly">Cada hora (@hourly)</option>
+          <option value="* * * * *">Cada minuto (* * * * *)</option>
+          <option value="@daily">Cada día (@daily)</option>
+        </select>
+      </label>
+
+      <label class="full-width">
+        Herramienta
+        <select name="tool_name" [(ngModel)]="newTask.tool_name" required>
+          @for (tool of tools(); track tool.name) {
+            <option [value]="tool.name">{{ tool.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="full-width">
+        Payload JSON
+        <textarea name="payload" [(ngModel)]="newTask.payload" rows="5" spellcheck="false"></textarea>
+      </label>
+    </div>
+  </form>
 
   <div class="tasks-list">
     @for (task of tasks(); track task.id) {

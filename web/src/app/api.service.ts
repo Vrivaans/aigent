@@ -53,7 +53,14 @@ export interface Task {
   cron_expression: string;
   tool_name: string;
   payload: any;
-  next_run_at: string;
+  next_run_at?: string | null;
+}
+
+export interface CreateTaskInput {
+  name: string;
+  cron_expression: string;
+  tool_name: string;
+  payload: Record<string, any>;
 }
 
 export interface LLMProvider {
@@ -274,6 +281,13 @@ export class ApiService {
 
   async getTasks(): Promise<Task[]> {
     return this.request('/tasks');
+  }
+
+  async createTask(task: CreateTaskInput): Promise<Task> {
+    return this.request('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(task)
+    });
   }
 
   async createProvider(provider: Partial<LLMProvider>): Promise<LLMProvider> {

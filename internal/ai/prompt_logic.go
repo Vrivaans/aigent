@@ -13,7 +13,7 @@ import (
 	"aigent/internal/handsai"
 	"aigent/internal/mcpstdio"
 	"aigent/internal/mcpstream"
-	"aigent/internal/utils"
+	tasksvc "aigent/internal/tasks"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -144,13 +144,13 @@ func (b *Brain) registerNativeTools() {
 		Parameters:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Nombre de la tarea"},"cron_expression":{"type":"string","description":"Expresión en palabras, ej: @hourly, o cada 1 minuto (* * * * *)"},"tool_name":{"type":"string","description":"La herramienta a correr"},"payload":{"type":"object","description":"Argumentos para la herramienta"}},"required":["name","cron_expression","tool_name","payload"]}`),
 		Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
 			payloadRaw, _ := json.Marshal(args["payload"])
-			newTask := database.Task{
+			newTask, err := tasksvc.CreateScheduledTask(tasksvc.CreateTaskInput{
 				Name:           fmt.Sprintf("%v", args["name"]),
 				CronExpression: fmt.Sprintf("%v", args["cron_expression"]),
 				ToolName:       fmt.Sprintf("%v", args["tool_name"]),
 				Payload:        payloadRaw,
-			}
-			if err := database.DB.Create(&newTask).Error; err != nil {
+			})
+			if err != nil {
 				return nil, fmt.Errorf("failed to save scheduled task: %w", err)
 			}
 			return []byte(fmt.Sprintf(`{"status":"success","task_id":%d}`, newTask.ID)), nil
@@ -471,146 +471,20 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
 
 	currentProvider := providerCandidates[activeProviderIdx]
-	defaultModel := currentProvider.DefaultModel
-	if session.LLMModelOverride != "" {
-		defaultModel = session.LLMModelOverride
-	}
-	if defaultModel == "" {
-		defaultModel = "meta-llama/llama-3.3-70b-instruct"
-	}
+	defaultModel := modelForActiveProvider(&session, currentProvider)
 	log.Printf("🌐 Provider inicial: %s | Model: %s | URL: %s", currentProvider.Name, defaultModel, currentProvider.BaseURL)
 
-	// 1. Obtener reglas dinámicas (Globales + Específicas del Agente)
-	// Globales = reglas sin ninguna entrada en rule_agents
-	// Específicas = reglas que tienen una entrada en rule_agents para este agente
-	var rules []database.Rule
-	if err := database.DB.
-		Preload("Agents").
-		Where(`id NOT IN (SELECT rule_id FROM rule_agents) OR id IN (SELECT rule_id FROM rule_agents WHERE agent_id = ?)`, session.AgentID).
-		Order("importance desc").
-		Find(&rules).Error; err != nil {
-		log.Printf("Warning: Failed to fetch rules: %v", err)
-	}
-	var rulesText string
-	for _, r := range rules {
-		agentScope := "GLOBAL"
-		if len(r.Agents) > 0 {
-			agentScope = "ESPECÍFICA"
-		}
-		rulesText += fmt.Sprintf("- [%s] (%s) %s\n", r.Category, agentScope, r.Content)
-	}
-	systemPrompt := `Eres AIgent, un asistente operativo con capacidad de ejecución real.
-REGLAS ACTUALES DEL USUARIO:
-` + rulesText + `
-
-Instrucciones Críticas:
-1. Tu propósito no es solo hablar, sino EJECUTAR acciones para el usuario.
-2. Cada vez que tengas usar una herramienta leé y entendé sus descripciones para formar correctamente los flujos de ejecución si son necesarios.
-3. BAJO NINGUNA CIRCUNSTANCIA respondas con un bloque de código JSON de ejemplo.
-4. NUNCA menciones que "no tienes acceso directo" o que "estás simulando". Tus herramientas SON reales.
-5. NO expliques qué parámetros vas a usar, solo ejecuta la acción.
-6. Cuando recibas el resultado de una herramienta (rol "tool"), léelo y responde en lenguaje natural con un resumen útil.
-7. Sé proactivo. Si puedes resolver algo con una herramienta, hazlo de una vez.
-8. Cuando el usuario pida una acción, ejecutá las tools necesarias de inmediato sin pedir confirmación ni explicar el plan primero.
-9. Cuando termines de completar un flujo de ejecución de tools (serie de ejecuciones de tools encadenadas, como varios post, get, etc), es MUY IMPORTANTE que siempre me hagas un resumen muy corto de lo que hiciste e informes si algo salió mal.
-10. Guarda lo que creas necesario en las memorias de HandsAI como Knowledge (conocimiento a largo plazo) o como Intent (intención del agente, vos), según corresponda.`
+	systemPrompt := buildSystemPromptForSession(session)
 	// 2. Sincronizar Herramientas MCP
 	if err := b.SyncTools(ctx); err != nil {
 		log.Printf("⚠️ SyncTools Warning: %v", err)
 	}
 
-	// 3. Preparar listado de herramientas y mapeo sanitizado -> original
-	// 3a. Obtener qué tools están autorizadas explícitamente para este agente
-	allowedTools := make(map[string]bool)
-	if session.Agent != nil {
-		for _, at := range session.Agent.Tools {
-			allowedTools[at.ToolName] = true
-		}
-	}
+	toolCtx := b.prepareAgentToolContext(session)
+	sanitizedToOriginal := toolCtx.SanitizedToOriginal
+	openRouterTools := toolCtx.OpenRouterTools
 
-	sanitizedToOriginal := make(map[string]string)
-	var openRouterTools []Tool
-	for _, rt := range b.Registry.List() {
-		switch {
-		case session.Agent == nil:
-			// Sin agente asociado: exponer todo el registry
-		case session.Agent.IsDefault:
-			// Agente General: siempre todas las herramientas del registry
-		case len(session.Agent.Tools) > 0:
-			if !allowedTools[rt.Name] {
-				continue
-			}
-		default:
-			// Agente personalizado sin tools seleccionadas: ninguna
-			continue
-		}
-
-		shortName := sanitizeName(rt.Name)
-		sanitizedToOriginal[shortName] = rt.Name
-
-		params := rt.Parameters
-		if len(params) == 0 || string(params) == "null" || string(params) == "{}" {
-			params = json.RawMessage(`{"type":"object","properties":{}}`)
-		}
-		openRouterTools = append(openRouterTools, Tool{
-			Type: "function",
-			Function: ToolFunction{
-				Name:        shortName,
-				Description: rt.Description,
-				Parameters:  params,
-			},
-		})
-	}
-
-	// 4. Reconstruir historial de mensajes EN MEMORIA desde la base de datos
-	// Paso 1: Construir set de tool_call IDs que tienen una respuesta en el historial
-	respondedToolCallIDs := make(map[string]bool)
-	for _, dbMsg := range chatHistory {
-		if dbMsg.Role == "tool" && dbMsg.ToolCallID != "" {
-			respondedToolCallIDs[dbMsg.ToolCallID] = true
-		}
-	}
-
-	// Paso 2: Añadir mensajes filtrando tool_calls huérfanos (sin respuesta)
-	// Google/Vertex exige que cada tool_call tenga exactamente una tool response.
-	messages := []ChatMessage{{Role: "system", Content: systemPrompt}}
-	for _, dbMsg := range chatHistory {
-		content := dbMsg.Content
-		if content == "" {
-			content = " " // Google/Vertex rechaza content vacío
-		}
-		m := ChatMessage{
-			Role:    dbMsg.Role,
-			Content: content,
-		}
-		if dbMsg.Role == "tool" {
-			m.ToolCallID = dbMsg.ToolCallID
-		}
-		if dbMsg.Role == "assistant" && dbMsg.RawToolCalls != "" {
-			var tCalls []ToolCall
-			if err := json.Unmarshal([]byte(dbMsg.RawToolCalls), &tCalls); err == nil {
-				// Filtrar solo los tool_calls que tienen respuesta
-				var pairedCalls []ToolCall
-				for _, tc := range tCalls {
-					if respondedToolCallIDs[tc.ID] {
-						pairedCalls = append(pairedCalls, tc)
-					}
-				}
-				if len(pairedCalls) > 0 {
-					m.ToolCalls = pairedCalls
-				} else {
-					// Todos huérfanos — no incluir como assistant con tool_calls
-					// (solo incluir el texto si hay)
-					m.ToolCalls = nil
-				}
-			}
-		}
-		messages = append(messages, m)
-	}
-	// Solo añadir mensaje de usuario si no está vacío
-	if newUserMsg != "" {
-		messages = append(messages, ChatMessage{Role: "user", Content: newUserMsg})
-	}
+	messages := buildRuntimeMessages(systemPrompt, chatHistory, newUserMsg)
 
 	// 5. Agent Loop — SOLO en memoria. Sin escrituras a DB aquí.
 	// Los mensajes intermedios se acumulan en esta slice y en dbMsgsToSave.
@@ -638,84 +512,9 @@ Instrucciones Críticas:
 		}
 		log.Printf("📚 [Iter %d] Context: %v", i+1, ctxSummary)
 
-		activeProvider := providerCandidates[activeProviderIdx]
-		activeModel := activeProvider.DefaultModel
-		if session.LLMModelOverride != "" {
-			activeModel = session.LLMModelOverride
-		}
-		if activeModel == "" {
-			activeModel = "meta-llama/llama-3.3-70b-instruct"
-		}
-		req.Model = activeModel
-		var switchNotice *ProviderSwitchInfo
-
-		apiKey, decErr := utils.Decrypt(activeProvider.APIKey, masterKey)
-		if decErr != nil {
-			return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", activeProvider.Name, decErr)
-		}
-		llmClient := NewClient(apiKey, activeProvider.BaseURL)
-		resp, err := llmClient.CreateChatCompletion(ctx, req)
+		resp, switchNotice, err := b.createChatCompletionWithFallback(ctx, req, &session, providerCandidates, &activeProviderIdx, masterKey)
 		if err != nil {
-			log.Printf("❌ LLM API Error (%s): %v", activeProvider.Name, err)
-			if !isRecoverableProviderError(err) {
-				return nil, nil, fmt.Errorf("llm inference failed: %w", err)
-			}
-
-			fromProvider := activeProvider.Name
-			fromModel := activeModel
-			fallbackWorked := false
-			var lastErr error = err
-
-			for nextIdx := activeProviderIdx + 1; nextIdx < len(providerCandidates); nextIdx++ {
-				nextProvider := providerCandidates[nextIdx]
-				nextModel := nextProvider.DefaultModel
-				if nextModel == "" {
-					nextModel = "meta-llama/llama-3.3-70b-instruct"
-				}
-
-				nextKey, decErr2 := utils.Decrypt(nextProvider.APIKey, masterKey)
-				if decErr2 != nil {
-					lastErr = fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", nextProvider.Name, decErr2)
-					log.Printf("❌ %v", lastErr)
-					continue
-				}
-
-				nextClient := NewClient(nextKey, nextProvider.BaseURL)
-				req.Model = nextModel
-				resp, err = nextClient.CreateChatCompletion(ctx, req)
-				if err != nil {
-					lastErr = err
-					log.Printf("❌ LLM API Error en fallback (%s): %v", nextProvider.Name, err)
-					if !isRecoverableProviderError(err) {
-						return nil, nil, fmt.Errorf("llm inference failed tras fallback (%s): %w", nextProvider.Name, err)
-					}
-					continue
-				}
-
-				// Persistimos el override SOLO si el fallback tuvo éxito.
-				activeProviderIdx = nextIdx
-				session.LLMProviderOverrideID = &nextProvider.ID
-				session.LLMModelOverride = ""
-				_ = database.DB.Model(&database.Session{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
-					"llm_provider_override_id": nextProvider.ID,
-					"llm_model_override":       "",
-				}).Error
-
-				switchNotice = &ProviderSwitchInfo{
-					Reason:       "provider_fallback",
-					FromProvider: fromProvider,
-					FromModel:    fromModel,
-					ToProvider:   nextProvider.Name,
-					ToModel:      nextModel,
-				}
-				log.Printf("🔁 Fallback automático aplicado: %s/%s -> %s/%s", fromProvider, fromModel, nextProvider.Name, nextModel)
-				fallbackWorked = true
-				break
-			}
-
-			if !fallbackWorked {
-				return nil, nil, fmt.Errorf("llm inference failed tras fallback: %w", lastErr)
-			}
+			return nil, nil, err
 		}
 		if resp == nil || len(resp.Choices) == 0 {
 			return nil, nil, fmt.Errorf("no response from llm")
@@ -734,22 +533,8 @@ Instrucciones Críticas:
 		}
 
 		// ── CASO B: Hay herramientas ──────────────────────────────────────────────
-		// Detectar si alguna requiere confirmación
-		hasSensitive := false
-		var sensitiveTC *ToolCall
-		for i, tc := range msg.ToolCalls {
-			realName, ok := sanitizedToOriginal[tc.Function.Name]
-			if !ok {
-				realName = tc.Function.Name
-			}
-			if tDef, exists := b.Registry.Get(realName); exists && tDef.Sensitive {
-				hasSensitive = true
-				sensitiveTC = &msg.ToolCalls[i]
-				break
-			}
-		}
-
-		if hasSensitive {
+		sensitiveTC := b.findSensitiveToolCall(msg.ToolCalls, sanitizedToOriginal)
+		if sensitiveTC != nil {
 			// NO añadimos a dbMsgsToSave aquí — el handler de chat guarda respMsg
 			// como el mensaje final del asistente (con RawToolCalls).
 			// Si lo agregáramos acá también, habría dos asistentes con el mismo tool_call
@@ -761,73 +546,10 @@ Instrucciones Críticas:
 		}
 
 		// ── Ejecución inmediata (no sensibles) ───────────────────────────────────
-		// 1. Añadir mensaje del asistente (con tool_calls) al contexto en memoria
-		// Nunca content vacío: Google/Vertex lo rechaza con INVALID_ARGUMENT
-		assistantContent := msg.Content
-		if assistantContent == "" {
-			assistantContent = " "
-		}
-		rawTools, _ := json.Marshal(msg.ToolCalls)
-		messages = append(messages, ChatMessage{
-			Role:      "assistant",
-			Content:   assistantContent,
-			ToolCalls: msg.ToolCalls,
-		})
-		// Acumular para DB (se guardará al final por el handler)
-		dbMsgsToSave = append(dbMsgsToSave, database.ChatMessage{
-			SessionID:    sessionID,
-			Role:         "assistant",
-			Content:      msg.Content, // guardamos el original en DB
-			RawToolCalls: string(rawTools),
-		})
-
-		// 2. Ejecutar cada herramienta y añadir resultado al contexto en memoria
-		for _, tc := range msg.ToolCalls {
-			realName, ok := sanitizedToOriginal[tc.Function.Name]
-			if !ok {
-				realName = tc.Function.Name
-			}
-			tDef, exists := b.Registry.Get(realName)
-			if !exists {
-				log.Printf("⚠️ Tool not found in registry: %s", realName)
-				continue
-			}
-
-			var args map[string]interface{}
-			json.Unmarshal([]byte(tc.Function.Arguments), &args)
-			finalArgs := make(map[string]interface{})
-			for k, v := range args {
-				if origK, ok := tDef.ArgMapping[k]; ok {
-					finalArgs[origK] = v
-				} else {
-					finalArgs[k] = v
-				}
-			}
-
-			log.Printf("🦾 Executing tool: %s with args: %v", realName, finalArgs)
-			result, execErr := tDef.Execute(ctx, finalArgs)
-			resultStr := string(result)
-			if execErr != nil {
-				resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
-				log.Printf("❌ Tool error: %v", execErr)
-			} else {
-				log.Printf("✅ Tool result: %s", resultStr)
-			}
-
-			// Añadir al contexto en memoria (CLAVE para que el LLM lo lea)
-			messages = append(messages, ChatMessage{
-				Role:       "tool",
-				Content:    resultStr,
-				ToolCallID: tc.ID,
-			})
-			// Acumular para DB
-			dbMsgsToSave = append(dbMsgsToSave, database.ChatMessage{
-				SessionID:  sessionID,
-				Role:       "tool",
-				Content:    resultStr,
-				ToolCallID: tc.ID,
-			})
-		}
+		messages, dbMsgsToSave = appendAssistantToolCallContext(messages, dbMsgsToSave, sessionID, msg)
+		toolMessages, toolDBMessages := b.executeImmediateToolCalls(ctx, sessionID, msg.ToolCalls, sanitizedToOriginal)
+		messages = append(messages, toolMessages...)
+		dbMsgsToSave = append(dbMsgsToSave, toolDBMessages...)
 		// Loop continúa: el LLM leerá [assistant(tool_calls) → tool(result)]
 	}
 

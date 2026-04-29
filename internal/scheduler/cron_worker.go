@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"strings"
 	"time"
 
 	"aigent/internal/ai"
 	"aigent/internal/database"
+	tasksvc "aigent/internal/tasks"
 )
 
 // StartCronWorker initializes a background process that sweeps the DB every minute.
@@ -64,23 +64,11 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 
 		// Para este MVP, si arranca con un simple "crontab" de cada hora, lo sumamos, si no por 24hs.
 		// En produccion usariamos un paquete como robfig/cron/v3 para parsear "0 9 * * *".
-		nextRun := calculateNextRun(task.CronExpression, now)
+		nextRun := tasksvc.CalculateNextRun(task.CronExpression, now)
 		task.NextRunAt = &nextRun
 
 		if err := database.DB.Save(&task).Error; err != nil {
 			log.Printf("❌ Scheduled task DB update failed: %v", err)
 		}
 	}
-}
-
-func calculateNextRun(cron string, now time.Time) time.Time {
-	cronLower := strings.ToLower(cron)
-	if strings.Contains(cronLower, "hourly") || strings.Contains(cronLower, "@hourly") {
-		return now.Add(time.Hour)
-	}
-	if strings.Contains(cronLower, "* * * * *") { 
-		return now.Add(time.Minute)
-	}
-	// Por defecto 24 hrs
-	return now.Add(24 * time.Hour)
 }

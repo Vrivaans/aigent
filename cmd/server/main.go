@@ -257,8 +257,9 @@ func main() {
 	api.Delete("/config/mcp-stream/:id", mcpStreamHandler.Delete)
 	api.Post("/config/mcp-stream/:id/test", mcpStreamHandler.TestSaved)
 
-	taskHandler := &handlers.TaskHandler{}
+	taskHandler := &handlers.TaskHandler{Brain: brain}
 	api.Get("/tasks", taskHandler.GetTasks)
+	api.Post("/tasks", taskHandler.CreateTask)
 	api.Delete("/tasks/:id", taskHandler.DeleteTask)
 
 	ruleHandler := &handlers.RuleHandler{}
