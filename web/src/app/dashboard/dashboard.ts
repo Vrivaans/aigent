@@ -1,7 +1,12 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
-import { ApiService, Task } from '../api.service';
+import { ApiService, Task, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+
+interface DayOption {
+  key: string;
+  label: string;
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -13,21 +18,36 @@ import { FormsModule } from '@angular/forms';
 export class Dashboard implements OnInit {
   private api = inject(ApiService);
   tasks = signal<Task[]>([]);
-  tools = signal<any[]>([]);
+  agents = signal<Agent[]>([]);
   isSaving = signal(false);
   error = signal('');
 
+  days: DayOption[] = [
+    { key: '1', label: 'L' },
+    { key: '2', label: 'M' },
+    { key: '3', label: 'X' },
+    { key: '4', label: 'J' },
+    { key: '5', label: 'V' },
+    { key: '6', label: 'S' },
+    { key: '0', label: 'D' },
+  ];
+
   newTask = {
     name: '',
-    cron_expression: '@hourly',
-    tool_name: '',
-    payload: '{}'
+    frequency: '@daily',
+    scheduledHour: '09:00',
+    customHour: '09:00',
+    customDays: [] as string[],
+    oneShot: false,
+    cron_expression: '0 9 * * *',
+    agent_id: 1,
+    prompt: ''
   };
 
   async ngOnInit() {
     this.loadTasks();
-    this.loadTools();
-    setInterval(() => this.loadTasks(), 15000); // Live reload MVP
+    this.loadAgents();
+    setInterval(() => this.loadTasks(), 15000);
   }
 
   async loadTasks() {
@@ -35,41 +55,76 @@ export class Dashboard implements OnInit {
     this.tasks.set(t);
   }
 
-  async loadTools() {
-    const tools = await this.api.getActiveTools();
-    const schedulableTools = tools.filter((tool) => tool.name !== 'schedule_task');
-    this.tools.set(schedulableTools);
-    if (!this.newTask.tool_name && schedulableTools.length > 0) {
-      this.newTask.tool_name = schedulableTools[0].name;
+  async loadAgents() {
+    this.agents.set(await this.api.getAgents());
+  }
+
+  toggleDay(key: string) {
+    const idx = this.newTask.customDays.indexOf(key);
+    if (idx >= 0) {
+      this.newTask.customDays.splice(idx, 1);
+    } else {
+      this.newTask.customDays.push(key);
     }
+    this.updateCronFromSelection();
+  }
+
+  updateCronFromSelection() {
+    if (this.newTask.frequency === '@daily' || this.newTask.frequency === '@weekdays') {
+      const [h, m] = this.newTask.scheduledHour.split(':');
+      if (this.newTask.frequency === '@daily') {
+        this.newTask.cron_expression = `${parseInt(m, 10)} ${parseInt(h, 10)} * * *`;
+      } else {
+        this.newTask.cron_expression = `${parseInt(m, 10)} ${parseInt(h, 10)} * * 1-5`;
+      }
+    } else if (this.newTask.frequency === 'custom') {
+      const [h, m] = this.newTask.customHour.split(':');
+      const minutes = parseInt(m, 10);
+      const hours = parseInt(h, 10);
+      const days = this.newTask.customDays.length > 0
+        ? this.newTask.customDays.sort().join(',')
+        : '*';
+      this.newTask.cron_expression = `${minutes} ${hours} * * ${days}`;
+    } else {
+      this.newTask.cron_expression = this.newTask.frequency;
+    }
+  }
+
+  onFrequencyChange() {
+    this.updateCronFromSelection();
+  }
+
+  onHourChange() {
+    this.updateCronFromSelection();
   }
 
   async createTask() {
     this.error.set('');
 
-    let payload: Record<string, any>;
-    try {
-      payload = JSON.parse(this.newTask.payload || '{}');
-    } catch {
-      this.error.set('El payload debe ser JSON válido.');
+    if (!this.newTask.name.trim()) {
+      this.error.set('El nombre es obligatorio.');
+      return;
+    }
+    if (!this.newTask.prompt.trim()) {
+      this.error.set('El prompt es obligatorio.');
       return;
     }
 
-    if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
-      this.error.set('El payload debe ser un objeto JSON.');
-      return;
-    }
+    this.updateCronFromSelection();
 
     this.isSaving.set(true);
     try {
       await this.api.createTask({
-        name: this.newTask.name,
+        name: this.newTask.name.trim(),
         cron_expression: this.newTask.cron_expression,
-        tool_name: this.newTask.tool_name,
-        payload
+        agent_id: this.newTask.agent_id,
+        prompt: this.newTask.prompt.trim(),
+        one_shot: this.newTask.oneShot
       });
       this.newTask.name = '';
-      this.newTask.payload = '{}';
+      this.newTask.prompt = '';
+      this.newTask.customDays = [];
+      this.newTask.oneShot = false;
       await this.loadTasks();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo crear la tarea.');
@@ -86,5 +141,15 @@ export class Dashboard implements OnInit {
   formatDate(d?: string | null): string {
     if (!d) return 'Pendiente';
     return new Date(d).toLocaleString();
+  }
+
+  cronLabel(expr: string, oneShot: boolean): string {
+    if (oneShot) return 'Ejecucion unica';
+    switch (expr) {
+      case '@hourly': return 'Cada hora';
+      case '@daily': return 'Cada dia';
+      case '* * * * *': return 'Cada minuto';
+      default: return expr;
+    }
   }
 }

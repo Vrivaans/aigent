@@ -1,27 +1,29 @@
 package tasks
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
 
 	"aigent/internal/database"
 
-	"gorm.io/datatypes"
+	"github.com/robfig/cron/v3"
 )
 
+var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+
 type CreateTaskInput struct {
-	Name           string          `json:"name"`
-	CronExpression string          `json:"cron_expression"`
-	ToolName       string          `json:"tool_name"`
-	Payload        json.RawMessage `json:"payload"`
+	Name           string `json:"name"`
+	CronExpression string `json:"cron_expression"`
+	AgentID        uint   `json:"agent_id"`
+	Prompt         string `json:"prompt"`
+	OneShot        bool   `json:"one_shot"`
 }
 
 func CreateScheduledTask(input CreateTaskInput) (*database.Task, error) {
 	name := strings.TrimSpace(input.Name)
 	cronExpression := strings.TrimSpace(input.CronExpression)
-	toolName := strings.TrimSpace(input.ToolName)
+	prompt := strings.TrimSpace(input.Prompt)
 
 	if name == "" {
 		return nil, errors.New("name is required")
@@ -29,26 +31,31 @@ func CreateScheduledTask(input CreateTaskInput) (*database.Task, error) {
 	if cronExpression == "" {
 		return nil, errors.New("cron_expression is required")
 	}
-	if toolName == "" {
-		return nil, errors.New("tool_name is required")
+	if prompt == "" {
+		return nil, errors.New("prompt is required")
 	}
 
-	payload := input.Payload
-	if len(payload) == 0 || string(payload) == "null" {
-		payload = json.RawMessage(`{}`)
+	if _, err := cronParser.Parse(cronExpression); err != nil {
+		return nil, errors.New("invalid cron expression: " + err.Error())
 	}
 
-	var payloadObject map[string]interface{}
-	if err := json.Unmarshal(payload, &payloadObject); err != nil {
-		return nil, errors.New("payload must be a valid JSON object")
+	agentID := input.AgentID
+	if agentID == 0 {
+		agentID = 1
+	}
+
+	var agent database.Agent
+	if err := database.DB.First(&agent, agentID).Error; err != nil {
+		return nil, errors.New("agent not found")
 	}
 
 	nextRun := CalculateNextRun(cronExpression, time.Now())
 	task := &database.Task{
 		Name:           name,
 		CronExpression: cronExpression,
-		ToolName:       toolName,
-		Payload:        datatypes.JSON(payload),
+		AgentID:        agentID,
+		Prompt:         prompt,
+		OneShot:        input.OneShot,
 		NextRunAt:      &nextRun,
 	}
 
@@ -60,12 +67,9 @@ func CreateScheduledTask(input CreateTaskInput) (*database.Task, error) {
 }
 
 func CalculateNextRun(cronExpression string, now time.Time) time.Time {
-	cronLower := strings.ToLower(strings.TrimSpace(cronExpression))
-	if strings.Contains(cronLower, "hourly") || strings.Contains(cronLower, "@hourly") {
-		return now.Add(time.Hour)
+	schedule, err := cronParser.Parse(cronExpression)
+	if err != nil {
+		return now.Add(24 * time.Hour)
 	}
-	if strings.Contains(cronLower, "* * * * *") {
-		return now.Add(time.Minute)
-	}
-	return now.Add(24 * time.Hour)
+	return schedule.Next(now)
 }

@@ -16,6 +16,17 @@
       </div>
       <div class="form-grid">
         <div class="form-group">
+          <label>Tipo de Provider</label>
+          <select [(ngModel)]="newProvider.provider_type">
+            <option value="zen">OpenCode Zen (modelos gratis)</option>
+            <option value="go">OpenCode Go</option>
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="openai">OpenAI</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Nombre</label>
           <input [(ngModel)]="newProvider.name" placeholder="Ej: Groq Official" />
         </div>
@@ -55,6 +66,7 @@
         <div class="info">
           <h3>{{ p.name }}</h3>
           <span class="badge" *ngIf="p.is_default">Default</span>
+          <span class="badge provider-type" *ngIf="p.provider_type">{{ p.provider_type }}</span>
         </div>
         <div class="status-indicator" [class.active]="p.is_active"></div>
       </div>

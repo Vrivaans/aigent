@@ -1,5 +1,5 @@
 import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
-import { ApiService, ChatMessage, Session, Agent, ProviderSwitchInfo } from '../api.service';
+import { ApiService, ChatMessage, Session, Agent, ProviderSwitchInfo, ModelGroup, ModelInfo } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -32,11 +32,18 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   isThinking = signal(false);
   
   agents = signal<Agent[]>([]);
+  modelGroups = signal<ModelGroup[]>([]);
+  selectedModelId = signal<string>('');
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   async ngOnInit() {
     this.agents.set(await this.api.getAgents());
+    try {
+      this.modelGroups.set(await this.api.getAllModels());
+    } catch {
+      this.modelGroups.set([]);
+    }
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -60,6 +67,19 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     } catch (e) {
       console.error('Failed to change agent', e);
     }
+  }
+
+  selectedModelDisplay(): string {
+    const id = this.selectedModelId();
+    if (!id) return 'Default model';
+    for (const group of this.modelGroups()) {
+      for (const m of group.models) {
+        if (m.model_id === id) {
+          return `${m.name} (${group.provider.name})`;
+        }
+      }
+    }
+    return id;
   }
 
   ngAfterViewChecked() {
@@ -93,7 +113,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     this.scrollToBottom();
 
     try {
-      const res = await this.api.sendChatMessage(this.session.id, text);
+      const res = await this.api.sendChatMessage(this.session.id, text, this.selectedModelId() || undefined);
       if (res.status === 'error') {
         await this.loadHistory();
         return;

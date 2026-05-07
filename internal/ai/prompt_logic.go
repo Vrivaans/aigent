@@ -140,21 +140,30 @@ func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler 
 func (b *Brain) registerNativeTools() {
 	b.Registry.Register(ToolDef{
 		Name:        "schedule_task",
-		Description: "Programa una tarea recurrente (@hourly, * * * * *, etc.) que invocará otras herramientas de forma autónoma.",
-		Parameters:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Nombre de la tarea"},"cron_expression":{"type":"string","description":"Expresión en palabras, ej: @hourly, o cada 1 minuto (* * * * *)"},"tool_name":{"type":"string","description":"La herramienta a correr"},"payload":{"type":"object","description":"Argumentos para la herramienta"}},"required":["name","cron_expression","tool_name","payload"]}`),
+		Description: "Programa una tarea recurrente que ejecutará un agente con un prompt en lenguaje natural a la frecuencia indicada.",
+		Parameters:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Nombre de la tarea"},"cron_expression":{"type":"string","description":"Expresion cron, ej: @hourly, @daily, 0 9 * * *"},"agent_id":{"type":"number","description":"ID del agente que ejecutara la tarea (default: 1)"},"prompt":{"type":"string","description":"Instruccion en lenguaje natural que el agente ejecutara"}},"required":["name","cron_expression","prompt"]}`),
 		Execute: func(ctx context.Context, args map[string]interface{}) (json.RawMessage, error) {
-			payloadRaw, _ := json.Marshal(args["payload"])
+			agentID := uint(1)
+			if v, ok := args["agent_id"]; ok {
+				switch n := v.(type) {
+				case float64:
+					agentID = uint(n)
+				case int:
+					agentID = uint(n)
+				}
+			}
 			newTask, err := tasksvc.CreateScheduledTask(tasksvc.CreateTaskInput{
 				Name:           fmt.Sprintf("%v", args["name"]),
 				CronExpression: fmt.Sprintf("%v", args["cron_expression"]),
-				ToolName:       fmt.Sprintf("%v", args["tool_name"]),
-				Payload:        payloadRaw,
+				AgentID:        agentID,
+				Prompt:         fmt.Sprintf("%v", args["prompt"]),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to save scheduled task: %w", err)
 			}
 			return []byte(fmt.Sprintf(`{"status":"success","task_id":%d}`, newTask.ID)), nil
 		},
+		Sensitive: true,
 	})
 }
 
@@ -533,7 +542,7 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 		}
 
 		// ── CASO B: Hay herramientas ──────────────────────────────────────────────
-		sensitiveTC := b.findSensitiveToolCall(msg.ToolCalls, sanitizedToOriginal)
+		sensitiveTC := b.findSensitiveToolCall(msg.ToolCalls, sanitizedToOriginal, session.AgentID)
 		if sensitiveTC != nil {
 			// NO añadimos a dbMsgsToSave aquí — el handler de chat guarda respMsg
 			// como el mensaje final del asistente (con RawToolCalls).

@@ -6,6 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -19,6 +22,27 @@ type Config struct {
 	Password string
 	DBName   string
 	SSLMode  string
+}
+
+func dsnFromConfig(cfg Config) string {
+	if cfg.SSLMode == "" {
+		cfg.SSLMode = "disable"
+	}
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
+	)
+	return dsn
+}
+
+func dsnForMigrate(cfg Config) string {
+	if cfg.SSLMode == "" {
+		cfg.SSLMode = "disable"
+	}
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName, cfg.SSLMode,
+	)
 }
 
 // validatePostgresURI catches incomplete URIs like postgresql://user:pass (no @host).
@@ -81,10 +105,35 @@ func ConnectDB(cfg Config) error {
 	DB = db
 	log.Println("Connected to PostgreSQL successfully")
 
+	// Run versioned migrations first
+	if err := RunMigrations(cfg); err != nil {
+		log.Printf("⚠️ Migrations warning: %v (continuing with AutoMigrate as fallback)", err)
+	}
+
 	if err := autoMigrate(db); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func RunMigrations(cfg Config) error {
+	migrateDSN := dsnForMigrate(cfg)
+
+	m, err := migrate.New(
+		"file://internal/database/migrations",
+		migrateDSN,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create migrator: %w", err)
+	}
+	defer m.Close()
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	log.Println("✅ Database migrations completed")
 	return nil
 }
 
@@ -94,6 +143,11 @@ func autoMigrate(db *gorm.DB) error {
 
 	// 1. Migrate LLMProvider first (base for Agent)
 	if err := db.AutoMigrate(&LLMProvider{}); err != nil {
+		return err
+	}
+
+	// 1.5 Migrate Model table (depends on LLMProvider)
+	if err := db.AutoMigrate(&Model{}); err != nil {
 		return err
 	}
 
@@ -125,6 +179,7 @@ func autoMigrate(db *gorm.DB) error {
 		&Session{},
 		&ChatMessage{},
 		&PendingAction{},
+		&ToolPermission{},
 		&HandsAIConfig{},
 		&McpStdioServer{},
 		&McpStreamServer{},

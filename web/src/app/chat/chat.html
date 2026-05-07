@@ -1,9 +1,24 @@
 <div class="chat-container">
   <div class="chat-agent-selector-bar">
-    <div class="selector-label">🧠 Contexto de Ejecución:</div>
+    <div class="selector-label">🧠 Agente:</div>
     <select class="agent-dropdown" [ngModel]="session.agent_id" (ngModelChange)="onAgentChange($event)">
       @for (agent of agents(); track agent.id) {
         <option [ngValue]="agent.id">{{ agent.name }}</option>
+      }
+    </select>
+
+    <div class="selector-label">🤖 Modelo:</div>
+    <select class="model-dropdown" [ngModel]="selectedModelId()" (ngModelChange)="selectedModelId.set($event)">
+      <option [ngValue]="''">Default del agente</option>
+      @for (group of modelGroups(); track group.provider.id) {
+        <optgroup label="{{ group.provider.name }}">
+          @for (model of group.models; track model.id) {
+            <option [ngValue]="model.model_id">
+              {{ model.name }}
+              @if (model.is_free) { (Gratis) }
+            </option>
+          }
+        </optgroup>
       }
     </select>
   </div>

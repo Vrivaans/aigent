@@ -9,17 +9,38 @@ import (
 	"aigent/internal/database"
 )
 
-func (b *Brain) findSensitiveToolCall(toolCalls []ToolCall, sanitizedToOriginal map[string]string) *ToolCall {
+func (b *Brain) findSensitiveToolCall(toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) *ToolCall {
 	for i, tc := range toolCalls {
 		realName, ok := sanitizedToOriginal[tc.Function.Name]
 		if !ok {
 			realName = tc.Function.Name
 		}
-		if tDef, exists := b.Registry.Get(realName); exists && tDef.Sensitive {
-			return &toolCalls[i]
+		tDef, exists := b.Registry.Get(realName)
+		if !exists || !tDef.Sensitive {
+			continue
 		}
+
+		if hasAutoAllowPermission(agentID, realName) {
+			continue
+		}
+
+		return &toolCalls[i]
 	}
 	return nil
+}
+
+var permissionChecker = func(agentID uint, toolName string) bool {
+	var perm database.ToolPermission
+	result := database.DB.Where("agent_id = ? AND tool_name = ? AND action_type = ? AND paused = ?",
+		agentID, toolName, "always_allow", false).First(&perm)
+	return result.Error == nil
+}
+
+func hasAutoAllowPermission(agentID uint, toolName string) bool {
+	if database.DB == nil {
+		return false
+	}
+	return permissionChecker(agentID, toolName)
 }
 
 func appendAssistantToolCallContext(

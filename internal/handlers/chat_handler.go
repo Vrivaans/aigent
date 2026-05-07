@@ -19,7 +19,8 @@ type ChatHandler struct {
 }
 
 type ChatRequest struct {
-	Message string `json:"message"`
+	Message       string `json:"message"`
+	ModelOverride string `json:"model_override,omitempty"`
 }
 
 type ResetLLMOverrideRequest struct{}
@@ -45,6 +46,11 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			title = title[:30] + "..."
 		}
 		database.DB.Model(&session).Update("title", title)
+	}
+
+	if req.ModelOverride != "" {
+		session.LLMModelOverride = req.ModelOverride
+		database.DB.Model(&session).Where("id = ?", session.ID).Update("llm_model_override", req.ModelOverride)
 	}
 
 	// 1. Save user message history
@@ -221,6 +227,11 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 
 	pending.Status = "APPROVED"
 	database.DB.Save(&pending)
+
+	var session database.Session
+	if err := database.DB.First(&session, pending.SessionID).Error; err == nil {
+		AutoSaveToolPermission(session.AgentID, tDef.Name)
+	}
 
 	// Guardamos el resultado de la tool para que el siguiente chat lo vea en contexto
 	toolResMsg := database.ChatMessage{

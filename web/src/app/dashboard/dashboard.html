@@ -1,15 +1,15 @@
 <div class="tasks-container">
   <h3>Tareas Programadas</h3>
-  <p class="desc">Cron jobs creados por el agente o manualmente desde esta vista.</p>
+  <p class="desc">Programa agentes para que ejecuten tareas automaticamente a la hora y frecuencia que elijas.</p>
 
   <form class="task-form" (ngSubmit)="createTask()">
     <div class="form-header">
       <div>
-        <span class="section-label">Nueva task</span>
-        <h4>Programar herramienta</h4>
+        <span class="section-label">Nueva tarea</span>
+        <h4>Programar agente</h4>
       </div>
-      <button type="submit" [disabled]="isSaving() || !newTask.name || !newTask.tool_name">
-        {{ isSaving() ? 'Creando...' : '+ Crear task' }}
+      <button type="submit" [disabled]="isSaving() || !newTask.name || !newTask.prompt">
+        {{ isSaving() ? 'Creando...' : '+ Crear tarea' }}
       </button>
     </div>
 
@@ -20,30 +20,68 @@
     <div class="form-grid">
       <label>
         Nombre
-        <input name="name" [(ngModel)]="newTask.name" placeholder="Ej: Revisar monedas cada hora" required>
+        <input name="name" [(ngModel)]="newTask.name" placeholder="Ej: Revisar correo cada mañana" required>
       </label>
 
       <label>
         Frecuencia
-        <select name="cron_expression" [(ngModel)]="newTask.cron_expression">
-          <option value="@hourly">Cada hora (@hourly)</option>
-          <option value="* * * * *">Cada minuto (* * * * *)</option>
-          <option value="@daily">Cada día (@daily)</option>
+        <select name="frequency" [(ngModel)]="newTask.frequency" (ngModelChange)="onFrequencyChange()">
+          <option value="@hourly">Cada hora</option>
+          <option value="* * * * *">Cada minuto</option>
+          <option value="@daily">Cada dia</option>
+          <option value="@weekdays">Dias de semana (L-V)</option>
+          <option value="custom">Personalizada</option>
         </select>
       </label>
 
-      <label class="full-width">
-        Herramienta
-        <select name="tool_name" [(ngModel)]="newTask.tool_name" required>
-          @for (tool of tools(); track tool.name) {
-            <option [value]="tool.name">{{ tool.name }}</option>
+      @if (newTask.frequency === '@daily' || newTask.frequency === '@weekdays') {
+        <label>
+          Horario
+          <input type="time" name="scheduledHour" [(ngModel)]="newTask.scheduledHour" (ngModelChange)="onHourChange()">
+        </label>
+      }
+
+      <label>
+        Agente
+        <select name="agent_id" [(ngModel)]="newTask.agent_id">
+          @for (agent of agents(); track agent.id) {
+            <option [ngValue]="agent.id">{{ agent.name }}</option>
           }
         </select>
       </label>
 
+      @if (newTask.frequency === 'custom') {
+        <div class="full-width custom-section">
+          <div class="custom-row">
+            <label class="custom-time">
+              Horario
+              <input type="time" name="customHour" [(ngModel)]="newTask.customHour" (ngModelChange)="onHourChange()">
+            </label>
+
+            <div class="custom-days">
+              <span class="days-label">Dias</span>
+              <div class="days-grid">
+                @for (day of days; track day.key) {
+                  <button type="button" class="day-btn"
+                    [class.active]="newTask.customDays.includes(day.key)"
+                    (click)="toggleDay(day.key)">
+                    {{ day.label }}
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="newTask.oneShot" name="oneShot">
+        Ejecucion unica (no se repite)
+      </label>
+
       <label class="full-width">
-        Payload JSON
-        <textarea name="payload" [(ngModel)]="newTask.payload" rows="5" spellcheck="false"></textarea>
+        Prompt (instruccion en lenguaje natural)
+        <textarea name="prompt" [(ngModel)]="newTask.prompt" rows="3" placeholder="Ej: Revisa mis correos nuevos y resumime los mas importantes." required></textarea>
       </label>
     </div>
   </form>
@@ -52,29 +90,47 @@
     @for (task of tasks(); track task.id) {
       <div class="task-card">
         <div class="header">
-          <span class="tool">{{task.tool_name}}</span>
-          <button class="delete-btn" (click)="deleteTask(task.id)">×</button>
+          <span class="agent-badge">{{ task.agent?.name || 'Agente ' + task.agent_id }}</span>
+          <span class="cron-badge">{{ cronLabel(task.cron_expression, task.one_shot) }}</span>
+          @if (task.one_shot) { <span class="one-shot-badge">Unica vez</span> }
+          <button class="delete-btn" (click)="deleteTask(task.id)">&times;</button>
         </div>
-        <h4 class="name">{{task.name}}</h4>
-        
+        <h4 class="name">{{ task.name }}</h4>
+
+        <div class="prompt-preview">{{ task.prompt }}</div>
+
         <div class="meta">
           <div class="meta-item">
-            <span class="icon">⏱️</span> {{task.cron_expression}}
+            <span class="icon">⏱️</span> {{ task.cron_expression }}
           </div>
           <div class="meta-item">
-            <span class="icon">⏭️</span> {{formatDate(task.next_run_at)}}
+            <span class="icon">⏭️</span> Proximo: {{ formatDate(task.next_run_at) }}
           </div>
         </div>
 
-        <details>
-          <summary>Ver Payload JSON</summary>
-          <pre>{{ task.payload | json }}</pre>
-        </details>
+        @if (task.last_run_at) {
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">✅</span> Ultima ejecucion: {{ formatDate(task.last_run_at) }}
+            </div>
+          </div>
+        }
+
+        @if (task.last_result) {
+          <details class="task-result">
+            <summary>Resultado</summary>
+            <p>{{ task.last_result }}</p>
+          </details>
+        }
+
+        @if (task.last_error) {
+          <div class="task-error">❌ {{ task.last_error }}</div>
+        }
       </div>
     }
 
     @if (tasks().length === 0) {
-      <div class="empty">No hay tareas programadas actualmente. Pídele al chat que recuerde algo.</div>
+      <div class="empty">No hay tareas programadas. Crea una o pedile al agente que recuerde algo.</div>
     }
   </div>
 </div>

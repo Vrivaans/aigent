@@ -29,5 +29,6 @@ web/dist/
 
 .cursor/
 .design/
-.openclaw/
-.hermes/
+.openclaw
+.hermes
+architecture-analysis.md

@@ -24,7 +24,8 @@ export class Providers implements OnInit {
     name: '',
     base_url: 'https://api.groq.com/openai/v1',
     api_key: '',
-    default_model: 'llama-3.3-70b-versatile'
+    default_model: 'llama-3.3-70b-versatile',
+    provider_type: 'groq'
   };
 
   handsaiConfig = signal({ url: '', token: '' });
@@ -412,7 +413,8 @@ export class Providers implements OnInit {
       name: p.name,
       base_url: p.base_url,
       api_key: '********', // Placeholder to indicate we have a key
-      default_model: p.default_model
+      default_model: p.default_model,
+      provider_type: p.provider_type
     };
     this.showAddForm.set(true);
   }
@@ -424,7 +426,8 @@ export class Providers implements OnInit {
       name: '',
       base_url: 'https://api.groq.com/openai/v1',
       api_key: '',
-      default_model: 'llama-3.3-70b-versatile'
+      default_model: 'llama-3.3-70b-versatile',
+      provider_type: 'groq'
     };
   }
 

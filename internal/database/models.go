@@ -29,16 +29,33 @@ type AgentTool struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Task represents a scheduled job to be executed dynamically using HandsAI Tools
+// Task represents a scheduled job that runs an agent flow with a prompt.
 type Task struct {
-	ID             uint           `gorm:"primarykey" json:"id"`
-	Name           string         `gorm:"size:255;not null" json:"name"`
-	CronExpression string         `gorm:"size:100;not null" json:"cron_expression"`
-	ToolName       string         `gorm:"size:255;not null" json:"tool_name"`
-	Payload        datatypes.JSON `json:"payload"`
-	NextRunAt      *time.Time     `json:"next_run_at"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID             uint       `gorm:"primarykey" json:"id"`
+	Name           string     `gorm:"size:255;not null" json:"name"`
+	CronExpression string     `gorm:"size:100;not null" json:"cron_expression"`
+	AgentID        uint       `gorm:"not null;default:1" json:"agent_id"`
+	Agent          Agent      `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
+	Prompt         string     `gorm:"type:text;not null" json:"prompt"`
+	OneShot        bool       `gorm:"default:false" json:"one_shot"`
+	NextRunAt      *time.Time `json:"next_run_at"`
+	LastRunAt      *time.Time `json:"last_run_at"`
+	LastResult     string     `gorm:"type:text" json:"last_result,omitempty"`
+	LastError      string     `gorm:"type:text" json:"last_error,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// ToolPermission stores persistent allow/deny decisions per agent+tool combination.
+type ToolPermission struct {
+	ID         uint       `gorm:"primarykey" json:"id"`
+	AgentID    uint       `gorm:"not null;index" json:"agent_id"`
+	ToolName   string     `gorm:"size:255;not null;index" json:"tool_name"`
+	ActionType string     `gorm:"size:20;not null;default:'always_allow'" json:"action_type"` // always_allow | always_deny
+	Paused     bool       `gorm:"default:false" json:"paused"`
+	PausedAt   *time.Time `json:"paused_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // Rule represents behavioral constraints or configuration injected into OpenRouter Prompts
@@ -93,11 +110,43 @@ type LLMProvider struct {
 	BaseURL      string         `json:"base_url"`
 	APIKey       string         `json:"api_key"` // Encrypted
 	DefaultModel string         `json:"default_model"`
+	ProviderType string         `gorm:"size:50;default:'custom'" json:"provider_type"` // zen, go, groq, openrouter, openai, custom
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
 	IsDefault    bool           `json:"is_default" gorm:"default:false"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+// Model represents an individual LLM available from a provider.
+type Model struct {
+	ID            uint         `gorm:"primarykey" json:"id"`
+	ProviderID    uint         `gorm:"not null;index" json:"provider_id"`
+	Provider      LLMProvider  `gorm:"foreignKey:ProviderID" json:"provider,omitempty"`
+	ModelID       string       `gorm:"size:255;not null" json:"model_id"`
+	Name          string       `gorm:"size:255;not null" json:"name"`
+	IsFree        bool         `gorm:"default:false" json:"is_free"`
+	ContextWindow int          `gorm:"default:0" json:"context_window"`
+	LastSeen      time.Time    `json:"last_seen"`
+	CreatedAt     time.Time    `json:"created_at"`
+	UpdatedAt     time.Time    `json:"updated_at"`
+}
+
+func ProviderPresetBaseURL(providerType string) string {
+	switch providerType {
+	case "zen":
+		return "https://opencode.ai/zen/v1"
+	case "go":
+		return "https://opencode.ai/go/v1"
+	case "groq":
+		return "https://api.groq.com/openai/v1"
+	case "openrouter":
+		return "https://openrouter.ai/api/v1"
+	case "openai":
+		return "https://api.openai.com/v1"
+	default:
+		return ""
+	}
 }
 
 // HandsAIConfig stores the connection settings for the real-world tool execution engine
