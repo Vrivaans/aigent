@@ -43,6 +43,7 @@ func (b *Brain) createChatCompletionWithFallback(
 	if decErr != nil {
 		return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", activeProvider.Name, decErr)
 	}
+	log.Printf("🔑 Using provider '%s' keyLen=%d baseURL=%s model=%s", activeProvider.Name, len(apiKey), activeProvider.BaseURL, activeModel)
 
 	llmClient := NewClient(apiKey, activeProvider.BaseURL)
 	resp, err := llmClient.CreateChatCompletion(ctx, req)

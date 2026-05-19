@@ -110,7 +110,7 @@ type LLMProvider struct {
 	BaseURL      string         `json:"base_url"`
 	APIKey       string         `json:"api_key"` // Encrypted
 	DefaultModel string         `json:"default_model"`
-	ProviderType string         `gorm:"size:50;default:'custom'" json:"provider_type"` // zen, go, groq, openrouter, openai, custom
+	ProviderType string         `gorm:"size:50;default:'custom'" json:"provider_type"` // zen, groq, openrouter, openai, custom
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
 	IsDefault    bool           `json:"is_default" gorm:"default:false"`
 	CreatedAt    time.Time      `json:"created_at"`
@@ -136,8 +136,6 @@ func ProviderPresetBaseURL(providerType string) string {
 	switch providerType {
 	case "zen":
 		return "https://opencode.ai/zen/v1"
-	case "go":
-		return "https://opencode.ai/go/v1"
 	case "groq":
 		return "https://api.groq.com/openai/v1"
 	case "openrouter":

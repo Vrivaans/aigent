@@ -283,9 +283,14 @@
   max-width: 150px;
 }
 
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .card-actions button {
-  width: 100%;
-  padding: 0.7rem;
+  padding: 0.55rem 1rem;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   color: #ccc;
@@ -293,11 +298,17 @@
   cursor: pointer;
   font-weight: 600;
   transition: all 0.2s;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .card-actions button:hover {
   background: rgba(255, 255, 255, 0.1);
   color: white;
+}
+
+.card-actions .btn-secondary {
+  flex: 1;
 }
 
 /* Animations */
@@ -552,4 +563,67 @@
   color: var(--accent);
   font-size: 0.88rem;
   word-break: break-word;
+}
+
+.model-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.model-hint-warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.form-group select {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  color: white;
+  outline: none;
+  transition: border-color 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23999' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+.form-group select:focus {
+  border-color: #3b82f6;
+}
+
+.form-group select option {
+  background: #1e1e1e;
+  color: white;
+}
+
+.btn-refresh {
+  padding: 0.4rem 0.8rem;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-refresh:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.btn-secondary-action {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
 }

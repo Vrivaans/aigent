@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService, LLMProvider, McpStdioServer, McpStreamServer } from '../api.service';
+import { ApiService, LLMProvider, McpStdioServer, McpStreamServer, ModelInfo } from '../api.service';
 
 @Component({
   selector: 'app-providers',
@@ -22,11 +22,15 @@ export class Providers implements OnInit {
   
   newProvider: Partial<LLMProvider> = {
     name: '',
-    base_url: 'https://api.groq.com/openai/v1',
+    base_url: 'https://opencode.ai/zen/v1',
     api_key: '',
-    default_model: 'llama-3.3-70b-versatile',
-    provider_type: 'groq'
+    default_model: 'big-pickle',
+    provider_type: 'zen'
   };
+
+  providerModels = signal<ModelInfo[]>([]);
+  modelsLoading = signal(false);
+  modelsError = signal<string | null>(null);
 
   handsaiConfig = signal({ url: '', token: '' });
 
@@ -406,16 +410,51 @@ export class Providers implements OnInit {
     this.resetForm();
   }
 
+  async onSaveAndRefreshModels() {
+    if (!this.newProvider.name) return;
+    
+    let savedId: number | null = null;
+    if (this.isEditing() && this.editingId()) {
+      savedId = this.editingId()!;
+      await this.api.updateProvider(savedId, this.newProvider);
+    } else {
+      const created = await this.api.createProvider(this.newProvider);
+      savedId = created.id;
+    }
+
+    await this.loadProviders();
+    this.showAddForm.set(false);
+
+    if (savedId) {
+      this.editingId.set(savedId);
+      await this.refreshModelsForProvider(savedId);
+      const p = this.providers().find(pr => pr.id === savedId);
+      if (p) {
+        this.isEditing.set(true);
+        this.editingId.set(p.id);
+        this.newProvider = {
+          name: p.name,
+          base_url: p.base_url,
+          api_key: '********',
+          default_model: p.default_model,
+          provider_type: p.provider_type
+        };
+        this.showAddForm.set(true);
+      }
+    }
+  }
+
   editProvider(p: LLMProvider) {
     this.isEditing.set(true);
     this.editingId.set(p.id);
     this.newProvider = {
       name: p.name,
       base_url: p.base_url,
-      api_key: '********', // Placeholder to indicate we have a key
+      api_key: '********',
       default_model: p.default_model,
       provider_type: p.provider_type
     };
+    this.loadProviderModels();
     this.showAddForm.set(true);
   }
 
@@ -424,17 +463,120 @@ export class Providers implements OnInit {
     this.editingId.set(null);
     this.newProvider = {
       name: '',
-      base_url: 'https://api.groq.com/openai/v1',
+      base_url: 'https://opencode.ai/zen/v1',
       api_key: '',
-      default_model: 'llama-3.3-70b-versatile',
-      provider_type: 'groq'
+      default_model: 'big-pickle',
+      provider_type: 'zen'
     };
+    this.providerModels.set([]);
+    this.modelsError.set(null);
+  }
+
+  async onProviderTypeChange() {
+    const type = this.newProvider.provider_type;
+    const presets = await this.api.getProviderPresets();
+    const preset = presets.find(p => p.type === type);
+    if (preset && preset.base_url) {
+      this.newProvider.base_url = preset.base_url;
+    } else if (type === 'custom') {
+      this.newProvider.base_url = '';
+    }
+    this.providerModels.set([]);
+    this.modelsError.set(null);
+  }
+
+  async loadProviderModels() {
+    const id = this.editingId();
+    if (id != null && id > 0) {
+      this.modelsLoading.set(true);
+      this.modelsError.set(null);
+      try {
+        const models = await this.api.getProviderModels(id);
+        this.providerModels.set(models);
+        if (models.length === 0) {
+          this.modelsError.set('No se encontraron modelos para este proveedor. Verificá la conexión y probá refrescar.');
+        }
+      } catch (e: any) {
+        this.providerModels.set([]);
+        this.modelsError.set('No se pudo obtener la lista de modelos. Podés escribir el nombre manualmente.');
+      } finally {
+        this.modelsLoading.set(false);
+      }
+    } else {
+      this.tryFetchModelsFromEndpoint();
+    }
+  }
+
+  async tryFetchModelsFromEndpoint() {
+    const baseUrl = this.newProvider.base_url?.trim();
+    const apiKey = this.newProvider.api_key;
+    if (!baseUrl) {
+      this.providerModels.set([]);
+      this.modelsError.set('Ingresá la Base URL para cargar los modelos disponibles.');
+      return;
+    }
+    if (apiKey === '********' || !apiKey) {
+      this.providerModels.set([]);
+      this.modelsError.set('Ingresá la API Key para cargar los modelos disponibles.');
+      return;
+    }
+    this.modelsLoading.set(true);
+    this.modelsError.set(null);
+    try {
+      await this.api.testProvider({
+        ...this.newProvider,
+        id: this.editingId() || 0
+      });
+      const id = this.editingId();
+      if (id != null && id > 0) {
+        const result = await this.api.refreshProviderModels(id);
+        this.providerModels.set(result.models || []);
+        if (!result.models?.length) {
+          this.modelsError.set('El proveedor no expone un endpoint /models. Escribí el nombre del modelo manualmente.');
+        }
+      } else {
+        this.providerModels.set([]);
+        this.modelsError.set('Guardá el proveedor primero, luego podés refrescar la lista de modelos.');
+      }
+    } catch {
+      this.providerModels.set([]);
+      this.modelsError.set('No se puede visualizar la lista de modelos. Escribí el nombre del modelo manualmente.');
+    } finally {
+      this.modelsLoading.set(false);
+    }
+  }
+
+  async refreshModelsForProvider(providerId: number) {
+    this.modelsLoading.set(true);
+    this.modelsError.set(null);
+    try {
+      const result = await this.api.refreshProviderModels(providerId);
+      this.providerModels.set(result.models || []);
+      if (!result.models?.length) {
+        this.modelsError.set('El proveedor no expone un endpoint /models. Escribí el nombre del modelo manualmente.');
+      }
+    } catch {
+      this.providerModels.set([]);
+      this.modelsError.set('No se puede visualizar la lista de modelos en /models. Escribí el nombre del modelo manualmente.');
+    } finally {
+      this.modelsLoading.set(false);
+    }
   }
 
   async setAsDefault(id: number, event: Event) {
     event.stopPropagation();
     await this.api.setDefaultProvider(id);
     await this.loadProviders();
+  }
+
+  async refreshModelsForCard(p: LLMProvider, event: Event) {
+    event.stopPropagation();
+    try {
+      const result = await this.api.refreshProviderModels(p.id);
+      alert(result.ok ? `✅ ${result.models?.length ?? 0} modelos cargados` : `⚠️ ${result.message}`);
+    } catch (e: any) {
+      alert('Error al refrescar modelos: ' + (e?.message || 'desconocido'));
+    }
   }
 
   async deleteProvider(id: number, event: Event) {
