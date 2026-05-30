@@ -92,6 +92,17 @@ type ChatMessage struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// Artifact represents code, diagrams, HTML or markdown mutable.
+type Artifact struct {
+	ID        string    `gorm:"primaryKey;size:64" json:"id"`
+	SessionID uint      `gorm:"not null;index" json:"session_id"`
+	Type      string    `gorm:"size:30" json:"type"` // e.g. "diagram"
+	Title     string    `gorm:"size:255" json:"title"`
+	Content   string    `gorm:"type:text" json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type PendingAction struct {
 	ID         uint           `gorm:"primarykey" json:"id"`
 	SessionID  uint           `json:"session_id"`

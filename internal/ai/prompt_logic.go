@@ -542,7 +542,7 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 		}
 
 		// ── CASO B: Hay herramientas ──────────────────────────────────────────────
-		sensitiveTC := b.findSensitiveToolCall(msg.ToolCalls, sanitizedToOriginal, session.AgentID)
+		sensitiveTC := b.findSensitiveToolCall(ctx, msg.ToolCalls, sanitizedToOriginal, session.AgentID)
 		if sensitiveTC != nil {
 			// NO añadimos a dbMsgsToSave aquí — el handler de chat guarda respMsg
 			// como el mensaje final del asistente (con RawToolCalls).

@@ -60,7 +60,8 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 		var history []database.ChatMessage
 		history = append(history, userMsg)
 
-		respMsg, intermediates, err := brain.ProcessChatInteraction(ctx, session.ID, history, "")
+		ctxTask := context.WithValue(ctx, ai.IsScheduledTaskKey, true)
+		respMsg, intermediates, err := brain.ProcessChatInteraction(ctxTask, session.ID, history, "")
 		nowAfter := time.Now()
 		task.LastRunAt = &nowAfter
 

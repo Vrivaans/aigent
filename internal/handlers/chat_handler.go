@@ -9,6 +9,7 @@ import (
 
 	"aigent/internal/ai"
 	"aigent/internal/database"
+	"aigent/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -114,6 +115,9 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	}
 	database.DB.Create(&asstMsg)
 
+	// Extraer y procesar artefactos
+	cleanContent, savedArtifacts := processAndSaveArtifacts(session.ID, respMsg.Content)
+
 	// 6. Manejar si requiere confirmación
 	var pendingID uint
 	if respMsg.RequiresConfirmation && respMsg.WaitingToolCall != nil {
@@ -129,7 +133,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"response":              asstMsg.Content,
+		"response":              cleanContent,
+		"artifacts":             savedArtifacts,
 		"tool_calls":            respMsg.ToolCalls,
 		"status":                "ok",
 		"requires_confirmation": respMsg.RequiresConfirmation,
@@ -280,6 +285,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	// 9. Manejar la respuesta final de la re-inferencia
 	var finalResponse string = "✅ Acción ejecutada correctamente."
 	var nextPendingID uint
+	var savedArtifacts []database.Artifact
 	if msg != nil {
 		var rawTools string
 		if len(msg.ToolCalls) > 0 {
@@ -293,7 +299,10 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 			RawToolCalls: rawTools,
 		}
 		database.DB.Create(&asstMsg)
-		finalResponse = msg.Content
+
+		cleanContent, arts := processAndSaveArtifacts(pending.SessionID, msg.Content)
+		finalResponse = cleanContent
+		savedArtifacts = arts
 
 		// Si la re-inferencia disparó OTRA acción sensible, crear el PendingAction
 		if msg.RequiresConfirmation && msg.WaitingToolCall != nil {
@@ -314,6 +323,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		"status":     "approved",
 		"result":     string(result),
 		"response":   finalResponse,
+		"artifacts":  savedArtifacts,
 		"pending_id": nextPendingID,
 	})
 }
@@ -346,6 +356,9 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 	// Enriquecer mensajes
 	response := make([]ChatMessageResponse, len(history))
 	for i, msg := range history {
+		cleanContent, _ := utils.ExtractArtifacts(msg.Content)
+		msg.Content = cleanContent
+
 		response[i] = ChatMessageResponse{
 			ChatMessage: msg,
 		}
@@ -461,4 +474,37 @@ func (h *ChatHandler) DeleteSession(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "deleted"})
+}
+
+func processAndSaveArtifacts(sessionID uint, content string) (string, []database.Artifact) {
+	cleanContent, arts := utils.ExtractArtifacts(content)
+	var savedArtifacts []database.Artifact
+	for _, art := range arts {
+		dbArt := database.Artifact{
+			ID:        art.ID,
+			SessionID: sessionID,
+			Type:      art.Type,
+			Title:     art.Title,
+			Content:   art.Content,
+		}
+		if dbArt.ID == "" {
+			dbArt.ID = fmt.Sprintf("diag-%d", time.Now().UnixNano())
+		}
+		if err := database.DB.Save(&dbArt).Error; err == nil {
+			savedArtifacts = append(savedArtifacts, dbArt)
+		} else {
+			log.Printf("⚠️ Error saving artifact: %v", err)
+		}
+	}
+	return cleanContent, savedArtifacts
+}
+
+// GetSessionArtifacts retrieves all artifacts created within a session
+func (h *ChatHandler) GetSessionArtifacts(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
+	var artifacts []database.Artifact
+	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Find(&artifacts).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(artifacts)
 }

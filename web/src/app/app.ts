@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chat } from './chat/chat';
 import { Dashboard } from './dashboard/dashboard';
@@ -21,11 +21,19 @@ export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'age
 export class App implements OnInit {
   private api = inject(ApiService);
   public auth = inject(AuthService);
+
+  constructor() {
+    effect(async () => {
+      if (this.auth.isLoggedIn()) {
+        await this.initAppData();
+      }
+    });
+  }
   
   currentTab: Tab = 'chats';
   sessions = signal<Session[]>([]);
   activeSessionId = signal<number | null>(null);
-  activeSession = computed(() => this.sessions().find(s => s.id === this.activeSessionId()));
+  activeSession = computed(() => this.sessions().find(s => s.id === this.activeSessionId()) ?? null);
 
   tools = signal<any[]>([]);
   toolsLoading = signal(false);
@@ -55,7 +63,7 @@ export class App implements OnInit {
     if (this.sessions().length > 0) {
       this.activeSessionId.set(this.sessions()[0].id);
     } else {
-      await this.createNewSession();
+      this.activeSessionId.set(null);
     }
   }
 
@@ -112,13 +120,18 @@ export class App implements OnInit {
         if (this.sessions().length > 0) {
           this.activeSessionId.set(this.sessions()[0].id);
         } else {
-          await this.createNewSession();
+          this.activeSessionId.set(null);
         }
       }
     } catch (err) {
       console.error('Failed to delete session', err);
       alert('Error al eliminar la conversación');
     }
+  }
+
+  async handleSessionCreated(sessionId: number) {
+    await this.loadSessions();
+    this.activeSessionId.set(sessionId);
   }
 }
 

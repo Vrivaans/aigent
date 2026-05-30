@@ -119,11 +119,14 @@ export class AgentsComponent implements OnInit {
   }
 
   selectAllTools() {
-    this.currentAgent.tools = this.availableTools().map(t => t.name);
+    const toAdd = this.filteredTools().map(t => t.name);
+    const combined = new Set([...this.currentAgent.tools, ...toAdd]);
+    this.currentAgent.tools = Array.from(combined);
   }
 
   deselectAllTools() {
-    this.currentAgent.tools = [];
+    const toRemove = this.filteredTools().map(t => t.name);
+    this.currentAgent.tools = this.currentAgent.tools.filter(t => !toRemove.includes(t));
   }
 
   async saveAgent() {

@@ -179,7 +179,7 @@ func TestFindSensitiveToolCall(t *testing.T) {
 		{ID: "call_2", Function: FunctionCall{Name: "dangerous_tool"}},
 	}
 
-	sensitive := b.findSensitiveToolCall(toolCalls, map[string]string{
+	sensitive := b.findSensitiveToolCall(context.Background(), toolCalls, map[string]string{
 		"safe_tool":       "safe_tool",
 		"dangerous_tool":  "dangerous_tool",
 	}, 1)
@@ -203,7 +203,7 @@ func TestFindSensitiveToolCallNone(t *testing.T) {
 		{ID: "call_1", Function: FunctionCall{Name: "safe_tool"}},
 	}
 
-	sensitive := b.findSensitiveToolCall(toolCalls, map[string]string{
+	sensitive := b.findSensitiveToolCall(context.Background(), toolCalls, map[string]string{
 		"safe_tool": "safe_tool",
 	}, 1)
 	if sensitive != nil {
@@ -227,7 +227,7 @@ func TestFindSensitiveToolCallWithSanitizedNames(t *testing.T) {
 		"dangerous_tool": "dangerous-tool",
 	}
 
-	sensitive := b.findSensitiveToolCall(toolCalls, sanitizedToOriginal, 1)
+	sensitive := b.findSensitiveToolCall(context.Background(), toolCalls, sanitizedToOriginal, 1)
 	if sensitive == nil {
 		t.Fatal("Expected to find sensitive tool call via sanitized name mapping")
 	}

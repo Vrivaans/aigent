@@ -178,6 +178,7 @@ func autoMigrate(db *gorm.DB) error {
 		&Task{},
 		&Session{},
 		&ChatMessage{},
+		&Artifact{},
 		&PendingAction{},
 		&ToolPermission{},
 		&HandsAIConfig{},

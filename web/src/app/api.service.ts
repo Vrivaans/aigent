@@ -207,10 +207,16 @@ export class ApiService {
     return res.json();
   }
 
+  async getSessionArtifacts(sessionId: number): Promise<any[]> {
+    const res = await this.fetchApi(`/sessions/${sessionId}/artifacts`);
+    return res.json();
+  }
+
   async sendChatMessage(sessionId: number, message: string, modelOverride?: string): Promise<{
     status?: string;
     error?: string;
     response: string;
+    artifacts?: any[];
     tool_calls: any[];
     requires_confirmation?: boolean;
     pending_action_id?: number;

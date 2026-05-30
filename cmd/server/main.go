@@ -215,6 +215,7 @@ func main() {
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
+	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
 
 	// LLM Provider Management
 	agentHandler := &handlers.AgentHandler{Brain: brain}

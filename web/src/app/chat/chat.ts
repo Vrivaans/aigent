@@ -1,7 +1,8 @@
-import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, signal, inject, OnInit, ViewChild, ElementRef, AfterViewChecked, Input, Output, EventEmitter, OnChanges, SimpleChanges, computed } from '@angular/core';
 import { ApiService, ChatMessage, Session, Agent, ProviderSwitchInfo, ModelGroup, ModelInfo } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DiagramRenderer } from './diagram-renderer';
 
 export interface ChatMessageUI extends ChatMessage {
   requires_confirmation?: boolean;
@@ -17,28 +18,40 @@ export interface ChatMessageUI extends ChatMessage {
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DiagramRenderer],
   templateUrl: './chat.html',
   styleUrl: './chat.css'
 })
 export class Chat implements OnInit, OnChanges, AfterViewChecked {
   private api = inject(ApiService);
-  
-  @Input({ required: true }) session!: Session;
+
+  @Input() session: Session | null | undefined = null;
   @Output() agentChanged = new EventEmitter<void>();
-  
+  @Output() sessionCreated = new EventEmitter<number>();
+
   messages = signal<ChatMessageUI[]>([]);
   inputText = signal('');
   isThinking = signal(false);
-  
+
   agents = signal<Agent[]>([]);
   modelGroups = signal<ModelGroup[]>([]);
   selectedModelId = signal<string>('');
+  localAgentId = signal<number | null>(null);
+
+  selectedAgentId = computed(() => {
+    return this.session ? this.session.agent_id : this.localAgentId();
+  });
+
+  artifacts = signal<any[]>([]);
+  activeArtifact = signal<any | null>(null);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   async ngOnInit() {
     this.agents.set(await this.api.getAgents());
+    if (this.agents().length > 0) {
+      this.localAgentId.set(this.agents()[0].id);
+    }
     try {
       this.modelGroups.set(await this.api.getAllModels());
     } catch {
@@ -47,8 +60,16 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['session'] && this.session?.id) {
-      this.loadHistory();
+    if (changes['session']) {
+      const prev = changes['session'].previousValue as Session | null;
+      const curr = changes['session'].currentValue as Session | null;
+      if (curr?.id && curr.id !== prev?.id) {
+        this.loadHistory();
+      } else if (!curr?.id) {
+        this.messages.set([]);
+        this.artifacts.set([]);
+        this.activeArtifact.set(null);
+      }
     }
   }
 
@@ -57,10 +78,25 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     const history = await this.api.getChatHistory(this.session.id);
     this.messages.set(history);
     this.scrollToBottom();
+
+    try {
+      const arts = await this.api.getSessionArtifacts(this.session.id);
+      this.artifacts.set(arts);
+      if (arts.length > 0) {
+        this.activeArtifact.set(arts[arts.length - 1]);
+      } else {
+        this.activeArtifact.set(null);
+      }
+    } catch (e) {
+      console.error('Failed to load session artifacts:', e);
+    }
   }
 
   async onAgentChange(newAgentId: number) {
-    if (!this.session?.id) return;
+    if (!this.session) {
+      this.localAgentId.set(newAgentId);
+      return;
+    }
     try {
       await this.api.updateSessionAgent(this.session.id, newAgentId);
       this.agentChanged.emit();
@@ -90,14 +126,47 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     setTimeout(() => {
       try {
         this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
-      } catch(err) { }
+      } catch (err) { }
     }, 0);
   }
 
   async sendMessage() {
-    if (!this.session?.id) return;
     const text = this.inputText().trim();
     if (!text) return;
+
+    let currentSessionId = this.session?.id;
+    if (!currentSessionId) {
+      this.isThinking.set(true);
+      try {
+        const newSession = await this.api.createSession();
+        currentSessionId = newSession.id;
+
+        // If a specific agent was selected locally, set it
+        const agentId = this.localAgentId();
+        if (agentId) {
+          try {
+            await this.api.updateSessionAgent(currentSessionId, agentId);
+            newSession.agent_id = agentId;
+          } catch (e) {
+            console.error('Failed to set initial agent on new session', e);
+          }
+        }
+
+        this.session = newSession;
+        this.sessionCreated.emit(currentSessionId);
+      } catch (e) {
+        console.error('Failed to auto-create session', e);
+        this.isThinking.set(false);
+        const detail = e instanceof Error ? e.message : 'Error desconocido';
+        this.messages.update(m => [...m, {
+          id: Date.now(),
+          role: 'system',
+          content: `❌ Error al iniciar conversación automáticamente: ${detail}`,
+          created_at: new Date().toISOString()
+        }]);
+        return;
+      }
+    }
 
     // Optimistic UI updates
     const tempMsg: ChatMessage = {
@@ -106,14 +175,14 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       content: text,
       created_at: new Date().toISOString()
     };
-    
+
     this.messages.update(m => [...m, tempMsg]);
     this.inputText.set('');
     this.isThinking.set(true);
     this.scrollToBottom();
 
     try {
-      const res = await this.api.sendChatMessage(this.session.id, text, this.selectedModelId() || undefined);
+      const res = await this.api.sendChatMessage(currentSessionId, text, this.selectedModelId() || undefined);
       if (res.status === 'error') {
         await this.loadHistory();
         return;
@@ -130,6 +199,23 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
         provider_switched: res.provider_switched,
         provider_switch: res.provider_switch
       }]);
+
+      if (res.artifacts && res.artifacts.length > 0) {
+        this.artifacts.update(current => {
+          const updated = [...current];
+          for (const art of res.artifacts!) {
+            const idx = updated.findIndex(a => a.id === art.id);
+            if (idx > -1) {
+              updated[idx] = art;
+            } else {
+              updated.push(art);
+            }
+          }
+          return updated;
+        });
+        this.activeArtifact.set(res.artifacts[res.artifacts.length - 1]);
+      }
+
       this.scrollToBottom();
     } catch (e) {
       console.error(e);
@@ -174,7 +260,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
 
   async approveAction(msg: ChatMessageUI) {
     if (this.isThinking() || !this.session?.id || !msg.pending_action_id) return;
-    
+
     this.isThinking.set(true);
     try {
       const res = await this.api.confirmAction(this.session.id, msg.pending_action_id, true);
@@ -185,6 +271,23 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       }
       msg.confirmed = true;
       msg.requires_confirmation = false;
+
+      if (res?.artifacts && res.artifacts.length > 0) {
+        this.artifacts.update(current => {
+          const updated = [...current];
+          for (const art of res.artifacts!) {
+            const idx = updated.findIndex(a => a.id === art.id);
+            if (idx > -1) {
+              updated[idx] = art;
+            } else {
+              updated.push(art);
+            }
+          }
+          return updated;
+        });
+        this.activeArtifact.set(res.artifacts[res.artifacts.length - 1]);
+      }
+
       await this.loadHistory();
     } catch (e: any) {
       console.error(e);
@@ -203,7 +306,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
 
   async rejectAction(msg: ChatMessageUI) {
     if (this.isThinking() || !this.session?.id || !msg.pending_action_id) return;
-    
+
     this.isThinking.set(true);
     try {
       await this.api.confirmAction(this.session.id, msg.pending_action_id, false);
@@ -215,6 +318,19 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     } finally {
       this.isThinking.set(false);
     }
+  }
+
+  reopenCanvas() {
+    const arts = this.artifacts();
+    if (arts.length > 0) {
+      this.activeArtifact.set(arts[arts.length - 1]);
+    }
+  }
+
+  async onNodeClicked(nodeLabel: string) {
+    const text = `Explicame más sobre el nodo "${nodeLabel}" del diagrama.`;
+    this.inputText.set(text);
+    await this.sendMessage();
   }
 
   onKeyDown(event: KeyboardEvent) {

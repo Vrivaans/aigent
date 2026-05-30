@@ -1,140 +1,172 @@
-<div class="chat-container">
-  <div class="chat-agent-selector-bar">
-    <div class="selector-label">🧠 Agente:</div>
-    <select class="agent-dropdown" [ngModel]="session.agent_id" (ngModelChange)="onAgentChange($event)">
-      @for (agent of agents(); track agent.id) {
-        <option [ngValue]="agent.id">{{ agent.name }}</option>
-      }
-    </select>
+<div class="chat-layout-wrapper" [class.has-canvas]="activeArtifact()">
+  <div class="chat-container">
+    <div class="chat-agent-selector-bar">
+      <div class="selector-label">🧠 Agente:</div>
+      <select class="agent-dropdown" [ngModel]="selectedAgentId()" (ngModelChange)="onAgentChange($event)">
+        @for (agent of agents(); track agent.id) {
+          <option [ngValue]="agent.id">{{ agent.name }}</option>
+        }
+      </select>
 
-    <div class="selector-label">🤖 Modelo:</div>
-    <select class="model-dropdown" [ngModel]="selectedModelId()" (ngModelChange)="selectedModelId.set($event)">
-      <option [ngValue]="''">Default del agente</option>
-      @for (group of modelGroups(); track group.provider.id) {
-        <optgroup label="{{ group.provider.name }}">
-          @for (model of group.models; track model.id) {
-            <option [ngValue]="model.model_id">
-              {{ model.name }}
-              @if (model.is_free) { (Gratis) }
-            </option>
-          }
-        </optgroup>
+      <div class="selector-label">🤖 Modelo:</div>
+      <select class="model-dropdown" [ngModel]="selectedModelId()" (ngModelChange)="selectedModelId.set($event)">
+        <option [ngValue]="''">Default del agente</option>
+        @for (group of modelGroups(); track group.provider.id) {
+          <optgroup label="{{ group.provider.name }}">
+            @for (model of group.models; track model.id) {
+              <option [ngValue]="model.model_id">
+                {{ model.name }}
+                @if (model.is_free) { (Gratis) }
+              </option>
+            }
+          </optgroup>
+        }
+      </select>
+    </div>
+    
+    <div class="messages" #scrollContainer>
+      @if (messages().length === 0) {
+        <div class="empty-state">
+          <div class="icon">✨</div>
+          <h2>AIgent Operator</h2>
+          <p>Conectado al Core de HandsAI. ¿En qué te puedo ayudar?</p>
+        </div>
       }
-    </select>
-  </div>
-  
-  <div class="messages" #scrollContainer>
-    @if (messages().length === 0) {
-      <div class="empty-state">
-        <div class="icon">✨</div>
-        <h2>AIgent Operator</h2>
-        <p>Conectado al Core de HandsAI. ¿En qué te puedo ayudar?</p>
-      </div>
-    }
 
-    @for (msg of messages(); track msg.id) {
-      @if (msg.content || (msg.tool_calls && msg.tool_calls.length > 0) || msg.role === 'tool' || msg.requires_confirmation) {
-        <div class="message" [class.user]="msg.role === 'user'" [class.system]="msg.role === 'system'" [class.tool]="msg.role === 'tool'">
-          
-          @if (msg.role !== 'tool') {
-            <div class="avatar">
-              @if (msg.role === 'user') {
-                👤
-              } @else if (msg.role === 'system') {
-                ⚠️
-              } @else {
-                🤖
-              }
-            </div>
-          }
-          
-          <div class="content">
-          @if (msg.tool_calls && msg.tool_calls.length > 0) {
-            <div class="tool-calls-container">
-              @for (tool of msg.tool_calls; track $index) {
-                <div class="tool-call-badge">
-                  <span class="icon">⚙️</span>
-                  <span class="text">Ejecutando: <strong>{{ tool.function?.name || tool.name || 'tool' }}</strong></span>
+      @for (msg of messages(); track msg.id) {
+        @if (msg.content || (msg.tool_calls && msg.tool_calls.length > 0) || msg.role === 'tool' || msg.requires_confirmation) {
+          <div class="message" [class.user]="msg.role === 'user'" [class.system]="msg.role === 'system'" [class.tool]="msg.role === 'tool'">
+            
+            @if (msg.role !== 'tool') {
+              <div class="avatar">
+                @if (msg.role === 'user') {
+                  👤
+                } @else if (msg.role === 'system') {
+                  ⚠️
+                } @else {
+                  🤖
+                }
+              </div>
+            }
+            
+            <div class="content">
+            @if (msg.tool_calls && msg.tool_calls.length > 0) {
+              <div class="tool-calls-container">
+                @for (tool of msg.tool_calls; track $index) {
+                  <div class="tool-call-badge">
+                    <span class="icon">⚙️</span>
+                    <span class="text">Ejecutando: <strong>{{ tool.function?.name || tool.name || 'tool' }}</strong></span>
+                  </div>
+                }
+              </div>
+            }
+            @if (msg.role === 'tool') {
+              <details class="tool-result-details">
+                <summary>Ver resultado de herramienta</summary>
+                <pre>{{ msg.content }}</pre>
+              </details>
+            } @else {
+              <p class="msg-text">{{ msg.content }}</p>
+            }
+
+            @if (msg.provider_switched && msg.provider_switch) {
+              <div class="provider-switch-card">
+                <div class="switch-title">🔁 Cambio automático de provider/modelo</div>
+                <div class="switch-body">
+                  Se cambió de <strong>{{ msg.provider_switch.from_provider }}</strong> ({{ msg.provider_switch.from_model }})
+                  a <strong>{{ msg.provider_switch.to_provider }}</strong> ({{ msg.provider_switch.to_model }})
+                  por falta de créditos/cuota.
                 </div>
-              }
-            </div>
-          }
-          @if (msg.role === 'tool') {
-            <details class="tool-result-details">
-              <summary>Ver resultado de herramienta</summary>
-              <pre>{{ msg.content }}</pre>
-            </details>
-          } @else {
-            <p class="msg-text">{{ msg.content }}</p>
-          }
+                <div class="switch-actions">
+                  <button
+                    class="btn-reject"
+                    [disabled]="isThinking() || msg.provider_switch_reset_done"
+                    (click)="resetProviderOverride(msg)">
+                    {{ msg.provider_switch_reset_done ? 'Default restaurado' : 'Volver al default del agente' }}
+                  </button>
+                </div>
+              </div>
+            }
 
-          @if (msg.provider_switched && msg.provider_switch) {
-            <div class="provider-switch-card">
-              <div class="switch-title">🔁 Cambio automático de provider/modelo</div>
-              <div class="switch-body">
-                Se cambió de <strong>{{ msg.provider_switch.from_provider }}</strong> ({{ msg.provider_switch.from_model }})
-                a <strong>{{ msg.provider_switch.to_provider }}</strong> ({{ msg.provider_switch.to_model }})
-                por falta de créditos/cuota.
+            @if (msg.requires_confirmation && !msg.confirmed && !msg.rejected) {
+              <div class="confirmation-card">
+                <div class="conf-header">
+                  <span class="icon">🛡️</span>
+                  <span>Confirmar Acción Sensible</span>
+                </div>
+                <div class="conf-body">
+                  El agente desea ejecutar: <br>
+                  <strong>{{ msg.waiting_tool?.function?.name }}</strong>
+                  <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
+                </div>
+                <div class="conf-footer">
+                  <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">Aprobar</button>
+                  <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">Rechazar</button>
+                </div>
               </div>
-              <div class="switch-actions">
-                <button
-                  class="btn-reject"
-                  [disabled]="isThinking() || msg.provider_switch_reset_done"
-                  (click)="resetProviderOverride(msg)">
-                  {{ msg.provider_switch_reset_done ? 'Default restaurado' : 'Volver al default del agente' }}
-                </button>
-              </div>
-            </div>
-          }
-
-          @if (msg.requires_confirmation && !msg.confirmed && !msg.rejected) {
-            <div class="confirmation-card">
-              <div class="conf-header">
-                <span class="icon">🛡️</span>
-                <span>Confirmar Acción Sensible</span>
-              </div>
-              <div class="conf-body">
-                El agente desea ejecutar: <br>
-                <strong>{{ msg.waiting_tool?.function?.name }}</strong>
-                <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
-              </div>
-              <div class="conf-footer">
-                <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">Aprobar</button>
-                <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">Rechazar</button>
-              </div>
-            </div>
-          }
+            }
+          </div>
         </div>
-      </div>
+        }
       }
-    }
 
-    @if (isThinking()) {
-      <div class="message thinking">
-        <div class="avatar">🤖</div>
-        <div class="content">
-          <div class="dot-typing"></div>
+      @if (isThinking()) {
+        <div class="message thinking">
+          <div class="avatar">🤖</div>
+          <div class="content">
+            <div class="dot-typing"></div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="input-area">
+      @if (artifacts().length > 0 && !activeArtifact()) {
+        <div class="reopen-canvas-container">
+          <button class="btn-reopen-canvas" (click)="reopenCanvas()">
+            📊 Mostrar Diagrama ({{ artifacts().length }})
+          </button>
+        </div>
+      }
+      <div class="input-wrapper">
+        <textarea 
+          [ngModel]="inputText()" 
+          (ngModelChange)="inputText.set($event)"
+          (keydown)="onKeyDown($event)"
+          placeholder="Escribe un comando para AIgent... (ej: 'Revisa slack cada 3 horas')"
+          rows="1">
+        </textarea>
+        <button (click)="sendMessage()" [disabled]="!inputText().trim() || isThinking()">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+      <div class="footer-tip">
+        Presiona <kbd>Enter</kbd> para enviar. El agente decidirá si usar Tools.
+      </div>
+    </div>
+  </div>
+
+  @if (activeArtifact(); as art) {
+    <div class="canvas-container">
+      <div class="canvas-header">
+        <div class="canvas-title-wrapper">
+          <span class="canvas-icon">📊</span>
+          <span class="canvas-title">{{ art.title || 'Diagrama Interactivo' }}</span>
+        </div>
+        <div class="canvas-actions">
+          @if (artifacts().length > 1) {
+            <select class="artifact-selector" [ngModel]="art" (ngModelChange)="activeArtifact.set($event)">
+              @for (a of artifacts(); track a.id) {
+                <option [ngValue]="a">{{ a.title || a.id }}</option>
+              }
+            </select>
+          }
+          <button class="close-canvas-btn" (click)="activeArtifact.set(null)">✕</button>
         </div>
       </div>
-    }
-  </div>
-
-  <div class="input-area">
-    <div class="input-wrapper">
-      <textarea 
-        [ngModel]="inputText()" 
-        (ngModelChange)="inputText.set($event)"
-        (keydown)="onKeyDown($event)"
-        placeholder="Escribe un comando para AIgent... (ej: 'Revisa slack cada 3 horas')"
-        rows="1">
-      </textarea>
-      <button (click)="sendMessage()" [disabled]="!inputText().trim() || isThinking()">
-        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-      </button>
+      <div class="canvas-content">
+        <app-diagram-renderer [code]="art.content" [title]="art.title" (nodeClicked)="onNodeClicked($event)"></app-diagram-renderer>
+      </div>
     </div>
-    <div class="footer-tip">
-      Presiona <kbd>Enter</kbd> para enviar. El agente decidirá si usar Tools.
-    </div>
-  </div>
-
+  }
 </div>

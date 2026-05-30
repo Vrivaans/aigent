@@ -9,7 +9,14 @@ import (
 	"aigent/internal/database"
 )
 
-func (b *Brain) findSensitiveToolCall(toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) *ToolCall {
+type ContextKey string
+
+const IsScheduledTaskKey ContextKey = "is_scheduled_task"
+
+func (b *Brain) findSensitiveToolCall(ctx context.Context, toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) *ToolCall {
+	if isTask, _ := ctx.Value(IsScheduledTaskKey).(bool); isTask {
+		return nil
+	}
 	for i, tc := range toolCalls {
 		realName, ok := sanitizedToOriginal[tc.Function.Name]
 		if !ok {
