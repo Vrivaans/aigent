@@ -215,18 +215,23 @@ func main() {
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
+	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
 
 	// LLM Provider Management
 	agentHandler := &handlers.AgentHandler{Brain: brain}
 	admin := api.Group("/admin")
 
 	api.Get("/providers", handlers.HandleListProviders)
+	api.Get("/providers/presets", handlers.HandleGetPrefilledProviders)
 	api.Post("/providers", handlers.HandleCreateProvider)
 	api.Patch("/providers/:id", handlers.HandleUpdateProvider)
 	api.Patch("/providers/:id/set-default", handlers.HandleSetDefaultProvider)
 	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
 	api.Post("/providers/test", handlers.HandleTestProviderConfig)
 	api.Post("/providers/:id/test", handlers.HandleTestProvider)
+	api.Get("/providers/:id/models", handlers.HandleGetProviderModels)
+	api.Post("/providers/:id/models/refresh", handlers.HandleRefreshProviderModels)
+	api.Get("/models", handlers.HandleGetAllModels)
 
 	// Agent management
 	admin.Get("/agents", agentHandler.GetAgents)
@@ -259,12 +264,17 @@ func main() {
 
 	taskHandler := &handlers.TaskHandler{}
 	api.Get("/tasks", taskHandler.GetTasks)
+	api.Post("/tasks", taskHandler.CreateTask)
 	api.Delete("/tasks/:id", taskHandler.DeleteTask)
 
 	ruleHandler := &handlers.RuleHandler{}
 	api.Get("/rules", ruleHandler.GetRules)
 	api.Post("/rules", ruleHandler.CreateRule)
 	api.Delete("/rules/:id", ruleHandler.DeleteRule)
+
+	api.Get("/permissions", handlers.HandleListPermissions)
+	api.Delete("/permissions/:id", handlers.HandleDeletePermission)
+	api.Post("/permissions/:id/pause", handlers.HandleTogglePausePermission)
 
 	// Serve Static Angular Files
 	app.Static("/", "./web/dist/web/browser")

@@ -1,16 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-color: #0d1117;
-  --panel-bg: #161b22;
-  --panel-border: #30363d;
-  --text-main: #c9d1d9;
-  --text-muted: #8b949e;
-  --accent: #58a6ff;
-  --accent-hover: #1f6feb;
-  --success: #2ea043;
-  --danger: #da3633;
-  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg: #050505; /* Sleeker deep dark background */
+  --surface: rgba(16, 16, 18, 0.65); /* Translucent surface for glassmorphism */
+  --surface-glass: rgba(22, 22, 24, 0.45); /* Extra translucent for overlays */
+  --surface2: rgba(28, 28, 30, 0.5); /* Semi-transparent secondary surface */
+  --border: rgba(255, 255, 255, 0.08); /* Subtle white translucent borders */
+  --accent: #c8f04a;
+  --accent-hover: #b6e037;
+  --accent-glow: rgba(200, 240, 74, 0.12);
+  --accent2: #4af0c8;
+  --text: #f3f3f1;
+  --muted: #8e8e93;
+  --danger: #ff453a;
+  --success: #32d74b;
+
+  /* Compatibilidad con estilos existentes */
+  --bg-color: var(--bg);
+  --panel-bg: var(--surface);
+  --panel-border: var(--border);
+  --text-main: var(--text);
+  --text-muted: var(--muted);
+  --font-family: 'Inter', sans-serif;
+  --font-display: 'Outfit', sans-serif;
+  --font-serif: var(--font-display);
+  --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -20,12 +34,34 @@
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 12% 6%, rgba(200, 240, 74, 0.08), transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(74, 240, 200, 0.06), transparent 42%);
+  z-index: -2;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.35px, transparent 0.35px);
+  background-size: 3px 3px;
+  opacity: 0.14;
+  z-index: -1;
 }
 
 button {
@@ -45,16 +81,20 @@ input, textarea {
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--panel-border);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }

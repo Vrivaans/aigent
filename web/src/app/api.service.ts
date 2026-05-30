@@ -51,9 +51,22 @@ export interface Task {
   id: number;
   name: string;
   cron_expression: string;
-  tool_name: string;
-  payload: any;
-  next_run_at: string;
+  agent_id: number;
+  agent?: Agent;
+  prompt: string;
+  one_shot: boolean;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_result?: string;
+  last_error?: string;
+}
+
+export interface CreateTaskInput {
+  name: string;
+  cron_expression: string;
+  agent_id: number;
+  prompt: string;
+  one_shot: boolean;
 }
 
 export interface LLMProvider {
@@ -62,8 +75,31 @@ export interface LLMProvider {
   base_url: string;
   api_key: string;
   default_model: string;
+  provider_type: string;
   is_active: boolean;
   is_default: boolean;
+}
+
+export interface ModelInfo {
+  id: number;
+  provider_id: number;
+  model_id: string;
+  name: string;
+  is_free: boolean;
+  context_window: number;
+  provider?: LLMProvider;
+}
+
+export interface ProviderPreset {
+  type: string;
+  name: string;
+  base_url: string;
+  description: string;
+}
+
+export interface ModelGroup {
+  provider: LLMProvider;
+  models: ModelInfo[];
 }
 
 export interface ProviderSwitchInfo {
@@ -171,10 +207,16 @@ export class ApiService {
     return res.json();
   }
 
-  async sendChatMessage(sessionId: number, message: string): Promise<{
+  async getSessionArtifacts(sessionId: number): Promise<any[]> {
+    const res = await this.fetchApi(`/sessions/${sessionId}/artifacts`);
+    return res.json();
+  }
+
+  async sendChatMessage(sessionId: number, message: string, modelOverride?: string): Promise<{
     status?: string;
     error?: string;
     response: string;
+    artifacts?: any[];
     tool_calls: any[];
     requires_confirmation?: boolean;
     pending_action_id?: number;
@@ -182,9 +224,11 @@ export class ApiService {
     provider_switched?: boolean;
     provider_switch?: ProviderSwitchInfo;
   }> {
+    const body: any = { message };
+    if (modelOverride) { body.model_override = modelOverride; }
     const res = await this.fetchApi(`/sessions/${sessionId}/chat`, {
       method: 'POST',
-      body: JSON.stringify({ message })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!res.ok) {
@@ -276,6 +320,13 @@ export class ApiService {
     return this.request('/tasks');
   }
 
+  async createTask(task: CreateTaskInput): Promise<Task> {
+    return this.request('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(task)
+    });
+  }
+
   async createProvider(provider: Partial<LLMProvider>): Promise<LLMProvider> {
     const res = await this.fetchApi('/providers', {
       method: 'POST',
@@ -310,6 +361,37 @@ export class ApiService {
 
   async deleteTask(id: number) {
     const res = await this.fetchApi(`/tasks/${id}`, { method: 'DELETE' });
+    return res.json();
+  }
+
+  async getProviderPresets(): Promise<ProviderPreset[]> {
+    return this.request('/providers/presets');
+  }
+
+  async getProviderModels(providerId: number): Promise<ModelInfo[]> {
+    return this.request(`/providers/${providerId}/models`);
+  }
+
+  async refreshProviderModels(providerId: number): Promise<{ ok: boolean; message: string; models: ModelInfo[] }> {
+    const res = await this.fetchApi(`/providers/${providerId}/models/refresh`, { method: 'POST' });
+    return res.json();
+  }
+
+  async getAllModels(): Promise<ModelGroup[]> {
+    return this.request('/models');
+  }
+
+  async getPermissions(): Promise<any[]> {
+    return this.request('/permissions');
+  }
+
+  async deletePermission(id: number): Promise<any> {
+    const res = await this.fetchApi(`/permissions/${id}`, { method: 'DELETE' });
+    return res.json();
+  }
+
+  async togglePausePermission(id: number): Promise<any> {
+    const res = await this.fetchApi(`/permissions/${id}/pause`, { method: 'POST' });
     return res.json();
   }
 

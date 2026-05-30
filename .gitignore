@@ -26,3 +26,11 @@ interno/
 web/node_modules/
 web/dist/
 **/.DS_Store
+
+.cursor/
+.design/
+.openclaw
+.hermes
+architecture-analysis.md
+opencode/
+server
