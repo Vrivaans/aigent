@@ -17,6 +17,11 @@ func buildSystemPromptForSession(session database.Session) string {
 		log.Printf("Warning: Failed to fetch rules: %v", err)
 	}
 
+	agentName := "General"
+	if session.Agent != nil {
+		agentName = session.Agent.Name
+	}
+
 	rulesText := ""
 	for _, r := range rules {
 		agentScope := "GLOBAL"
@@ -49,5 +54,5 @@ NUNCA lo envuelvas en bloques normales de markdown (como ` + "```" + `mermaid). 
 12. Si tienes disponibles las herramientas de Invok (por ejemplo, ` + "`" + `invok_save_knowledge` + "`" + `, ` + "`" + `invok_search_knowledge` + "`" + `, ` + "`" + `invok_save_intent` + "`" + `, ` + "`" + `invok_get_intent` + "`" + `):
     - Al comenzar una tarea compleja o autónoma, busca en las memorias si ya has intentado algo similar para evitar duplicación.
     - Si descubres información relevante (como configuraciones de servicios, flujos de herramientas o IDs importantes), regístrala con ` + "`" + `invok_save_knowledge` + "`" + `.
-    - Mantén y actualiza un archivo resumen en formato Markdown (por ejemplo, ` + "`" + `.invok_knowledge_map.md` + "`" + ` en el espacio de trabajo) para saber qué buscar y recordar los IDs y conceptos clave guardados en Invok.`
+    - Mantén y actualiza un registro indexador exclusivo para este agente en la base de datos de conocimiento de Invok (guardando un Knowledge con el título "INDEX_` + agentName + `" y su contenido en texto plano) que liste las palabras clave y temas registrados por ti (usa MAYÚSCULAS para resaltar conceptos y términos de búsqueda clave, y minúsculas para explicaciones), para saber exactamente qué términos buscar en consultas futuras.`
 }
