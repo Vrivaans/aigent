@@ -13,6 +13,7 @@ export interface ChatMessageUI extends ChatMessage {
   provider_switched?: boolean;
   provider_switch?: ProviderSwitchInfo;
   provider_switch_reset_done?: boolean;
+  always_allow?: boolean;
 }
 
 @Component({
@@ -263,7 +264,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
 
     this.isThinking.set(true);
     try {
-      const res = await this.api.confirmAction(this.session.id, msg.pending_action_id, true);
+      const res = await this.api.confirmAction(this.session.id, msg.pending_action_id, true, !!msg.always_allow);
       if (res?.status === 'error') {
         msg.requires_confirmation = false;
         await this.loadHistory();

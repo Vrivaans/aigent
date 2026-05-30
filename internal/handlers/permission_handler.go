@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"time"
 
 	"aigent/internal/database"
@@ -49,16 +50,22 @@ func HandleTogglePausePermission(c *fiber.Ctx) error {
 }
 
 func AutoSaveToolPermission(agentID uint, toolName string) {
+	log.Printf("🛡️ AutoSaveToolPermission: attempting to allow tool '%s' for agent #%d", toolName, agentID)
 	var existing database.ToolPermission
 	result := database.DB.Where("agent_id = ? AND tool_name = ?", agentID, toolName).First(&existing)
 	if result.Error == nil {
 		if existing.ActionType == "always_allow" && !existing.Paused {
+			log.Printf("🛡️ AutoSaveToolPermission: permission already exists and is active")
 			return
 		}
 		existing.ActionType = "always_allow"
 		existing.Paused = false
 		existing.PausedAt = nil
-		database.DB.Save(&existing)
+		if err := database.DB.Save(&existing).Error; err != nil {
+			log.Printf("❌ AutoSaveToolPermission: failed to update permission: %v", err)
+		} else {
+			log.Printf("🛡️ AutoSaveToolPermission: permission updated successfully")
+		}
 		return
 	}
 	perm := database.ToolPermission{
@@ -66,5 +73,9 @@ func AutoSaveToolPermission(agentID uint, toolName string) {
 		ToolName:   toolName,
 		ActionType: "always_allow",
 	}
-	database.DB.Create(&perm)
+	if err := database.DB.Create(&perm).Error; err != nil {
+		log.Printf("❌ AutoSaveToolPermission: failed to create permission: %v", err)
+	} else {
+		log.Printf("🛡️ AutoSaveToolPermission: permission created successfully in database")
+	}
 }

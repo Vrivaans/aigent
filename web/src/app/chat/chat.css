@@ -431,6 +431,27 @@ textarea {
   border: 1px solid var(--panel-border);
 }
 
+.conf-options {
+  padding: 0 20px 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conf-options label {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.conf-options input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
 .conf-footer {
   padding: 12px 16px;
   display: flex;

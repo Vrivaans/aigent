@@ -38,13 +38,20 @@ func (b *Brain) findSensitiveToolCall(ctx context.Context, toolCalls []ToolCall,
 
 var permissionChecker = func(agentID uint, toolName string) bool {
 	var perm database.ToolPermission
+	log.Printf("🔍 DB permission check: querying permission for agent #%d and tool '%s'", agentID, toolName)
 	result := database.DB.Where("agent_id = ? AND tool_name = ? AND action_type = ? AND paused = ?",
 		agentID, toolName, "always_allow", false).First(&perm)
-	return result.Error == nil
+	if result.Error != nil {
+		log.Printf("🔍 DB permission check: result error: %v", result.Error)
+		return false
+	}
+	log.Printf("🔍 DB permission check: found active permission ID #%d", perm.ID)
+	return true
 }
 
 func hasAutoAllowPermission(agentID uint, toolName string) bool {
 	if database.DB == nil {
+		log.Printf("🔍 DB permission check: database.DB is nil!")
 		return false
 	}
 	return permissionChecker(agentID, toolName)

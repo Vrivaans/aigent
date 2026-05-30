@@ -237,10 +237,10 @@ export class ApiService {
     return data;
   }
 
-  async confirmAction(sessionId: number, pendingId: number, approved: boolean): Promise<any> {
+  async confirmAction(sessionId: number, pendingId: number, approved: boolean, alwaysAllow = false): Promise<any> {
     const res = await this.fetchApi(`/sessions/${sessionId}/confirm/${pendingId}`, {
       method: 'POST',
-      body: JSON.stringify({ approved })
+      body: JSON.stringify({ approved, always_allow: alwaysAllow })
     });
     const data = await res.json();
     if (!res.ok) {

@@ -146,7 +146,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 }
 
 type ConfirmRequest struct {
-	Approved bool `json:"approved"`
+	Approved    bool `json:"approved"`
+	AlwaysAllow bool `json:"always_allow"`
 }
 
 func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
@@ -235,7 +236,9 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 
 	var session database.Session
 	if err := database.DB.First(&session, pending.SessionID).Error; err == nil {
-		AutoSaveToolPermission(session.AgentID, tDef.Name)
+		if req.AlwaysAllow {
+			AutoSaveToolPermission(session.AgentID, tDef.Name)
+		}
 	}
 
 	// Guardamos el resultado de la tool para que el siguiente chat lo vea en contexto

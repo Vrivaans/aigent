@@ -99,6 +99,10 @@
                   <strong>{{ msg.waiting_tool?.function?.name }}</strong>
                   <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
                 </div>
+                <div class="conf-options">
+                  <input type="checkbox" id="always-allow-{{msg.id}}" [(ngModel)]="msg.always_allow">
+                  <label for="always-allow-{{msg.id}}">Permitir siempre (no volver a preguntar)</label>
+                </div>
                 <div class="conf-footer">
                   <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">Aprobar</button>
                   <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">Rechazar</button>
