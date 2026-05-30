@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"strings"
 
 	"aigent/internal/database"
 )
@@ -24,18 +25,24 @@ func (b *Brain) prepareAgentToolContext(session database.Session) agentToolConte
 	}
 
 	for _, rt := range b.Registry.List() {
+		// Las herramientas nativas de Invok (memoria, intents, etc.) que empiezan con "invok_"
+		// se integran automáticamente si la conexión con Invok está configurada.
+		isInvokCoreTool := strings.HasPrefix(rt.Name, "invok_") && b.HandsAI != nil && b.HandsAI.IsConfigured()
+
 		switch {
 		case session.Agent == nil:
 			// Sin agente asociado: exponer todo el registry.
 		case session.Agent.IsDefault:
 			// Agente General: siempre todas las herramientas del registry.
 		case len(session.Agent.Tools) > 0:
-			if !allowedTools[rt.Name] {
+			if !allowedTools[rt.Name] && !isInvokCoreTool {
 				continue
 			}
 		default:
-			// Agente personalizado sin tools seleccionadas: ninguna.
-			continue
+			// Agente personalizado sin tools seleccionadas: sólo las de Invok core si existen.
+			if !isInvokCoreTool {
+				continue
+			}
 		}
 
 		shortName := sanitizeName(rt.Name)
