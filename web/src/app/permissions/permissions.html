@@ -1,0 +1,64 @@
+<div class="permissions-panel">
+  <div class="panel-header">
+    <div class="header-main">
+      <h2 class="view-title">Permisos de Agentes</h2>
+      <p class="view-desc">Administra los permisos permanentes de ejecución automática otorgados a los agentes para acciones sensibles.</p>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner">⏳</span> Cargando permisos...
+    </div>
+  } @else {
+    <div class="permissions-content">
+      @for (p of permissions(); track p.id) {
+        <div class="permission-card" [class.paused]="p.paused">
+          <div class="perm-header">
+            <div class="agent-info">
+              <span class="avatar">🧠</span>
+              <div class="name-wrapper">
+                <span class="agent-name">{{ getAgentName(p.agent_id) }}</span>
+                <span class="meta-sub">ID Agente: #{{ p.agent_id }}</span>
+              </div>
+            </div>
+            <div class="status-badge" [class.active]="!p.paused">
+              <span class="led"></span>
+              {{ p.paused ? 'Pausado' : 'Activo' }}
+            </div>
+          </div>
+
+          <div class="perm-body">
+            <div class="detail-row">
+              <span class="label">Herramienta:</span>
+              <span class="value code-val">⚙️ {{ p.tool_name }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Acción:</span>
+              <span class="value">Permitir siempre</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Creado el:</span>
+              <span class="value">{{ p.created_at | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </div>
+
+          <div class="perm-actions">
+            <button class="btn-toggle" (click)="togglePause(p)">
+              {{ p.paused ? 'Reanudar' : 'Pausar' }}
+            </button>
+            <button class="btn-revoke" (click)="revokePermission(p.id)">
+              Revocar
+            </button>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <div class="icon">🛡️</div>
+          <h3>No hay permisos permanentes</h3>
+          <p>Cuando apruebes una acción sensible de un agente en el chat, aparecerá aquí como un permiso automático.</p>
+        </div>
+      }
+    </div>
+  }
+</div>

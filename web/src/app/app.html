@@ -69,6 +69,7 @@
           @else if (currentTab === 'providers') { Providers }
           @else if (currentTab === 'tools') { Tools }
           @else if (currentTab === 'agents') { Agentes }
+          @else if (currentTab === 'permissions') { Permisos }
         </span>
       </div>
 
@@ -130,6 +131,13 @@
               </path>
             </svg>
             Tools
+          </button>
+          <button [class.active]="currentTab === 'permissions'" (click)="currentTab = 'permissions'; isMenuOpen.set(false)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Permisos
           </button>
         </div>
       </div>
@@ -200,6 +208,10 @@
       } @else if (currentTab === 'agents') {
       <div class="feature-view">
         <app-agents></app-agents>
+      </div>
+      } @else if (currentTab === 'permissions') {
+      <div class="feature-view">
+        <app-permissions></app-permissions>
       </div>
       }
     </div>

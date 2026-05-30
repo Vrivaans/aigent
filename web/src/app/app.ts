@@ -8,13 +8,14 @@ import { AgentsComponent } from './agents/agents';
 import { ApiService, Session } from './api.service';
 import { AuthService } from './auth/auth.service';
 import { LoginComponent } from './auth/login';
+import { PermissionsComponent } from './permissions/permissions';
 
-export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'agents';
+export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'agents' | 'permissions';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent, AgentsComponent],
+  imports: [CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent, AgentsComponent, PermissionsComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
