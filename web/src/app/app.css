@@ -127,6 +127,38 @@ body {
   box-shadow: 0 6px 20px rgba(200, 240, 74, 0.25);
 }
 
+.cron-toggle-container {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 16px;
+  width: 100%;
+}
+
+.cron-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.cron-toggle-label:hover {
+  color: var(--text-main);
+}
+
+.cron-toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
@@ -634,4 +666,51 @@ app-chat {
   .app-layout.sidebar-closed .sidebar {
     transform: translateX(-100%);
   }
+}
+
+.approval-badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  margin-left: auto;
+  min-width: 18px;
+  text-align: center;
+  line-height: 14px;
+  box-shadow: 0 2px 8px rgba(240, 74, 74, 0.4);
+}
+
+.lang-selector {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 12px;
+}
+
+.lang-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+.lang-btn.active {
+  background: rgba(200, 240, 74, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
 }

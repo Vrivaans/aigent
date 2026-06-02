@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService, LLMProvider, McpStdioServer, McpStreamServer, ModelInfo } from '../api.service';
+import { TranslationService } from '../translation.service';
 
 @Component({
   selector: 'app-providers',
@@ -12,6 +13,11 @@ import { ApiService, LLMProvider, McpStdioServer, McpStreamServer, ModelInfo } f
 })
 export class Providers implements OnInit {
   private api = inject(ApiService);
+  private translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
   
   providers = signal<LLMProvider[]>([]);
   showAddForm = signal(false);
@@ -192,7 +198,7 @@ export class Providers implements OnInit {
     const alias = this.mcpForm.alias.trim();
     const command = this.mcpForm.command.trim();
     if (!alias || !command) {
-      alert('Alias y comando son obligatorios.');
+      alert(this.t('prov.err_alias_cmd'));
       return;
     }
     const args = this.parseArgsText(this.mcpForm.argsText);
@@ -219,25 +225,25 @@ export class Providers implements OnInit {
       await this.loadMcpStdio();
       this.closeMcpModal();
     } catch (e: any) {
-      alert(e?.message || 'Error al guardar');
+      alert(e?.message || this.t('prov.err_save'));
     }
   }
 
   async deleteMcp(s: McpStdioServer, ev: Event) {
     ev.stopPropagation();
-    if (!confirm(`¿Eliminar servidor MCP «${s.alias}»?`)) return;
+    if (!confirm(this.t('prov.confirm_delete_mcp', { name: s.alias }))) return;
     try {
       await this.api.deleteMcpStdioServer(s.id);
       await this.loadMcpStdio();
     } catch (e: any) {
-      alert(e?.message || 'Error al eliminar');
+      alert(e?.message || this.t('prov.err_delete'));
     }
   }
 
   async testMcpDryRun() {
     const command = this.mcpForm.command.trim();
     if (!command) {
-      alert('Indica un comando para probar.');
+      alert(this.t('prov.err_cmd_test'));
       return;
     }
     this.mcpTesting.set(true);
@@ -248,7 +254,7 @@ export class Providers implements OnInit {
       const r = await this.api.testMcpStdioDryRun({ command, args, env });
       this.mcpTestMsg.set(`OK: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
     } catch (e: any) {
-      this.mcpTestMsg.set(e?.message || 'Error');
+      this.mcpTestMsg.set(e?.message || this.t('global.error'));
     } finally {
       this.mcpTesting.set(false);
     }
@@ -263,7 +269,7 @@ export class Providers implements OnInit {
       const r = await this.api.testMcpStdioSaved(id);
       this.mcpTestMsg.set(`OK [${r.alias}]: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
     } catch (e: any) {
-      this.mcpTestMsg.set(e?.message || 'Error');
+      this.mcpTestMsg.set(e?.message || this.t('global.error'));
     } finally {
       this.mcpTesting.set(false);
     }
@@ -305,7 +311,7 @@ export class Providers implements OnInit {
     const alias = this.mcpStreamForm.alias.trim();
     const baseUrl = this.mcpStreamForm.baseUrl.trim();
     if (!alias || !baseUrl) {
-      alert('Alias y URL base son obligatorios.');
+      alert(this.t('prov.err_alias_url'));
       return;
     }
     const headers = this.parseHeadersText(this.mcpStreamForm.headersText);
@@ -331,25 +337,25 @@ export class Providers implements OnInit {
       await this.loadMcpStream();
       this.closeMcpStreamModal();
     } catch (e: any) {
-      alert(e?.message || 'Error al guardar');
+      alert(e?.message || this.t('prov.err_save'));
     }
   }
 
   async deleteMcpStream(s: McpStreamServer, ev: Event) {
     ev.stopPropagation();
-    if (!confirm(`¿Eliminar servidor MCP remoto «${s.alias}»?`)) return;
+    if (!confirm(this.t('prov.confirm_delete_mcp', { name: s.alias }))) return;
     try {
       await this.api.deleteMcpStreamServer(s.id);
       await this.loadMcpStream();
     } catch (e: any) {
-      alert(e?.message || 'Error al eliminar');
+      alert(e?.message || this.t('prov.err_delete'));
     }
   }
 
   async testMcpStreamDryRun() {
     const baseUrl = this.mcpStreamForm.baseUrl.trim();
     if (!baseUrl) {
-      alert('Indica la URL base del servidor MCP.');
+      alert(this.t('prov.err_url_test'));
       return;
     }
     this.mcpStreamTesting.set(true);
@@ -363,7 +369,7 @@ export class Providers implements OnInit {
       });
       this.mcpStreamTestMsg.set(`OK: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
     } catch (e: any) {
-      this.mcpStreamTestMsg.set(e?.message || 'Error');
+      this.mcpStreamTestMsg.set(e?.message || this.t('global.error'));
     } finally {
       this.mcpStreamTesting.set(false);
     }
@@ -378,7 +384,7 @@ export class Providers implements OnInit {
       const r = await this.api.testMcpStreamSaved(id);
       this.mcpStreamTestMsg.set(`OK [${r.alias}]: ${r.tools?.length ?? 0} tools — ${(r.tools || []).join(', ')}`);
     } catch (e: any) {
-      this.mcpStreamTestMsg.set(e?.message || 'Error');
+      this.mcpStreamTestMsg.set(e?.message || this.t('global.error'));
     } finally {
       this.mcpStreamTesting.set(false);
     }
@@ -386,12 +392,12 @@ export class Providers implements OnInit {
 
   async saveHandsAIConfig() {
     await this.api.updateHandsAIConfig(this.handsaiConfig());
-    alert('Configuración de HandsAI guardada correctamente.');
+    alert(this.t('prov.save_bridge_ok'));
     await this.loadHandsAIConfig();
   }
 
   async deleteHandsAIConfig() {
-    if (!confirm('¿Eliminar la configuración de HandsAI? Las herramientas dejarán de estar disponibles hasta que vuelvas a configurarlo.')) return;
+    if (!confirm(this.t('prov.confirm_delete_bridge'))) return;
     await this.api.deleteHandsAIConfig();
     this.handsaiConfig.set({ url: '', token: '' });
   }
@@ -494,11 +500,11 @@ export class Providers implements OnInit {
         const models = await this.api.getProviderModels(id);
         this.providerModels.set(models);
         if (models.length === 0) {
-          this.modelsError.set('No se encontraron modelos para este proveedor. Verificá la conexión y probá refrescar.');
+          this.modelsError.set(this.t('prov.no_models'));
         }
       } catch (e: any) {
         this.providerModels.set([]);
-        this.modelsError.set('No se pudo obtener la lista de modelos. Podés escribir el nombre manualmente.');
+        this.modelsError.set(this.t('prov.err_load_models'));
       } finally {
         this.modelsLoading.set(false);
       }
@@ -512,12 +518,12 @@ export class Providers implements OnInit {
     const apiKey = this.newProvider.api_key;
     if (!baseUrl) {
       this.providerModels.set([]);
-      this.modelsError.set('Ingresá la Base URL para cargar los modelos disponibles.');
+      this.modelsError.set(this.t('prov.err_url_models'));
       return;
     }
     if (apiKey === '********' || !apiKey) {
       this.providerModels.set([]);
-      this.modelsError.set('Ingresá la API Key para cargar los modelos disponibles.');
+      this.modelsError.set(this.t('prov.err_key_models'));
       return;
     }
     this.modelsLoading.set(true);
@@ -532,15 +538,15 @@ export class Providers implements OnInit {
         const result = await this.api.refreshProviderModels(id);
         this.providerModels.set(result.models || []);
         if (!result.models?.length) {
-          this.modelsError.set('El proveedor no expone un endpoint /models. Escribí el nombre del modelo manualmente.');
+          this.modelsError.set(this.t('prov.no_models_endpoint'));
         }
       } else {
         this.providerModels.set([]);
-        this.modelsError.set('Guardá el proveedor primero, luego podés refrescar la lista de modelos.');
+        this.modelsError.set(this.t('prov.err_save_first'));
       }
     } catch {
       this.providerModels.set([]);
-      this.modelsError.set('No se puede visualizar la lista de modelos. Escribí el nombre del modelo manualmente.');
+      this.modelsError.set(this.t('prov.err_load_models'));
     } finally {
       this.modelsLoading.set(false);
     }
@@ -553,11 +559,11 @@ export class Providers implements OnInit {
       const result = await this.api.refreshProviderModels(providerId);
       this.providerModels.set(result.models || []);
       if (!result.models?.length) {
-        this.modelsError.set('El proveedor no expone un endpoint /models. Escribí el nombre del modelo manualmente.');
+        this.modelsError.set(this.t('prov.no_models_endpoint'));
       }
     } catch {
       this.providerModels.set([]);
-      this.modelsError.set('No se puede visualizar la lista de modelos en /models. Escribí el nombre del modelo manualmente.');
+      this.modelsError.set(this.t('prov.err_load_models'));
     } finally {
       this.modelsLoading.set(false);
     }
@@ -573,15 +579,15 @@ export class Providers implements OnInit {
     event.stopPropagation();
     try {
       const result = await this.api.refreshProviderModels(p.id);
-      alert(result.ok ? `✅ ${result.models?.length ?? 0} modelos cargados` : `⚠️ ${result.message}`);
+      alert(result.ok ? `✅ ${this.t('prov.models_loaded', { count: '' + (result.models?.length ?? 0) })}` : `⚠️ ${result.message}`);
     } catch (e: any) {
-      alert('Error al refrescar modelos: ' + (e?.message || 'desconocido'));
+      alert(this.t('prov.err_refresh_models', { error: e?.message || this.t('global.unknown_error') }));
     }
   }
 
   async deleteProvider(id: number, event: Event) {
     event.stopPropagation();
-    if (!confirm('¿Eliminar este proveedor?')) return;
+    if (!confirm(this.t('prov.confirm_delete'))) return;
     await this.api.deleteProvider(id);
     await this.loadProviders();
   }
@@ -598,7 +604,7 @@ export class Providers implements OnInit {
       const res = await this.api.testProvider(config);
       this.testResult.set(res);
     } catch (e: any) {
-      this.testResult.set({ ok: false, message: e.message || 'Error desconocido' });
+      this.testResult.set({ ok: false, message: e.message || this.t('global.unknown_error') });
     } finally {
       this.isTesting.set(false);
     }

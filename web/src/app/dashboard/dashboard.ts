@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit } from '@angular/core';
 import { ApiService, Task, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslationService } from '../translation.service';
 
 interface DayOption {
   key: string;
@@ -17,6 +18,12 @@ interface DayOption {
 })
 export class Dashboard implements OnInit {
   private api = inject(ApiService);
+  private translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
+
   tasks = signal<Task[]>([]);
   agents = signal<Agent[]>([]);
   isSaving = signal(false);
@@ -102,11 +109,11 @@ export class Dashboard implements OnInit {
     this.error.set('');
 
     if (!this.newTask.name.trim()) {
-      this.error.set('El nombre es obligatorio.');
+      this.error.set(this.t('tasks.name_required'));
       return;
     }
     if (!this.newTask.prompt.trim()) {
-      this.error.set('El prompt es obligatorio.');
+      this.error.set(this.t('tasks.prompt_required'));
       return;
     }
 
@@ -127,7 +134,7 @@ export class Dashboard implements OnInit {
       this.newTask.oneShot = false;
       await this.loadTasks();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo crear la tarea.');
+      this.error.set(err instanceof Error ? err.message : this.t('tasks.create_error'));
     } finally {
       this.isSaving.set(false);
     }
@@ -139,17 +146,30 @@ export class Dashboard implements OnInit {
   }
 
   formatDate(d?: string | null): string {
-    if (!d) return 'Pendiente';
+    if (!d) return this.t('tasks.pending');
     return new Date(d).toLocaleString();
   }
 
   cronLabel(expr: string, oneShot: boolean): string {
-    if (oneShot) return 'Ejecucion unica';
+    if (oneShot) return this.t('tasks.one_shot_badge');
     switch (expr) {
-      case '@hourly': return 'Cada hora';
-      case '@daily': return 'Cada dia';
-      case '* * * * *': return 'Cada minuto';
+      case '@hourly': return this.t('tasks.freq_hourly');
+      case '@daily': return this.t('tasks.freq_daily');
+      case '* * * * *': return this.t('tasks.freq_minutely');
       default: return expr;
+    }
+  }
+
+  getDayKey(key: string): string {
+    switch (key) {
+      case '1': return 'days.mon';
+      case '2': return 'days.tue';
+      case '3': return 'days.wed';
+      case '4': return 'days.thu';
+      case '5': return 'days.fri';
+      case '6': return 'days.sat';
+      case '0': return 'days.sun';
+      default: return '';
     }
   }
 }

@@ -39,9 +39,11 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 	for _, task := range tasks {
 		log.Printf("⚙️ Cron executing task: '%s' with agent %d", task.Name, task.AgentID)
 
+		taskID := task.ID
 		session := database.Session{
 			Title:   "Cron: " + task.Name,
 			AgentID: task.AgentID,
+			TaskID:  &taskID,
 		}
 		if err := database.DB.Create(&session).Error; err != nil {
 			log.Printf("❌ Task '%s' failed to create session: %v", task.Name, err)
@@ -50,18 +52,8 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 			continue
 		}
 
-		userMsg := database.ChatMessage{
-			SessionID: session.ID,
-			Role:      "user",
-			Content:   task.Prompt,
-		}
-		database.DB.Create(&userMsg)
-
-		var history []database.ChatMessage
-		history = append(history, userMsg)
-
 		ctxTask := context.WithValue(ctx, ai.IsScheduledTaskKey, true)
-		respMsg, intermediates, err := brain.ProcessChatInteraction(ctxTask, session.ID, history, "")
+		respMsg, _, err := brain.ProcessChatInteraction(ctxTask, session.ID, nil, task.Prompt)
 		nowAfter := time.Now()
 		task.LastRunAt = &nowAfter
 
@@ -70,17 +62,6 @@ func processScheduledTasks(ctx context.Context, brain *ai.Brain) {
 			task.LastError = err.Error()
 			task.LastResult = ""
 		} else {
-			for i := range intermediates {
-				database.DB.Create(&intermediates[i])
-			}
-			asstMsg := database.ChatMessage{
-				SessionID:    session.ID,
-				Role:         "assistant",
-				Content:      respMsg.Content,
-				RawToolCalls: "",
-			}
-			database.DB.Create(&asstMsg)
-
 			log.Printf("✅ Task '%s' Execution Succeeded: %s", task.Name, truncate(respMsg.Content, 100))
 			task.LastError = ""
 			task.LastResult = respMsg.Content

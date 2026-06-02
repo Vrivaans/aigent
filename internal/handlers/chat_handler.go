@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -54,25 +55,35 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		database.DB.Model(&session).Where("id = ?", session.ID).Update("llm_model_override", req.ModelOverride)
 	}
 
-	// 1. Save user message history
-	userMsg := database.ChatMessage{
-		SessionID: session.ID,
-		Role:      "user",
-		Content:   req.Message,
+	// Cancelar cualquier acción pendiente antes de procesar el nuevo mensaje
+	var pendingActions []database.PendingAction
+	if err := database.DB.Where("session_id = ? AND status = ?", session.ID, "PENDING").Find(&pendingActions).Error; err == nil && len(pendingActions) > 0 {
+		activeSess, sessErr := ai.GetSessionManager().GetOrCreateSession(session.ID)
+		for _, p := range pendingActions {
+			p.Status = "REJECTED"
+			database.DB.Save(&p)
+			
+			// Registrar en el chat que fue cancelada para mantener la validez del historial
+			if sessErr == nil {
+				activeSess.AddMessage("tool", `{"status":"rejected","error":"Acción cancelada por el inicio de un nuevo mensaje"}`, p.ToolCallID, "")
+			} else {
+				// Fallback si no está en caché
+				sysMsg := database.ChatMessage{
+					SessionID:  session.ID,
+					Role:       "tool",
+					Content:    `{"status":"rejected","error":"Acción cancelada por el inicio de un nuevo mensaje"}`,
+					ToolCallID: p.ToolCallID,
+				}
+				database.DB.Create(&sysMsg)
+			}
+		}
 	}
-	if err := database.DB.Create(&userMsg).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save history"})
-	}
-
-	// 2. Traer el historial de ESTA sesion (10 mensajes anteriores)
-	var history []database.ChatMessage
-	database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(10).Find(&history)
 
 	// 3. Ejecutar The Brain Loop
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	respMsg, intermediates, err := h.Brain.ProcessChatInteraction(ctx, session.ID, history, req.Message)
+	respMsg, _, err := h.Brain.ProcessChatInteraction(ctx, session.ID, nil, req.Message)
 	if err != nil {
 		errText := err.Error()
 		sysMsg := database.ChatMessage{
@@ -96,40 +107,16 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		})
 	}
 
-	// 4. Persistir mensajes intermedios (tool_calls y resultados) acumulados por el Brain
-	for i := range intermediates {
-		database.DB.Create(&intermediates[i])
-	}
-
-	// 5. Guardar la respuesta FINAL del asistente
-	var rawTools string
-	if len(respMsg.ToolCalls) > 0 {
-		b, _ := json.Marshal(respMsg.ToolCalls)
-		rawTools = string(b)
-	}
-	asstMsg := database.ChatMessage{
-		SessionID:    session.ID,
-		Role:         "assistant",
-		Content:      respMsg.Content,
-		RawToolCalls: rawTools,
-	}
-	database.DB.Create(&asstMsg)
-
 	// Extraer y procesar artefactos
 	cleanContent, savedArtifacts := processAndSaveArtifacts(session.ID, respMsg.Content)
 
 	// 6. Manejar si requiere confirmación
 	var pendingID uint
-	if respMsg.RequiresConfirmation && respMsg.WaitingToolCall != nil {
-		pending := database.PendingAction{
-			SessionID:  session.ID,
-			ToolName:   respMsg.WaitingToolCall.Function.Name,
-			Arguments:  respMsg.WaitingToolCall.Function.Arguments,
-			ToolCallID: respMsg.WaitingToolCall.ID,
-			Status:     "PENDING",
+	if respMsg.RequiresConfirmation {
+		var firstPending database.PendingAction
+		if err := database.DB.Where("session_id = ? AND status = ?", session.ID, "PENDING").Order("id asc").First(&firstPending).Error; err == nil {
+			pendingID = firstPending.ID
 		}
-		database.DB.Create(&pending)
-		pendingID = pending.ID
 	}
 
 	return c.JSON(fiber.Map{
@@ -143,6 +130,103 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		"provider_switched":     respMsg.ProviderSwitched,
 		"provider_switch":       respMsg.ProviderSwitch,
 	})
+}
+
+func (h *ChatHandler) HandleChatStream(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
+
+	var req ChatRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid JSON format"})
+	}
+
+	// Validate Session
+	var session database.Session
+	if err := database.DB.First(&session, sessionID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	}
+
+	// Update title if it's the first message
+	if session.Title == "Nueva conversación" && len(req.Message) > 0 {
+		title := req.Message
+		if len(title) > 30 {
+			title = title[:30] + "..."
+		}
+		database.DB.Model(&session).Update("title", title)
+	}
+
+	if req.ModelOverride != "" {
+		session.LLMModelOverride = req.ModelOverride
+		database.DB.Model(&session).Where("id = ?", session.ID).Update("llm_model_override", req.ModelOverride)
+	}
+
+	// Cancelar cualquier acción pendiente antes de procesar el nuevo mensaje
+	var pendingActions []database.PendingAction
+	if err := database.DB.Where("session_id = ? AND status = ?", session.ID, "PENDING").Find(&pendingActions).Error; err == nil && len(pendingActions) > 0 {
+		activeSess, sessErr := ai.GetSessionManager().GetOrCreateSession(session.ID)
+		for _, p := range pendingActions {
+			p.Status = "REJECTED"
+			database.DB.Save(&p)
+			
+			// Registrar en el chat que fue cancelada para mantener la validez del historial
+			if sessErr == nil {
+				activeSess.AddMessage("tool", `{"status":"rejected","error":"Acción cancelada por el inicio de un nuevo mensaje"}`, p.ToolCallID, "")
+			} else {
+				// Fallback si no está en caché
+				sysMsg := database.ChatMessage{
+					SessionID:  session.ID,
+					Role:       "tool",
+					Content:    `{"status":"rejected","error":"Acción cancelada por el inicio de un nuevo mensaje"}`,
+					ToolCallID: p.ToolCallID,
+				}
+				database.DB.Create(&sysMsg)
+			}
+		}
+	}
+
+	// Configurar los headers de SSE
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("Transfer-Encoding", "chunked")
+
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// Helper para enviar eventos formateados de SSE
+		sendEvent := func(eventType string, data interface{}) {
+			dataBytes, err := json.Marshal(data)
+			if err != nil {
+				return
+			}
+			_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, string(dataBytes))
+			_ = w.Flush()
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		respMsg, err := h.Brain.ProcessChatInteractionStream(ctx, session.ID, req.Message, sendEvent)
+		if err != nil {
+			log.Printf("⚠️ Stream interaction error: %v", err)
+			sendEvent("error", map[string]string{"message": err.Error()})
+
+			sysMsg := database.ChatMessage{
+				SessionID: session.ID,
+				Role:      "system",
+				Content:   "❌ Error: " + err.Error(),
+			}
+			database.DB.Create(&sysMsg)
+			return
+		}
+
+		// Extraer y guardar artefactos si hay respuesta textual
+		if respMsg != nil && respMsg.Content != "" {
+			_, _ = processAndSaveArtifacts(session.ID, respMsg.Content)
+		}
+
+		sendEvent("done", map[string]interface{}{"status": "ok"})
+	})
+
+	return nil
 }
 
 type ConfirmRequest struct {
@@ -165,7 +249,58 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	if !req.Approved {
 		pending.Status = "REJECTED"
 		database.DB.Save(&pending)
-		return c.JSON(fiber.Map{"status": "rejected"})
+
+		// Agregar mensaje de herramienta rechazada en el historial para mantener la integridad de la API
+		activeSess, err := ai.GetSessionManager().GetOrCreateSession(pending.SessionID)
+		if err == nil {
+			activeSess.AddMessage("tool", `{"status":"rejected","error":"Acción cancelada por el usuario"}`, pending.ToolCallID, "")
+		}
+
+		var pendingCount int64
+		database.DB.Model(&database.PendingAction{}).Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Count(&pendingCount)
+
+		if pendingCount > 0 {
+			var nextPending database.PendingAction
+			var nextPendingID uint
+			if err := database.DB.Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Order("id asc").First(&nextPending).Error; err == nil {
+				nextPendingID = nextPending.ID
+			}
+			return c.JSON(fiber.Map{
+				"status":     "rejected",
+				"partial":    true,
+				"pending_id": nextPendingID,
+				"response":   "⏳ Acción rechazada. Esperando otras aprobaciones pendientes...",
+			})
+		}
+
+		// Re-inferencia tras el rechazo final
+		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		msg, _, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, nil, "")
+		var finalResponse string = "❌ Acción cancelada."
+		var nextPendingID uint
+		var savedArtifacts []database.Artifact
+		if err == nil && msg != nil {
+			cleanContent, arts := processAndSaveArtifacts(pending.SessionID, msg.Content)
+			finalResponse = cleanContent
+			savedArtifacts = arts
+
+			if msg.RequiresConfirmation {
+				var nextPending database.PendingAction
+				if err := database.DB.Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Order("id asc").First(&nextPending).Error; err == nil {
+					nextPendingID = nextPending.ID
+				}
+				finalResponse = "⏳ Acción cancelada. Pendiente de la siguiente confirmación..."
+			}
+		}
+
+		return c.JSON(fiber.Map{
+			"status":     "rejected",
+			"response":   finalResponse,
+			"artifacts":  savedArtifacts,
+			"pending_id": nextPendingID,
+		})
 	}
 
 	// EXECUTE TOOL
@@ -175,12 +310,6 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	var args map[string]interface{}
 	json.Unmarshal([]byte(pending.Arguments), &args)
 
-	// Necesitamos el Brain para obtener el Sanitize y el Registry
-	// Pero el Handlers.ChatHandler ya tiene el Brain.
-	// Ojo: En confirmación el nombre viene sanitizado de la DB.
-
-	// Buscamos herramienta — el nombre en DB está sanitizado (guiones→guiones_bajos),
-	// pero el Registry usa el nombre original del MCP (puede tener guiones).
 	tDef, exists := h.Brain.Registry.GetBySanitized(pending.ToolName)
 	if !exists {
 		errText := "Tool no longer registered: " + pending.ToolName
@@ -196,7 +325,6 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		})
 	}
 
-	// Mapeamos argumentos sanitizados a originales (como en ProcessChatInteraction)
 	finalArgs := make(map[string]interface{})
 	for k, v := range args {
 		origK, ok := tDef.ArgMapping[k]
@@ -242,24 +370,36 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 
 	// Guardamos el resultado de la tool para que el siguiente chat lo vea en contexto
-	toolResMsg := database.ChatMessage{
-		SessionID:  pending.SessionID,
-		Role:       "tool",
-		Content:    string(result),
-		ToolCallID: pending.ToolCallID,
+	activeSess, err := ai.GetSessionManager().GetOrCreateSession(pending.SessionID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to access session cache"})
 	}
-	database.DB.Create(&toolResMsg)
+	activeSess.AddMessage("tool", string(result), pending.ToolCallID, "")
 
-	// 7. RE-INFERENCIA: Reanudamos el bucle del agente para ver si hay más pasos.
-	// 7a. Obtener el historial actualizado (incluyendo el resultado que acabamos de guardar)
-	var history []database.ChatMessage
-	database.DB.Where("session_id = ?", pending.SessionID).Order("created_at asc").Limit(20).Find(&history)
+	// Verificar si hay otras acciones PENDING para la misma sesión antes de la re-inferencia
+	var pendingCount int64
+	database.DB.Model(&database.PendingAction{}).Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Count(&pendingCount)
 
-	// 7b. Reanudar bucle
+	if pendingCount > 0 {
+		var nextPending database.PendingAction
+		var nextPendingID uint
+		if err := database.DB.Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Order("id asc").First(&nextPending).Error; err == nil {
+			nextPendingID = nextPending.ID
+		}
+		return c.JSON(fiber.Map{
+			"status":     "approved",
+			"partial":    true,
+			"result":     string(result),
+			"response":   "⏳ Acción ejecutada. Esperando otras aprobaciones pendientes...",
+			"pending_id": nextPendingID,
+		})
+	}
+
+	// 7. RE-INFERENCIA: Reanudamos el bucle del agente al estar todo resuelto.
 	newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	msg, toSave, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, history, "")
+	msg, _, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, nil, "")
 	if err != nil {
 		log.Printf("⚠️ Error re-inferring after confirm: %v", err)
 		errText := err.Error()
@@ -280,44 +420,19 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		})
 	}
 
-	// 8. Persistir mensajes intermedios generados en la re-inferencia
-	for _, m := range toSave {
-		database.DB.Create(&m)
-	}
-
-	// 9. Manejar la respuesta final de la re-inferencia
 	var finalResponse string = "✅ Acción ejecutada correctamente."
 	var nextPendingID uint
 	var savedArtifacts []database.Artifact
 	if msg != nil {
-		var rawTools string
-		if len(msg.ToolCalls) > 0 {
-			b, _ := json.Marshal(msg.ToolCalls)
-			rawTools = string(b)
-		}
-		asstMsg := database.ChatMessage{
-			SessionID:    pending.SessionID,
-			Role:         "assistant",
-			Content:      msg.Content,
-			RawToolCalls: rawTools,
-		}
-		database.DB.Create(&asstMsg)
-
 		cleanContent, arts := processAndSaveArtifacts(pending.SessionID, msg.Content)
 		finalResponse = cleanContent
 		savedArtifacts = arts
 
-		// Si la re-inferencia disparó OTRA acción sensible, crear el PendingAction
-		if msg.RequiresConfirmation && msg.WaitingToolCall != nil {
-			newPending := database.PendingAction{
-				SessionID:  pending.SessionID,
-				ToolName:   msg.WaitingToolCall.Function.Name,
-				Arguments:  msg.WaitingToolCall.Function.Arguments,
-				ToolCallID: msg.WaitingToolCall.ID,
-				Status:     "PENDING",
+		if msg.RequiresConfirmation {
+			var nextPending database.PendingAction
+			if err := database.DB.Where("session_id = ? AND status = ?", pending.SessionID, "PENDING").Order("id asc").First(&nextPending).Error; err == nil {
+				nextPendingID = nextPending.ID
 			}
-			database.DB.Create(&newPending)
-			nextPendingID = newPending.ID
 			finalResponse = "⏳ Acción ejecutada. Pendiente de la siguiente confirmación..."
 		}
 	}
@@ -341,9 +456,14 @@ type ChatMessageResponse struct {
 // GetHistory expone el chat de una sesion enriquecido con acciones pendientes
 func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
-	var history []database.ChatMessage
-	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Limit(50).Find(&history).Error; err != nil {
+	var recentHistory []database.ChatMessage
+	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at desc").Limit(50).Find(&recentHistory).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var history []database.ChatMessage
+	for i := len(recentHistory) - 1; i >= 0; i-- {
+		history = append(history, recentHistory[i])
 	}
 
 	// Buscar acciones pendientes para esta sesión
@@ -387,8 +507,20 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 
 // GetSessions devuelve todas las sesiones ordenadas
 func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
+	excludeCron := c.Query("exclude_cron") == "true"
+	excludeWorkflows := c.Query("exclude_workflows") == "true"
+
 	var sessions []database.Session
-	database.DB.Preload("Agent").Order("updated_at desc").Find(&sessions)
+	query := database.DB.Preload("Agent")
+	if excludeCron {
+		query = query.Where("title NOT LIKE ?", "Cron: %")
+	}
+	if excludeWorkflows {
+		query = query.Where("title NOT LIKE ? AND title NOT LIKE ?", "Workflow Run: %", "Workflow: %")
+	}
+	if err := query.Order("updated_at desc").Find(&sessions).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.JSON(sessions)
 }
 
@@ -510,4 +642,49 @@ func (h *ChatHandler) GetSessionArtifacts(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(artifacts)
+}
+
+type PendingApprovalResponse struct {
+	database.PendingAction
+	SessionTitle string `json:"session_title"`
+	TaskName     string `json:"task_name,omitempty"`
+	TaskID       *uint  `json:"task_id,omitempty"`
+}
+
+// GetPendingApprovals retorna todas las aprobaciones pendientes del sistema
+func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
+	var pendings []database.PendingAction
+	if err := database.DB.Where("status = ?", "PENDING").Order("created_at desc").Find(&pendings).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	response := make([]PendingApprovalResponse, len(pendings))
+	for i, p := range pendings {
+		var sess database.Session
+		var taskName string
+		var taskID *uint
+
+		if err := database.DB.First(&sess, p.SessionID).Error; err == nil {
+			if sess.TaskID != nil {
+				var t database.Task
+				if err := database.DB.First(&t, *sess.TaskID).Error; err == nil {
+					taskName = t.Name
+					taskID = sess.TaskID
+				}
+			}
+			response[i] = PendingApprovalResponse{
+				PendingAction: p,
+				SessionTitle:  sess.Title,
+				TaskName:      taskName,
+				TaskID:        taskID,
+			}
+		} else {
+			response[i] = PendingApprovalResponse{
+				PendingAction: p,
+				SessionTitle:  fmt.Sprintf("Sesión #%d", p.SessionID),
+			}
+		}
+	}
+
+	return c.JSON(response)
 }

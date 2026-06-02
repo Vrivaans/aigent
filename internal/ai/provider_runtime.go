@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"aigent/internal/database"
@@ -103,4 +104,84 @@ func (b *Brain) createChatCompletionWithFallback(
 	}
 
 	return nil, nil, fmt.Errorf("llm inference failed tras fallback: %w", lastErr)
+}
+
+func (b *Brain) createChatCompletionStreamWithFallback(
+	ctx context.Context,
+	req ChatCompletionRequest,
+	session *database.Session,
+	providerCandidates []database.LLMProvider,
+	activeProviderIdx *int,
+	masterKey string,
+) (io.ReadCloser, *ProviderSwitchInfo, error) {
+	activeProvider := providerCandidates[*activeProviderIdx]
+	activeModel := modelForActiveProvider(session, activeProvider)
+	req.Model = activeModel
+	req.Stream = true
+	req.IncludeReasoning = true
+
+	apiKey, decErr := utils.Decrypt(activeProvider.APIKey, masterKey)
+	if decErr != nil {
+		return nil, nil, fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", activeProvider.Name, decErr)
+	}
+
+	llmClient := NewClient(apiKey, activeProvider.BaseURL)
+	stream, err := llmClient.CreateChatCompletionStream(ctx, req)
+	if err == nil {
+		return stream, nil, nil
+	}
+
+	log.Printf("❌ LLM Stream API Error (%s): %v", activeProvider.Name, err)
+	if !isRecoverableProviderError(err) {
+		return nil, nil, fmt.Errorf("llm stream inference failed: %w", err)
+	}
+
+	fromProvider := activeProvider.Name
+	fromModel := activeModel
+	var lastErr error = err
+
+	for nextIdx := *activeProviderIdx + 1; nextIdx < len(providerCandidates); nextIdx++ {
+		nextProvider := providerCandidates[nextIdx]
+		nextModel := modelForFallbackProvider(nextProvider)
+		req.IncludeReasoning = true
+
+		nextKey, decErr2 := utils.Decrypt(nextProvider.APIKey, masterKey)
+		if decErr2 != nil {
+			lastErr = fmt.Errorf("error al descifrar la API Key del proveedor '%s': %w", nextProvider.Name, decErr2)
+			log.Printf("❌ %v", lastErr)
+			continue
+		}
+
+		nextClient := NewClient(nextKey, nextProvider.BaseURL)
+		req.Model = nextModel
+		stream, err = nextClient.CreateChatCompletionStream(ctx, req)
+		if err != nil {
+			lastErr = err
+			log.Printf("❌ LLM Stream API Error en fallback (%s): %v", nextProvider.Name, err)
+			if !isRecoverableProviderError(err) {
+				return nil, nil, fmt.Errorf("llm stream inference failed tras fallback (%s): %w", nextProvider.Name, err)
+			}
+			continue
+		}
+
+		*activeProviderIdx = nextIdx
+		session.LLMProviderOverrideID = &nextProvider.ID
+		session.LLMModelOverride = ""
+		_ = database.DB.Model(&database.Session{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
+			"llm_provider_override_id": nextProvider.ID,
+			"llm_model_override":       "",
+		}).Error
+
+		switchNotice := &ProviderSwitchInfo{
+			Reason:       "provider_fallback",
+			FromProvider: fromProvider,
+			FromModel:    fromModel,
+			ToProvider:   nextProvider.Name,
+			ToModel:      nextModel,
+		}
+		log.Printf("🔁 Fallback automático aplicado a stream: %s/%s -> %s/%s", fromProvider, fromModel, nextProvider.Name, nextModel)
+		return stream, switchNotice, nil
+	}
+
+	return nil, nil, fmt.Errorf("llm stream inference failed tras fallback: %w", lastErr)
 }

@@ -74,9 +74,11 @@ type Session struct {
 	Title                 string       `gorm:"size:255;not null" json:"title"`
 	AgentID               uint         `gorm:"not null;default:1" json:"agent_id"`
 	Agent                 *Agent       `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
+	TaskID                *uint        `json:"task_id,omitempty"`
 	LLMProviderOverrideID *uint        `json:"llm_provider_override_id,omitempty"`
 	LLMProviderOverride   *LLMProvider `gorm:"foreignKey:LLMProviderOverrideID" json:"llm_provider_override,omitempty"`
 	LLMModelOverride      string       `gorm:"size:255" json:"llm_model_override,omitempty"`
+	ContextSummary        string       `gorm:"type:text" json:"context_summary,omitempty"`
 	CreatedAt             time.Time    `json:"created_at"`
 	UpdatedAt             time.Time    `json:"updated_at"`
 }
@@ -193,4 +195,25 @@ type McpStreamServer struct {
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	DeletedAt            gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+type Workflow struct {
+	ID             uint      `gorm:"primarykey" json:"id"`
+	Name           string    `gorm:"size:255;not null" json:"name"`
+	Description    string    `gorm:"type:text" json:"description"`
+	CronExpression string    `gorm:"size:100" json:"cron_expression,omitempty"`
+	Definition     string    `gorm:"type:text;not null" json:"definition"` // JSON de RuleChain
+	Enabled        bool      `gorm:"default:true" json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type WorkflowRun struct {
+	ID            uint      `gorm:"primarykey" json:"id"`
+	WorkflowID    uint      `gorm:"not null;index" json:"workflow_id"`
+	Status        string    `gorm:"size:50;default:'RUNNING'" json:"status"` // RUNNING, COMPLETED, FAILED, PAUSED
+	CurrentNodeID string    `gorm:"size:100" json:"current_node_id,omitempty"`
+	Logs          string    `gorm:"type:text" json:"logs,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

@@ -132,6 +132,50 @@ export interface McpStreamServer {
   updated_at?: string;
 }
 
+export interface PendingApproval {
+  id: number;
+  session_id: number;
+  tool_name: string;
+  arguments: string;
+  tool_call_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  session_title: string;
+  task_name?: string;
+  task_id?: number;
+}
+
+export interface Workflow {
+  id: number;
+  name: string;
+  description: string;
+  cron_expression?: string;
+  definition: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowRun {
+  id: number;
+  workflow_id: number;
+  status: string;
+  current_node_id?: string;
+  logs?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowResponse extends Workflow {
+  mermaid: string;
+}
+
+export interface WorkflowRunResponse extends WorkflowRun {
+  mermaid: string;
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly baseUrl = environment.apiBaseUrl;
@@ -179,8 +223,12 @@ export class ApiService {
     return data;
   }
 
-  async getSessions(): Promise<Session[]> {
-    const res = await this.fetchApi('/sessions');
+  async getSessions(excludeCron: boolean = false, excludeWorkflows: boolean = false): Promise<Session[]> {
+    const params = [];
+    if (excludeCron) params.push('exclude_cron=true');
+    if (excludeWorkflows) params.push('exclude_workflows=true');
+    const url = params.length > 0 ? `/sessions?${params.join('&')}` : '/sessions';
+    const res = await this.fetchApi(url);
     return res.json();
   }
 
@@ -237,6 +285,73 @@ export class ApiService {
     return data;
   }
 
+  async sendChatMessageStream(
+    sessionId: number,
+    message: string,
+    modelOverride?: string,
+    onEvent?: (event: string, data: any) => void
+  ): Promise<void> {
+    const body: any = { message };
+    if (modelOverride) { body.model_override = modelOverride; }
+
+    const token = localStorage.getItem('aigent_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const response = await fetch(`${this.baseUrl}/sessions/${sessionId}/chat/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      let errText = 'Error en stream';
+      try {
+        errText = await response.text();
+      } catch {}
+      throw new Error(errText);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('ReadableStream no soportado en la respuesta');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Guardar la línea incompleta
+
+      let currentEvent = 'message';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('event: ')) {
+          currentEvent = trimmed.slice(7);
+        } else if (trimmed.startsWith('data: ')) {
+          const dataStr = trimmed.slice(6);
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (onEvent) {
+              onEvent(currentEvent, parsed);
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data', e, dataStr);
+          }
+        }
+      }
+    }
+  }
+
   async confirmAction(sessionId: number, pendingId: number, approved: boolean, alwaysAllow = false): Promise<any> {
     const res = await this.fetchApi(`/sessions/${sessionId}/confirm/${pendingId}`, {
       method: 'POST',
@@ -247,6 +362,11 @@ export class ApiService {
       throw new Error(data.error || 'Server error');
     }
     return data;
+  }
+
+  async getPendingApprovals(): Promise<PendingApproval[]> {
+    const res = await this.fetchApi('/approvals');
+    return res.json();
   }
 
   async resetSessionLLMOverride(sessionId: number): Promise<{ status: string }> {
@@ -544,5 +664,44 @@ export class ApiService {
     }
     if (!res.ok) throw new Error(data.error || 'Test failed');
     return data;
+  }
+
+  // --- Workflows ---
+  async getWorkflows(): Promise<Workflow[]> {
+    return this.request('/workflows');
+  }
+
+  async getWorkflow(id: number): Promise<WorkflowResponse> {
+    return this.request(`/workflows/${id}`);
+  }
+
+  async createWorkflow(workflow: { name: string; description: string; cron_expression?: string; definition: string }): Promise<Workflow> {
+    return this.request('/workflows', {
+      method: 'POST',
+      body: JSON.stringify(workflow)
+    });
+  }
+
+  async deleteWorkflow(id: number): Promise<{ status: string }> {
+    return this.request(`/workflows/${id}`, { method: 'DELETE' });
+  }
+
+  async reloadWorkflows(): Promise<{ status: string }> {
+    return this.request('/workflows/reload', { method: 'POST' });
+  }
+
+  async runWorkflow(id: number, payload = '{}'): Promise<{ status: string; run_id: number }> {
+    return this.request(`/workflows/${id}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ payload })
+    });
+  }
+
+  async getWorkflowRuns(workflowId: number): Promise<WorkflowRun[]> {
+    return this.request(`/workflows/${workflowId}/runs`);
+  }
+
+  async getWorkflowRun(runId: number): Promise<WorkflowRunResponse> {
+    return this.request(`/workflows/runs/${runId}`);
   }
 }

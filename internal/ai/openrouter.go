@@ -36,9 +36,11 @@ func NewClient(apiKey, baseURL string) *OpenRouterClient {
 
 // Request and Response structs para interactuar con la API estructurada (compatible con OpenAI/OpenRouter)
 type ChatCompletionRequest struct {
-	Model    string        `json:"model"`
-	Messages []ChatMessage `json:"messages"`
-	Tools    []Tool        `json:"tools,omitempty"`
+	Model            string        `json:"model"`
+	Messages         []ChatMessage `json:"messages"`
+	Tools            []Tool        `json:"tools,omitempty"`
+	Stream           bool          `json:"stream,omitempty"`
+	IncludeReasoning bool          `json:"include_reasoning,omitempty"`
 }
 
 type ChatMessage struct {
@@ -72,6 +74,8 @@ type Choice struct {
 type ChoiceMessage struct {
 	Role                 string              `json:"role"`
 	Content              string              `json:"content"`
+	Reasoning            string              `json:"reasoning,omitempty"`
+	ReasoningContent     string              `json:"reasoning_content,omitempty"`
 	ToolCalls            []ToolCall          `json:"tool_calls,omitempty"`
 	RequiresConfirmation bool                `json:"requires_confirmation,omitempty"`
 	WaitingToolCall      *ToolCall           `json:"waiting_tool_call,omitempty"`
@@ -135,5 +139,74 @@ func (c *OpenRouterClient) CreateChatCompletion(ctx context.Context, req ChatCom
 		return nil, fmt.Errorf("failed to decode openrouter response: %w", err)
 	}
 
+	for i := range completion.Choices {
+		msg := &completion.Choices[i].Message
+		if msg.Reasoning == "" && msg.ReasoningContent != "" {
+			msg.Reasoning = msg.ReasoningContent
+		}
+	}
+
 	return &completion, nil
+}
+
+// Structs para parsear las deltas de streaming de OpenAI/OpenRouter
+type ChatCompletionStreamResponse struct {
+	Choices []struct {
+		Delta struct {
+			Role             string            `json:"role"`
+			Content          string            `json:"content"`
+			Reasoning        string            `json:"reasoning,omitempty"`
+			ReasoningContent string            `json:"reasoning_content,omitempty"`
+			ToolCalls        []ToolCallSnippet `json:"tool_calls,omitempty"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+}
+
+type ToolCallSnippet struct {
+	Index    *int                 `json:"index,omitempty"`
+	ID       string               `json:"id,omitempty"`
+	Type     string               `json:"type,omitempty"`
+	Function *FunctionCallSnippet `json:"function,omitempty"`
+}
+
+type FunctionCallSnippet struct {
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
+}
+
+func (c *OpenRouterClient) CreateChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (io.ReadCloser, error) {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = DefaultModel
+	}
+
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal stream request: %w", err)
+	}
+
+	url := c.BaseURL + "/chat/completions"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("HTTP-Referer", "http://localhost:3000")
+	httpReq.Header.Set("X-Title", "AIgent")
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("openrouter connection failed: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("openrouter stream API error %d: %s", resp.StatusCode, string(b))
+	}
+
+	return resp.Body, nil
 }

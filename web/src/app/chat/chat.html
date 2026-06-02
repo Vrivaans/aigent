@@ -1,22 +1,22 @@
 <div class="chat-layout-wrapper" [class.has-canvas]="activeArtifact()">
   <div class="chat-container">
     <div class="chat-agent-selector-bar">
-      <div class="selector-label">🧠 Agente:</div>
+      <div class="selector-label">{{ t('chat.agent_label') }}</div>
       <select class="agent-dropdown" [ngModel]="selectedAgentId()" (ngModelChange)="onAgentChange($event)">
         @for (agent of agents(); track agent.id) {
           <option [ngValue]="agent.id">{{ agent.name }}</option>
         }
       </select>
 
-      <div class="selector-label">🤖 Modelo:</div>
+      <div class="selector-label">{{ t('chat.model_label') }}</div>
       <select class="model-dropdown" [ngModel]="selectedModelId()" (ngModelChange)="selectedModelId.set($event)">
-        <option [ngValue]="''">Default del agente</option>
+        <option [ngValue]="''">{{ t('chat.default_agent') }}</option>
         @for (group of modelGroups(); track group.provider.id) {
           <optgroup label="{{ group.provider.name }}">
             @for (model of group.models; track model.id) {
               <option [ngValue]="model.model_id">
                 {{ model.name }}
-                @if (model.is_free) { (Gratis) }
+                @if (model.is_free) { ({{ t('chat.free') }}) }
               </option>
             }
           </optgroup>
@@ -28,8 +28,8 @@
       @if (messages().length === 0) {
         <div class="empty-state">
           <div class="icon">✨</div>
-          <h2>AIgent Operator</h2>
-          <p>Conectado al Core de HandsAI. ¿En qué te puedo ayudar?</p>
+          <h2>{{ t('chat.empty_title') }}</h2>
+          <p>{{ t('chat.empty_desc') }}</p>
         </div>
       }
 
@@ -55,34 +55,41 @@
                 @for (tool of msg.tool_calls; track $index) {
                   <div class="tool-call-badge">
                     <span class="icon">⚙️</span>
-                    <span class="text">Ejecutando: <strong>{{ tool.function?.name || tool.name || 'tool' }}</strong></span>
+                    <span class="text">{{ t('chat.executing', { name: tool.function?.name || tool.name || 'tool' }) }}</span>
                   </div>
                 }
               </div>
             }
             @if (msg.role === 'tool') {
               <details class="tool-result-details">
-                <summary>Ver resultado de herramienta</summary>
+                <summary>{{ t('chat.view_result') }}</summary>
                 <pre>{{ msg.content }}</pre>
               </details>
             } @else {
+              @if (msg.reasoning) {
+                <details class="reasoning-details" [open]="msg.show_reasoning !== false" (toggle)="msg.show_reasoning = $any($event.target).open">
+                  <summary class="reasoning-summary">
+                    <span class="thinking-icon">🧠</span>
+                    <span>{{ t('chat.reasoning') }}</span>
+                  </summary>
+                  <pre class="reasoning-text">{{ msg.reasoning }}</pre>
+                </details>
+              }
               <p class="msg-text">{{ msg.content }}</p>
             }
 
             @if (msg.provider_switched && msg.provider_switch) {
               <div class="provider-switch-card">
-                <div class="switch-title">🔁 Cambio automático de provider/modelo</div>
+                <div class="switch-title">{{ t('chat.auto_switch') }}</div>
                 <div class="switch-body">
-                  Se cambió de <strong>{{ msg.provider_switch.from_provider }}</strong> ({{ msg.provider_switch.from_model }})
-                  a <strong>{{ msg.provider_switch.to_provider }}</strong> ({{ msg.provider_switch.to_model }})
-                  por falta de créditos/cuota.
+                  {{ t('chat.switch_desc', { from_prov: msg.provider_switch.from_provider, from_model: msg.provider_switch.from_model, to_prov: msg.provider_switch.to_provider, to_model: msg.provider_switch.to_model }) }}
                 </div>
                 <div class="switch-actions">
                   <button
                     class="btn-reject"
                     [disabled]="isThinking() || msg.provider_switch_reset_done"
                     (click)="resetProviderOverride(msg)">
-                    {{ msg.provider_switch_reset_done ? 'Default restaurado' : 'Volver al default del agente' }}
+                    {{ msg.provider_switch_reset_done ? t('chat.restore_default') : t('chat.return_default') }}
                   </button>
                 </div>
               </div>
@@ -92,20 +99,20 @@
               <div class="confirmation-card">
                 <div class="conf-header">
                   <span class="icon">🛡️</span>
-                  <span>Confirmar Acción Sensible</span>
+                  <span>{{ t('chat.confirm_action') }}</span>
                 </div>
                 <div class="conf-body">
-                  El agente desea ejecutar: <br>
+                  {{ t('chat.desires_execute') }} <br>
                   <strong>{{ msg.waiting_tool?.function?.name }}</strong>
                   <pre class="args">{{ msg.waiting_tool?.function?.arguments }}</pre>
                 </div>
                 <div class="conf-options">
                   <input type="checkbox" id="always-allow-{{msg.id}}" [(ngModel)]="msg.always_allow">
-                  <label for="always-allow-{{msg.id}}">Permitir siempre (no volver a preguntar)</label>
+                  <label for="always-allow-{{msg.id}}">{{ t('chat.always_allow') }}</label>
                 </div>
                 <div class="conf-footer">
-                  <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">Aprobar</button>
-                  <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">Rechazar</button>
+                  <button class="btn-approve" [disabled]="isThinking()" (click)="approveAction(msg)">{{ t('chat.approve') }}</button>
+                  <button class="btn-reject" [disabled]="isThinking()" (click)="rejectAction(msg)">{{ t('chat.reject') }}</button>
                 </div>
               </div>
             }
@@ -128,7 +135,7 @@
       @if (artifacts().length > 0 && !activeArtifact()) {
         <div class="reopen-canvas-container">
           <button class="btn-reopen-canvas" (click)="reopenCanvas()">
-            📊 Mostrar Diagrama ({{ artifacts().length }})
+            📊 {{ t('chat.show_diagram', { count: '' + artifacts().length }) }}
           </button>
         </div>
       }
@@ -137,7 +144,7 @@
           [ngModel]="inputText()" 
           (ngModelChange)="inputText.set($event)"
           (keydown)="onKeyDown($event)"
-          placeholder="Escribe un comando para AIgent... (ej: 'Revisa slack cada 3 horas')"
+          [placeholder]="t('chat.placeholder')"
           rows="1">
         </textarea>
         <button (click)="sendMessage()" [disabled]="!inputText().trim() || isThinking()">
@@ -145,7 +152,7 @@
         </button>
       </div>
       <div class="footer-tip">
-        Presiona <kbd>Enter</kbd> para enviar. El agente decidirá si usar Tools.
+        {{ t('chat.press') }} <kbd>Enter</kbd> {{ t('chat.enter_tip_after') }}
       </div>
     </div>
   </div>
@@ -155,7 +162,7 @@
       <div class="canvas-header">
         <div class="canvas-title-wrapper">
           <span class="canvas-icon">📊</span>
-          <span class="canvas-title">{{ art.title || 'Diagrama Interactivo' }}</span>
+          <span class="canvas-title">{{ art.title || t('chat.interactive_diagram') }}</span>
         </div>
         <div class="canvas-actions">
           @if (artifacts().length > 1) {
