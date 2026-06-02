@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-
-	"aigent/internal/database"
 )
 
 func TestRegistryRegisterAndGet(t *testing.T) {
@@ -234,9 +232,9 @@ func TestFindSensitiveToolCallWithSanitizedNames(t *testing.T) {
 }
 
 func TestBuildRuntimeMessages(t *testing.T) {
-	chatHistory := []database.ChatMessage{
+	chatHistory := []ChatMessage{
 		{Role: "user", Content: "Hello"},
-		{Role: "assistant", Content: "Hi there", RawToolCalls: `[]`},
+		{Role: "assistant", Content: "Hi there"},
 	}
 
 	messages := buildRuntimeMessages("You are a helpful assistant.", chatHistory, "")
@@ -253,7 +251,7 @@ func TestBuildRuntimeMessages(t *testing.T) {
 }
 
 func TestBuildRuntimeMessagesWithNewUserMsg(t *testing.T) {
-	chatHistory := []database.ChatMessage{
+	chatHistory := []ChatMessage{
 		{Role: "user", Content: "Hello"},
 		{Role: "assistant", Content: "Hi"},
 	}

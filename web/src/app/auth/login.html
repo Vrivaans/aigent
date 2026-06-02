@@ -3,18 +3,18 @@
     <div class="login-header">
       <div class="logo">🤖</div>
       <h1>AIgent Login</h1>
-      <p>Acceso restringido para el operador</p>
+      <p>{{ t('login.access_restricted') }}</p>
     </div>
 
     <form (submit)="onLogin()">
       <div class="form-group">
-        <label>Usuario</label>
-        <input type="text" [(ngModel)]="username" name="username" placeholder="Nombre de usuario" autocomplete="username">
+        <label>{{ t('login.username') }}</label>
+        <input type="text" [ngModel]="username()" (ngModelChange)="username.set($event)" name="username" [placeholder]="t('login.username_placeholder')" autocomplete="username">
       </div>
 
       <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" [(ngModel)]="password" name="password" placeholder="••••••••" autocomplete="current-password">
+        <label>{{ t('login.password') }}</label>
+        <input type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" placeholder="••••••••" autocomplete="current-password">
       </div>
 
       <div class="error-msg" *ngIf="error()">
@@ -22,7 +22,7 @@
       </div>
 
       <button type="submit" class="btn-primary" [disabled]="isLoading()">
-        <span *ngIf="!isLoading()">Entrar</span>
+        <span *ngIf="!isLoading()">{{ t('login.btn_login') }}</span>
         <span *ngIf="isLoading()" class="spinner-small"></span>
       </button>
     </form>

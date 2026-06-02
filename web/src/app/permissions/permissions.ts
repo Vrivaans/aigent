@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit } from '@angular/core';
 import { ApiService, Agent } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslationService } from '../translation.service';
 
 export interface ToolPermission {
   id: number;
@@ -22,6 +23,11 @@ export interface ToolPermission {
 })
 export class PermissionsComponent implements OnInit {
   private api = inject(ApiService);
+  private translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
   
   permissions = signal<ToolPermission[]>([]);
   agents = signal<Agent[]>([]);
@@ -47,9 +53,13 @@ export class PermissionsComponent implements OnInit {
     }
   }
 
+  getDayKey(key: string): string {
+    return '';
+  }
+
   getAgentName(agentId: number): string {
     const agent = this.agents().find(a => a.id === agentId);
-    return agent ? agent.name : `Agente #${agentId}`;
+    return agent ? agent.name : this.t('permissions.agent_label_id', { id: '' + agentId });
   }
 
   async togglePause(perm: ToolPermission) {
@@ -60,12 +70,12 @@ export class PermissionsComponent implements OnInit {
       );
     } catch (err) {
       console.error('Failed to toggle pause on permission:', err);
-      alert('Error al modificar el permiso');
+      alert(this.t('permissions.error_modify'));
     }
   }
 
   async revokePermission(id: number) {
-    if (!confirm('¿Seguro que querés revocar este permiso permanente? El agente volverá a pedir autorización para esta herramienta.')) {
+    if (!confirm(this.t('permissions.delete_confirm'))) {
       return;
     }
     try {
@@ -73,7 +83,7 @@ export class PermissionsComponent implements OnInit {
       this.permissions.update(list => list.filter(p => p.id !== id));
     } catch (err) {
       console.error('Failed to delete permission:', err);
-      alert('Error al eliminar el permiso');
+      alert(this.t('permissions.error_delete'));
     }
   }
 }

@@ -184,6 +184,8 @@ func autoMigrate(db *gorm.DB) error {
 		&HandsAIConfig{},
 		&McpStdioServer{},
 		&McpStreamServer{},
+		&Workflow{},
+		&WorkflowRun{},
 	)
 }
 

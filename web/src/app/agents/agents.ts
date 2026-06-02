@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit, computed } from '@angular/core';
 import { ApiService, Agent, LLMProvider } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslationService } from '../translation.service';
 
 @Component({
   selector: 'app-agents',
@@ -12,6 +13,11 @@ import { FormsModule } from '@angular/forms';
 })
 export class AgentsComponent implements OnInit {
   private api = inject(ApiService);
+  private translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
   
   agents = signal<Agent[]>([]);
   providers = signal<LLMProvider[]>([]);
@@ -100,7 +106,7 @@ export class AgentsComponent implements OnInit {
       this.showModal.set(true);
     } catch (e) {
       console.error('No se pudo cargar el agente:', e);
-      alert('No se pudo cargar la configuración del agente.');
+      alert(this.t('agents.load_error'));
       this.isEditing.set(false);
     }
   }
@@ -139,18 +145,18 @@ export class AgentsComponent implements OnInit {
       this.showModal.set(false);
       this.loadData();
     } catch (err) {
-      alert('Error al guardar el agente: ' + err);
+      alert(this.t('agents.save_error', { error: '' + err }));
     }
   }
 
   async deleteAgent(id: number) {
     if (id === 1) return; // Protect General
-    if (confirm('¿Seguro que querés eliminar este agente?')) {
+    if (confirm(this.t('agents.delete_confirm'))) {
       try {
         await this.api.deleteAgent(id);
         this.loadData();
       } catch (err) {
-        alert('Error al eliminar el agente: ' + err);
+        alert(this.t('agents.delete_error', { error: '' + err }));
       }
     }
   }

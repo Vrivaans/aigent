@@ -14,7 +14,11 @@ export interface ChatMessageUI extends ChatMessage {
   provider_switch?: ProviderSwitchInfo;
   provider_switch_reset_done?: boolean;
   always_allow?: boolean;
+  reasoning?: string;
+  show_reasoning?: boolean;
 }
+
+import { TranslationService } from '../translation.service';
 
 @Component({
   selector: 'app-chat',
@@ -25,6 +29,11 @@ export interface ChatMessageUI extends ChatMessage {
 })
 export class Chat implements OnInit, OnChanges, AfterViewChecked {
   private api = inject(ApiService);
+  public translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
 
   @Input() session: Session | null | undefined = null;
   @Output() agentChanged = new EventEmitter<void>();
@@ -108,7 +117,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
 
   selectedModelDisplay(): string {
     const id = this.selectedModelId();
-    if (!id) return 'Default model';
+    if (!id) return this.t('chat.default_agent');
     for (const group of this.modelGroups()) {
       for (const m of group.models) {
         if (m.model_id === id) {
@@ -158,11 +167,11 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       } catch (e) {
         console.error('Failed to auto-create session', e);
         this.isThinking.set(false);
-        const detail = e instanceof Error ? e.message : 'Error desconocido';
+        const detail = e instanceof Error ? e.message : this.t('global.unknown_error');
         this.messages.update(m => [...m, {
           id: Date.now(),
           role: 'system',
-          content: `❌ Error al iniciar conversación automáticamente: ${detail}`,
+          content: `❌ ${this.t('chat.err_auto_start', { error: detail })}`,
           created_at: new Date().toISOString()
         }]);
         return;
@@ -170,7 +179,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     }
 
     // Optimistic UI updates
-    const tempMsg: ChatMessage = {
+    const tempMsg: ChatMessageUI = {
       id: Date.now(),
       role: 'user',
       content: text,
@@ -182,49 +191,113 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     this.isThinking.set(true);
     this.scrollToBottom();
 
+    const assistantMsgId = Date.now() + 1;
+    const assistantMsg: ChatMessageUI = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+      tool_calls: []
+    };
+    this.messages.update(m => [...m, assistantMsg]);
+
     try {
-      const res = await this.api.sendChatMessage(currentSessionId, text, this.selectedModelId() || undefined);
-      if (res.status === 'error') {
-        await this.loadHistory();
-        return;
-      }
-      this.messages.update(m => [...m, {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: res.response,
-        created_at: new Date().toISOString(),
-        tool_calls: res.tool_calls,
-        requires_confirmation: res.requires_confirmation,
-        pending_action_id: res.pending_action_id,
-        waiting_tool: res.waiting_tool,
-        provider_switched: res.provider_switched,
-        provider_switch: res.provider_switch
-      }]);
-
-      if (res.artifacts && res.artifacts.length > 0) {
-        this.artifacts.update(current => {
-          const updated = [...current];
-          for (const art of res.artifacts!) {
-            const idx = updated.findIndex(a => a.id === art.id);
-            if (idx > -1) {
-              updated[idx] = art;
-            } else {
-              updated.push(art);
-            }
+      await this.api.sendChatMessageStream(
+        currentSessionId,
+        text,
+        this.selectedModelId() || undefined,
+        (event, data) => {
+          if (event === 'token' && data?.text) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, content: msg.content + data.text }
+                  : msg
+              )
+            );
+            this.scrollToBottom();
+          } else if (event === 'reasoning' && data?.text) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, reasoning: (msg.reasoning || '') + data.text }
+                  : msg
+              )
+            );
+            this.scrollToBottom();
+          } else if (event === 'tool_start' && data?.name) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, content: msg.content + `\n\n*🔧 ${this.t('chat.executing', { name: data.name })}...*` }
+                  : msg
+              )
+            );
+            this.scrollToBottom();
+          } else if (event === 'tool_end' && data?.name) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, content: msg.content + `\n\n*✅ ${this.t('chat.completed', { name: data.name })}.*` }
+                  : msg
+              )
+            );
+            this.scrollToBottom();
+          } else if (event === 'provider_switch' && data) {
+            const switchInfo = data as ProviderSwitchInfo;
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? {
+                      ...msg,
+                      provider_switched: true,
+                      provider_switch: switchInfo
+                    }
+                  : msg
+              )
+            );
+          } else if (event === 'confirmation_required' && data) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? {
+                      ...msg,
+                      requires_confirmation: true,
+                      pending_action_id: data.pending_action_id,
+                      waiting_tool: data.waiting_tool
+                    }
+                  : msg
+              )
+            );
+            this.scrollToBottom();
+          } else if (event === 'error' && data?.message) {
+            this.messages.update(list =>
+              list.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, content: msg.content + `\n\n*❌ Error: ${data.message}*` }
+                  : msg
+              )
+            );
           }
-          return updated;
-        });
-        this.activeArtifact.set(res.artifacts[res.artifacts.length - 1]);
-      }
+        }
+      );
 
+      // Sincronizar artefactos finales
+      const arts = await this.api.getSessionArtifacts(currentSessionId);
+      this.artifacts.set(arts);
+      if (arts.length > 0) {
+        this.activeArtifact.set(arts[arts.length - 1]);
+      }
       this.scrollToBottom();
     } catch (e) {
       console.error(e);
-      const detail = e instanceof Error ? e.message : 'Error desconocido';
+      const detail = e instanceof Error ? e.message : this.t('global.unknown_error');
+      // Limpiar mensaje del asistente si quedó vacío por error inicial
+      this.messages.update(list => list.filter(msg => msg.id !== assistantMsgId));
       this.messages.update(m => [...m, {
-        id: Date.now() + 1,
+        id: Date.now() + 2,
         role: 'system',
-        content: `❌ Error: ${detail}`,
+        content: `❌ ${this.t('global.error')}: ${detail}`,
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
@@ -242,7 +315,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       this.messages.update(m => [...m, {
         id: Date.now(),
         role: 'system',
-        content: '✅ Se restauró el provider/modelo default del agente para esta conversación.',
+        content: '✅ ' + this.t('chat.provider_restored_msg'),
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
@@ -250,7 +323,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       this.messages.update(m => [...m, {
         id: Date.now(),
         role: 'system',
-        content: `❌ No se pudo restaurar el default del agente: ${e?.message || 'Error desconocido'}`,
+        content: `❌ ${this.t('chat.provider_restore_error_msg')}: ${e?.message || this.t('global.unknown_error')}`,
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
@@ -296,7 +369,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       this.messages.update(m => [...m, {
         id: Date.now(),
         role: 'system',
-        content: `❌ Error al ejecutar la acción: ${e.message}`,
+        content: `❌ ${this.t('chat.action_error')}: ${e.message}`,
         created_at: new Date().toISOString()
       }]);
       this.scrollToBottom();
@@ -329,7 +402,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   }
 
   async onNodeClicked(nodeLabel: string) {
-    const text = `Explicame más sobre el nodo "${nodeLabel}" del diagrama.`;
+    const text = this.t('chat.node_clicked_prompt', { node: nodeLabel });
     this.inputText.set(text);
     await this.sendMessage();
   }

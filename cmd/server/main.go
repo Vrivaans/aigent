@@ -97,6 +97,12 @@ func main() {
 	}
 	initCancel()
 
+	// 3.5 Inicializar motor RuleGo y cargar workflows activos
+	ai.SetGlobalBrain(brain)
+	if err := ai.ReloadWorkflows(); err != nil {
+		log.Printf("⚠️ RuleGo Workflows initialization failed: %v", err)
+	}
+
 	// 4. Levantar Cron Worker
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -213,9 +219,11 @@ func main() {
 	api.Patch("/sessions/:id/agent", chatHandler.UpdateSessionAgent)
 	api.Patch("/sessions/:id/llm/reset", chatHandler.ResetSessionLLMOverride)
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
+	api.Post("/sessions/:id/chat/stream", chatHandler.HandleChatStream)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
+	api.Get("/approvals", chatHandler.GetPendingApprovals)
 
 	// LLM Provider Management
 	agentHandler := &handlers.AgentHandler{Brain: brain}
@@ -271,6 +279,16 @@ func main() {
 	api.Get("/rules", ruleHandler.GetRules)
 	api.Post("/rules", ruleHandler.CreateRule)
 	api.Delete("/rules/:id", ruleHandler.DeleteRule)
+
+	workflowHandler := &handlers.WorkflowHandler{}
+	api.Get("/workflows", workflowHandler.GetWorkflows)
+	api.Get("/workflows/:id", workflowHandler.GetWorkflow)
+	api.Post("/workflows", workflowHandler.CreateWorkflow)
+	api.Post("/workflows/reload", workflowHandler.ReloadWorkflows)
+	api.Delete("/workflows/:id", workflowHandler.DeleteWorkflow)
+	api.Post("/workflows/:id/run", workflowHandler.RunWorkflow)
+	api.Get("/workflows/:id/runs", workflowHandler.GetWorkflowRuns)
+	api.Get("/workflows/runs/:run_id", workflowHandler.GetWorkflowRun)
 
 	api.Get("/permissions", handlers.HandleListPermissions)
 	api.Delete("/permissions/:id", handlers.HandleDeletePermission)

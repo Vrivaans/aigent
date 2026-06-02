@@ -1,0 +1,75 @@
+<div class="approvals-container">
+  <div class="approvals-header">
+    <div class="header-main">
+      <h2 class="approvals-title">{{ t('approvals.title') }}</h2>
+      <p class="approvals-subtitle">{{ t('approvals.subtitle') }}</p>
+    </div>
+    <button class="btn-refresh" (click)="loadApprovals()" [disabled]="isLoading()">
+      @if (isLoading()) {
+      <span class="spinner">⏳</span>
+      } @else {
+      🔄
+      }
+      <span>{{ t('sidebar.refresh') }}</span>
+    </button>
+  </div>
+
+  @if (isLoading() && approvals().length === 0) {
+    <div class="loading-state">
+      <div class="spinner">⏳</div>
+      <p>{{ t('approvals.loading') }}</p>
+    </div>
+  } @else {
+    <div class="approvals-list">
+      @for (app of approvals(); track app.id) {
+        <div class="approval-card">
+          <div class="card-header">
+            <div class="tool-identity">
+              <span class="tool-icon">🔧</span>
+              <div>
+                <h3 class="tool-name">{{ app.tool_name }}</h3>
+                <span class="session-source">
+                  @if (app.task_name) {
+                    {{ t('approvals.cron_task', { name: app.task_name }) }}
+                  } @else {
+                    {{ t('approvals.chat_session', { title: app.session_title }) }}
+                  }
+                </span>
+              </div>
+            </div>
+            <div class="action-time">
+              <span>{{ t('approvals.requested', { time: (app.created_at | date:'short') || '' }) }}</span>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="args-header">{{ t('approvals.args_header') }}</div>
+            <pre class="args-json"><code>{{ formatJson(app.arguments) }}</code></pre>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn-reject" (click)="reject(app)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              {{ t('approvals.btn_reject') }}
+            </button>
+            <button class="btn-approve" (click)="approve(app)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              {{ t('approvals.btn_approve') }}
+            </button>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <div class="empty-icon">🎉</div>
+          <h3>{{ t('approvals.empty_title') }}</h3>
+          <p>{{ t('approvals.empty_desc') }}</p>
+        </div>
+      }
+    </div>
+  }
+</div>

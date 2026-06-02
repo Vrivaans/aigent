@@ -1,0 +1,198 @@
+<div class="workflows-container">
+  <!-- Left Panel: Workflows List -->
+  <div class="workflows-list-panel">
+    <div class="panel-header">
+      <h3>{{ t('workflows.title') }}</h3>
+      <div class="header-buttons">
+        <button class="btn-refresh" [class.loading]="isReloading()" (click)="reloadEngine()" [disabled]="isReloading()" [title]="t('workflows.reload_title')">
+          🔄
+        </button>
+        <button class="btn-create" (click)="startCreate()">{{ t('workflows.btn_create') }}</button>
+      </div>
+    </div>
+
+    <div class="search-and-list">
+      @if (isLoadingList()) {
+        <div class="loading-state">{{ t('workflows.loading_list') }}</div>
+      } @else {
+        <div class="list-items">
+          @for (wf of workflows(); track wf.id) {
+            <div class="list-item" [class.active]="selectedWorkflow()?.id === wf.id" (click)="selectWorkflow(wf)">
+              <div class="item-info">
+                <span class="item-name">⚡ {{ wf.name }}</span>
+                <span class="item-desc">{{ wf.description || t('workflows.no_description') }}</span>
+                @if (wf.cron_expression) {
+                  <span class="item-cron">⏰ {{ wf.cron_expression }}</span>
+                }
+              </div>
+              <button class="btn-delete" (click)="deleteWorkflow(wf, $event)" [title]="t('workflows.delete_title')">🗑️</button>
+            </div>
+          } @empty {
+            <div class="empty-state">{{ t('workflows.empty_workflows') }}</div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Right Panel: Workspace Area -->
+  <div class="workflows-workspace">
+    @if (isCreating()) {
+      <div class="workspace-card create-form">
+        <h4>{{ t('workflows.create_header') }}</h4>
+        
+        <div class="form-group">
+          <label>{{ t('workflows.form_name') }}</label>
+          <input type="text" [(ngModel)]="newName" [placeholder]="t('workflows.form_name_placeholder')">
+        </div>
+
+        <div class="form-group">
+          <label>{{ t('workflows.form_desc') }}</label>
+          <input type="text" [(ngModel)]="newDescription" [placeholder]="t('workflows.form_desc_placeholder')">
+        </div>
+
+        <div class="form-group">
+          <label>{{ t('workflows.form_cron') }}</label>
+          <input type="text" [(ngModel)]="newCron" [placeholder]="t('workflows.form_cron_placeholder')">
+        </div>
+
+        <div class="form-group">
+          <label>{{ t('workflows.form_definition') }}</label>
+          <textarea class="json-textarea" [(ngModel)]="newDefinition" rows="12"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-secondary" (click)="isCreating.set(false)">{{ t('workflows.cancel') }}</button>
+          <button class="btn-primary" (click)="saveWorkflow()">{{ t('workflows.save') }}</button>
+        </div>
+      </div>
+    } @else if (selectedWorkflow()) {
+      <div class="workspace-details">
+        <!-- Workflow General Info & Actions -->
+        <div class="details-header">
+          <div class="header-titles">
+            <h2>⚡ {{ selectedWorkflow()?.name }}</h2>
+            <p>{{ selectedWorkflow()?.description || t('workflows.no_description') }}</p>
+            @if (selectedWorkflow()?.cron_expression) {
+              <div class="cron-tag">⏰ {{ t('workflows.scheduled', { cron: selectedWorkflow()?.cron_expression || '' }) }}</div>
+            }
+          </div>
+          
+          <div class="header-actions">
+            <div class="payload-run-box">
+              <input type="text" [(ngModel)]="runPayload" [placeholder]="t('workflows.run_initial_payload')">
+              <button class="btn-run" (click)="executeWorkflow()" [disabled]="isExecuting()">
+                @if (isExecuting()) {
+                  <span>{{ t('workflows.run_starting') }}</span>
+                } @else {
+                  <span>{{ t('workflows.run_button') }}</span>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inner Tabs -->
+        <div class="details-tabs">
+          <button [class.active]="activeView() === 'preview' && !selectedRun()" (click)="selectView('preview')">{{ t('workflows.tab_schema') }}</button>
+          <button [class.active]="activeView() === 'json' && !selectedRun()" (click)="selectView('json')">{{ t('workflows.tab_json') }}</button>
+          <button [class.active]="activeView() === 'runs' || selectedRun()" (click)="selectView('runs')">{{ t('workflows.tab_history') }}</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tab-content">
+          <!-- 1. Visual Schema Design-time -->
+          @if (activeView() === 'preview' && !selectedRun()) {
+            <div class="schema-view">
+              <div class="mermaid-canvas-container">
+                <div #designCanvas class="mermaid-canvas"></div>
+              </div>
+            </div>
+          }
+
+          <!-- 2. JSON RuleChain Representation -->
+          @if (activeView() === 'json' && !selectedRun()) {
+            <div class="json-view">
+              <pre><code>{{ formatJson(selectedWorkflow()?.definition || '') }}</code></pre>
+            </div>
+          }
+
+          <!-- 3. Executions and Runtime Log highlighting -->
+          @if (activeView() === 'runs') {
+            <div class="runs-split-view">
+              <!-- Left mini pane: Runs List -->
+              <div class="runs-history-pane">
+                <h5>{{ t('workflows.history_title') }}</h5>
+                @if (isLoadingRuns()) {
+                  <div class="loading-state">{{ t('workflows.history_loading') }}</div>
+                } @else {
+                  <div class="runs-list">
+                    @for (run of runs(); track run.id) {
+                      <div class="run-item" [class.active]="selectedRun()?.id === run.id" (click)="selectRun(run)">
+                        <div class="run-meta">
+                          <span class="run-id">{{ t('workflows.run_number', { id: '' + run.id }) }}</span>
+                          <span class="run-status" [class]="run.status.toLowerCase()">
+                            {{ run.status }}
+                          </span>
+                        </div>
+                        <span class="run-time">{{ run.created_at | date:'short' }}</span>
+                      </div>
+                    } @empty {
+                      <div class="empty-runs">{{ t('workflows.history_empty') }}</div>
+                    }
+                  </div>
+                }
+              </div>
+
+              <!-- Right mini pane: Active Run Visualizer & Console logs -->
+              <div class="run-detail-pane">
+                @if (selectedRun()) {
+                  <div class="active-run-header">
+                    <h4>{{ t('workflows.run_number', { id: '' + selectedRun()?.id }) }}</h4>
+                    <div class="run-meta-badges">
+                      <span class="status-badge" [class]="selectedRun()?.status.toLowerCase()">
+                        {{ selectedRun()?.status }}
+                      </span>
+                      @if (selectedRun()?.status === 'RUNNING') {
+                        <span class="ping-badge">{{ t('workflows.live_running') }}</span>
+                      }
+                      @if (selectedRun()?.current_node_id) {
+                        <span class="node-badge">{{ t('workflows.active_node', { node: selectedRun()?.current_node_id || '' }) }}</span>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Interactive active-node Mermaid Renderer -->
+                  <div class="mermaid-canvas-container run-canvas">
+                    <div #runCanvas class="mermaid-canvas"></div>
+                  </div>
+
+                  <!-- Terminal-like Console Logs -->
+                  <div class="run-console">
+                    <h5>{{ t('workflows.process_logs') }}</h5>
+                    <pre class="console-output"><code>{{ selectedRun()?.logs || t('workflows.console_starting') }}</code></pre>
+                  </div>
+                } @else {
+                  <div class="run-details-placeholder">
+                    <div class="placeholder-icon">📋</div>
+                    <h4>{{ t('workflows.run_viewer_title') }}</h4>
+                    <p>{{ t('workflows.run_viewer_desc') }}</p>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <!-- Splash / No selected Workflow -->
+      <div class="workflows-splash">
+        <div class="splash-icon">⚙️</div>
+        <h2>{{ t('workflows.splash_title') }}</h2>
+        <p>{{ t('workflows.splash_subtitle') }}</p>
+        <p class="subtitle">{{ t('workflows.splash_desc') }}</p>
+        <button class="btn-primary" (click)="startCreate()">{{ t('workflows.splash_button') }}</button>
+      </div>
+    }
+  </div>
+</div>

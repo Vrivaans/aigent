@@ -1,0 +1,789 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - link "Ir al contenido principal" [ref=e2] [cursor=pointer]
+      - link "Ayuda sobre la accesibilidad" [ref=e3] [cursor=pointer]:
+        - /url: https://support.google.com/websearch/answer/181196?hl=es-419
+  - generic [ref=e8]:
+    - search [ref=e9]:
+      - generic [ref=e11]:
+        - link "Ir a la Página principal de Google" [ref=e13] [cursor=pointer]:
+          - /url: https://www.google.com/webhp?hl=es-419&sa=X&ved=0ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQPAgI
+          - img [ref=e14]
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - combobox "Buscar" [ref=e25]: en qué empresas conviene invertir este año 2025 en qué empresas conviene invertir este año 2025
+            - generic [ref=e26]:
+              - button "Borrar" [ref=e28] [cursor=pointer]:
+                - img [ref=e30]
+              - generic [ref=e33]:
+                - button "Búsqueda por voz" [ref=e34] [cursor=pointer]:
+                  - img [ref=e35]
+                - button "Búsqueda por imagen" [ref=e37] [cursor=pointer]:
+                  - img [ref=e38]
+          - button "Buscar" [ref=e40] [cursor=pointer]:
+            - img [ref=e43]
+    - generic [ref=e45]:
+      - button "Configuración" [ref=e47] [cursor=pointer]:
+        - img [ref=e50]
+      - generic [ref=e53]:
+        - button "Apps de Google" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+        - link "Acceder" [ref=e60] [cursor=pointer]:
+          - /url: https://accounts.google.com/ServiceLogin?hl=es-419&passive=true&continue=https://www.google.com/search%3Fq%3Den%2Bqu%25C3%25A9%2Bempresas%2Bconviene%2Binvertir%2Beste%2Ba%25C3%25B1o%2B2025%26sca_esv%3D9b1747b23a0104d9%26source%3Dhp%26ei%3DGpIbaq2FDazO1sQPjvTkkQo%26iflsig%3DAFdpzrgAAAAAahugKuXcLtbyEdPUSvpdsvGEQsVrX7Q1%26ved%3D0ahUKEwit-uGQs-KUAxUsp5UCHQ46OaIQ4dUDCBk%26uact%3D5%26oq%3Den%2Bqu%25C3%25A9%2Bempresas%2Bconviene%2Binvertir%2Beste%2Ba%25C3%25B1o%2B2025%26gs_lp%3DEgdnd3Mtd2l6IjFlbiBxdcOpIGVtcHJlc2FzIGNvbnZpZW5lIGludmVydGlyIGVzdGUgYcOxbyAyMDI1SDJQAFgAcAB4AJABAJgBAKABAKoBALgBA8gBAPgBAZgCAKACAJgDAJIHAKAHALIHALgHAMIHAMgHAIAIAQ%26sclient%3Dgws-wiz%26sei%3DSJIbaqi1NZHe1sQP-ueNqA4&ec=futura_srp_og_si_72236_p
+  - generic [ref=e62]:
+    - navigation [ref=e68]:
+      - generic [ref=e74]:
+        - list [ref=e75]:
+          - listitem [ref=e76]:
+            - link "Modo IA" [ref=e79] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&udm=50&source=hp&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&aep=1&ntc=1&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ2J8OegQIEBAD
+              - generic [ref=e82]: Modo IA
+          - listitem [ref=e83]:
+            - link "Todo" [disabled] [ref=e84]:
+              - generic [ref=e86]: Todo
+          - listitem [ref=e87]:
+            - link "Empleos" [ref=e88] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&udm=8&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQs6gLegQIERAB
+              - generic [ref=e90]: Empleos
+          - listitem [ref=e91]:
+            - link "Noticias" [ref=e92] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&tbm=nws&source=lnms&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ0pQJegQIGBAB
+              - generic [ref=e94]: Noticias
+          - listitem [ref=e95]:
+            - link "Imágenes" [ref=e96] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&udm=2&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQtKgLegQIFRAB
+              - generic [ref=e98]: Imágenes
+          - listitem [ref=e99]:
+            - link "Shopping" [ref=e100] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&udm=28&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&ved=1t:220175&ictx=111
+              - generic [ref=e102]: Shopping
+          - listitem [ref=e103]:
+            - link "Videos" [ref=e104] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&udm=7&fbs=ADc_l-ZUDZDy4t9PXtlQNilOnoiV0TVSmzzjDM3Rfcwlq--wg3hgRpuZtcEfN5M3tzS3pyZwduy9epG70lSxsAKj00RlSwj7hW4AQ5UO64SvZx0LraweXtL4Gzk7V_DmlAJrz8ytzhoKELospdE6sLmgppsO7I_InaZhDBBK0r8pEVAgtywZPb3QAUeMCEwRT2jUKcXZekZtKNdwRUoLTVzSLkG1AIwTjhdoBhH1MvfC_Xg14NKY4Wk&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQtKgLegQIFxAB
+              - generic [ref=e106]: Videos
+          - listitem [ref=e107]:
+            - button "Más filtros" [ref=e108] [cursor=pointer]:
+              - generic "Más filtros" [ref=e109]:
+                - generic [ref=e110]:
+                  - generic [ref=e111]: Más
+                  - img [ref=e113]
+        - button "Herramientas" [ref=e116] [cursor=pointer]:
+          - generic [ref=e118]:
+            - generic [ref=e119]: Herramientas
+            - img [ref=e121]
+    - heading "Resultados de búsqueda" [level=1] [ref=e123]
+    - generic [ref=e131]:
+      - generic [ref=e147]:
+        - generic [ref=e149]:
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - img [ref=e153]
+              - heading "Visión general creada por IA" [level=2] [ref=e155]
+            - button "Acerca de este resultado" [ref=e159]:
+              - img [ref=e161]
+          - generic [ref=e181]:
+            - generic [ref=e184]:
+              - generic [ref=e185]:
+                - text: Las inversiones más recomendadas por analistas y fondos para este año se centran en gigantes tecnológicos de Inteligencia Artificial (ej.
+                - strong [ref=e186]: Amazon
+                - text: ","
+                - strong [ref=e187]: Apple
+                - text: ), el sector energético global y corporativo, ETF como el
+                - strong [ref=e188]: SPY
+                - text: o
+                - strong [ref=e189]: GLD
+                - text: ", y alternativas locales en Argentina como Obligaciones Negociables (ej."
+                - strong [ref=e190]: Edenor
+                - text: ).
+                - generic [ref=e192]:
+                  - link "YouTube (más de 4) - Ver vínculos relacionados" [ref=e193] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=clxwlDtlL1E
+                  - button "YouTube (más de 4) - Ver vínculos relacionados" [ref=e194] [cursor=pointer]:
+                    - generic [ref=e196]:
+                      - generic [ref=e197]: YouTube
+                      - generic [ref=e198]: ·Rankia
+                      - generic [ref=e199]: "+4"
+              - generic [ref=e200]: "Para armar una cartera diversificada, los expertos dividen las estrategias de inversión en tres áreas principales:"
+              - heading "1. Acciones Internacionales (CEDEARs)" [level=3] [ref=e202]
+              - list [ref=e204]:
+                - listitem [ref=e205]:
+                  - generic [ref=e206]:
+                    - strong [ref=e207]: "Tecnología e IA:"
+                    - text: Empresas como
+                    - strong [ref=e208]: Amazon
+                    - text: o
+                    - strong [ref=e209]: Apple
+                    - text: continúan liderando el mercado gracias a su rentabilidad y constante innovación en Inteligencia Artificial y Cloud.
+                - listitem [ref=e210]:
+                  - generic [ref=e211]:
+                    - strong [ref=e212]: "Salud / Pharma:"
+                    - text: Compañías como
+                    - strong [ref=e213]: Eli Lilly
+                    - text: tienen una fuerte proyección por su I+D en nuevos tratamientos de alta demanda.
+                  - generic [ref=e215]:
+                    - link [ref=e216] [cursor=pointer]:
+                      - /url: https://www.invertironline.com/posts/portafolio-inversiones-mayor-potencial-argentina-diciembre-01-12-2025
+                    - button [ref=e217] [cursor=pointer]:
+                      - generic [ref=e219]:
+                        - generic [ref=e220]: Invertir Online
+                        - generic [ref=e221]: "+3"
+              - heading [level=3] [ref=e223]: 2. Diversificación en Índices (ETFs)
+              - list [ref=e225]:
+                - listitem [ref=e226]:
+                  - generic [ref=e227]:
+                    - strong [ref=e228]: "SPY (S&P 500):"
+                    - text: Invierte en las 500 empresas más grandes de EE. UU., siendo una opción sólida y diversificada para mitigar riesgos.
+                - listitem [ref=e229]:
+                  - generic [ref=e230]:
+                    - strong [ref=e231]: "GLD (SPDR Gold Shares):"
+                    - text: El oro ha actuado como un excelente refugio de valor, destacándose por su alta rentabilidad.
+                  - generic [ref=e233]:
+                    - link [ref=e234] [cursor=pointer]:
+                      - /url: https://www.bcr.com.ar/es/mercados/investigacion-y-desarrollo/informativo-semanal/noticias-informativo-semanal/que-es-lo-que
+                    - button [ref=e235] [cursor=pointer]:
+                      - generic [ref=e237]:
+                        - generic [ref=e238]: Bolsa de Comercio de Rosario
+                        - generic [ref=e239]: "+2"
+              - heading [level=3] [ref=e241]: 3. Activos Locales (Mercado Argentino)
+              - list [ref=e243]:
+                - listitem [ref=e244]:
+                  - generic [ref=e245]:
+                    - strong [ref=e246]: "Obligaciones Negociables (ONs):"
+                    - text: Brindan renta fija (cobro de cupones en dólares). Las empresas emisoras del sector energético, como
+                    - strong [ref=e247]: Edenor
+                    - text: o
+                    - strong [ref=e248]: Pampa Energía
+                    - text: ", suelen ser opciones populares por su flujo de caja sólido."
+                  - generic [ref=e250]:
+                    - link [ref=e251] [cursor=pointer]:
+                      - /url: https://www.invertironline.com/posts/portafolio-inversiones-mayor-potencial-argentina-diciembre-01-12-2025
+                    - button [ref=e252] [cursor=pointer]:
+                      - generic [ref=e254]:
+                        - generic [ref=e255]: Invertir Online
+                        - generic [ref=e256]: "+1"
+                - listitem [ref=e257]:
+                  - generic [ref=e258]:
+                    - strong [ref=e259]: "Acciones argentinas:"
+                    - text: Los sectores financiero (ej.
+                    - strong [ref=e260]: Grupo Financiero Galicia
+                    - text: ) y de servicios públicos continúan en la mira de inversores con perfil de riesgo moderado a agresivo.
+                  - generic [ref=e262]:
+                    - link [ref=e263] [cursor=pointer]:
+                      - /url: https://www.reddit.com/r/merval/comments/1hmrql9/en_qu%C3%A9_conviene_invertir_de_cara_al_2025_iol/
+                    - button [ref=e264] [cursor=pointer]:
+                      - generic [ref=e266]:
+                        - generic [ref=e267]: Reddit
+                        - generic [ref=e268]: ·r/merval
+              - generic [ref=e270]:
+                - emphasis [ref=e271]:
+                  - text: "Nota: Toda inversión conlleva riesgos. Antes de operar, se recomienda evaluar tu perfil de riesgo y consultar plataformas de inversión autorizadas como"
+                  - generic [ref=e272]: InvertirOnline
+                  - text: o
+                  - generic [ref=e273]: eToro
+                  - text: para analizar cotizaciones en tiempo real.
+                - generic [ref=e275]:
+                  - link [ref=e276] [cursor=pointer]:
+                    - /url: https://www.invertironline.com/posts/portafolio-inversiones-mayor-potencial-argentina-diciembre-01-12-2025
+                  - button [ref=e277] [cursor=pointer]:
+                    - generic [ref=e279]:
+                      - generic [ref=e280]: Invertir Online
+                      - generic [ref=e281]: "+1"
+            - generic [ref=e286]:
+              - generic [ref=e288]:
+                - button "8 sitios" [ref=e289] [cursor=pointer]:
+                  - generic [ref=e298]: 8 sitios
+                - button "Acerca de este resultado" [ref=e303] [cursor=pointer]:
+                  - img [ref=e305]
+              - list [ref=e308]:
+                - listitem [ref=e309]:
+                  - generic [ref=e310]:
+                    - 'link "¿En qué conviene invertir de cara al 2025? | IOL : r/merval. Se abrirá en una pestaña nueva." [ref=e311] [cursor=pointer]':
+                      - /url: https://www.reddit.com/r/merval/comments/1hmrql9/en_qu%C3%A9_conviene_invertir_de_cara_al_2025_iol/
+                    - generic [ref=e312]:
+                      - generic [ref=e314]:
+                        - generic [ref=e315]: "¿En qué conviene invertir de cara al 2025? | IOL : r/merval"
+                        - generic [ref=e316]: 26 dic 2024 — ... el sector construcción se reactiva y sube como pedo de buzo. Yo hasta que no vea esa reacctivación lo tomaria con pinzas pero ...
+                      - generic [ref=e317]:
+                        - generic [ref=e321]:
+                          - generic [ref=e322]: Reddit
+                          - generic [ref=e323]: ·
+                          - generic [ref=e324]: r/merval
+                        - button "Acerca de este resultado" [ref=e328] [cursor=pointer]:
+                          - img [ref=e330]
+                - listitem [ref=e334]:
+                  - generic [ref=e335]:
+                    - link "Las 10 industrias más rentables para invertir en 2025 .... Se abrirá en una pestaña nueva." [ref=e336] [cursor=pointer]:
+                      - /url: https://www.youtube.com/watch?v=clxwlDtlL1E
+                    - generic [ref=e337]:
+                      - generic [ref=e338]:
+                        - generic [ref=e339]:
+                          - generic [ref=e340]: Las 10 industrias más rentables para invertir en 2025 ...
+                          - generic [ref=e341]: 23 jul 2025 — ¿quieres saber en qué sectores se está moviendo más dinero en el mundo y cómo podrías estar invertido en ellos pues en este vídeo ...
+                        - button [ref=e345] [cursor=pointer]:
+                          - generic [ref=e346]: 9:04
+                          - img [ref=e349]
+                          - img [ref=e353]
+                      - generic [ref=e355]:
+                        - generic [ref=e362]:
+                          - generic [ref=e363]: YouTube
+                          - generic [ref=e364]: ·
+                          - generic [ref=e365]: Rankia
+                        - button [ref=e369] [cursor=pointer]:
+                          - img [ref=e371]
+                - listitem [ref=e375]:
+                  - generic [ref=e376]:
+                    - link [ref=e377] [cursor=pointer]:
+                      - /url: https://www.bcr.com.ar/es/mercados/investigacion-y-desarrollo/informativo-semanal/noticias-informativo-semanal/que-es-lo-que
+                    - generic [ref=e378]:
+                      - generic [ref=e380]:
+                        - generic [ref=e381]: ¿Qué es lo que más rindió en 2025 en materia de inversiones financieras?
+                        - generic [ref=e382]: 2 ene 2026 — Entre los CEDEARs ETF que registraron mayor rentabilidad en pesos durante 2025 se encuentra GLD (↑113%), un certificado que permit...
+                      - generic [ref=e384]:
+                        - generic [ref=e389]: Bolsa de Comercio de Rosario
+                        - button [ref=e393] [cursor=pointer]:
+                          - img [ref=e395]
+              - button [ref=e399] [cursor=pointer]:
+                - generic [ref=e400]: Mostrar todo
+        - button "Mostrar más Visión general creada por IA" [ref=e404]:
+          - generic [ref=e406] [cursor=pointer]:
+            - generic [ref=e407]: Mostrar más
+            - img [ref=e409]
+      - main [ref=e412]:
+        - generic [ref=e416]:
+          - region "Anuncios" [ref=e420]:
+            - generic [ref=e421]:
+              - heading "Resultados patrocinados" [level=2] [ref=e428]
+              - generic [ref=e429]:
+                - generic [ref=e436]:
+                  - generic [ref=e441]:
+                    - generic [ref=e442]:
+                      - link "Acciones infravaloradas de Argentina - Investing.com - Rastreador de... Investing.com https://es.investing.com" [ref=e443] [cursor=pointer]:
+                        - /url: https://es.investing.com/equities/argentina/most-undervalued
+                        - heading "Acciones infravaloradas de Argentina - Investing.com - Rastreador de..." [level=3] [ref=e444]
+                        - generic [ref=e450]:
+                          - generic [ref=e452]: Investing.com
+                          - generic [ref=e453]: https://es.investing.com
+                      - button "¿Por qué este anuncio?" [ref=e456] [cursor=pointer]:
+                        - img [ref=e458]
+                    - generic [ref=e462]: Encuentre oportunidades de inversión con fuerte potencial de crecimiento. Consulta acciones que cumplen criterios de subvaloración con indicadores financieros.
+                    - generic [ref=e463]:
+                      - link "Supera al S&P 500" [ref=e466] [cursor=pointer]:
+                        - /url: https://es.investing.com/pro/propicks/beat-sp-500?sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQwgUoAXoECBkQEA
+                        - img [ref=e468]
+                        - generic [ref=e470]: Supera al S&P 500
+                      - link "Acciones de mayor valor" [ref=e473] [cursor=pointer]:
+                        - /url: https://es.investing.com/equities/argentina/most-undervalued?sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQwgUoA3oECBkQEg
+                        - img [ref=e475]
+                        - generic [ref=e477]: Acciones de mayor valor
+                      - link "Ideas Accionarias con IA" [ref=e480] [cursor=pointer]:
+                        - /url: /aclk?sa=L&pf=1&ai=DChsSEwidgaCns-KUAxXeUEgAHXVaENMYACICCAEQBxoCY2U&co=1&ase=2&gclid=EAIaIQobChMInYGgp7PilAMV3lBIAB11WhDTEAAYASAFEgJCgvD_BwE&cid=CAAS0gHkaP2izuakuOlts9LL8tt_y4kYYix61WzsnUP7wtt84S4f3GcafbVt5OlWTUVCP9nn0txmDzPh8j2req2EyDnR4mkVdLhfOQq8EXO0grcExTGKAVD1tI_R8RIrXJLRdIWVPBTV_Qx4jwuX1zDoEj3Xgh8WmeLuCuDDVpVoOWj0kEPnUwwWFDgFoMlvwxtdouZsCBhL2C-_O4e2qzHBHS9KR2t3YlacrOzqE_MIe8NZFr2GjphZPgUUC4JaI44k4jKPn4fPu6qDPTgDeHKMchw4W1s&cce=2&category=acrcp_v1_32&sig=AOD64_1nmUVQYHC5dktBl_j55zzSFDk93A&q=&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQwgUoBXoECBkQFA&adurl=https://es.investing.com/equities/argentina/most-undervalued%3Futm_source%3DGoogleAds%26utm_medium%3Dcpc%26utm_campaign%3D22858803750%26utm_content%3D185962138720%26utm_term%3Dkwd-11830961_%26GL_Ad_ID%3D767759725614%26GL_Campaign_ID%3D22858803750%26gad_source%3D1%26gad_campaignid%3D22858803750%26gbraid%3D0AAAAA-hZNFbcP0-ci6xsHEYXZF-rL7PLm%26gclid%3DEAIaIQobChMInYGgp7PilAMV3lBIAB11WhDTEAAYASAFEgJCgvD_BwE
+                        - img [ref=e482]
+                        - generic [ref=e484]: Ideas Accionarias con IA
+                      - link "Invertir Con IA" [ref=e487] [cursor=pointer]:
+                        - /url: https://es.investing.com/academy/trading/como-invertir-con-ia/?sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQwgUoB3oECBkQFg
+                        - img [ref=e489]
+                        - generic [ref=e491]: Invertir Con IA
+                      - link "Invertir desde cero" [ref=e494] [cursor=pointer]:
+                        - /url: https://es.investing.com/academy/trading/aprende-a-invertir-desde-cero/?sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQwgUoCXoECBkQGA
+                        - img [ref=e496]
+                        - generic [ref=e498]: Invertir desde cero
+                  - generic [ref=e504]:
+                    - generic [ref=e505]:
+                      - link "Invertir en acciones economiamundial.net https://www.economiamundial.net › comentarios › verificados" [ref=e506] [cursor=pointer]:
+                        - /url: https://economiamundial.net/invierte-en-acciones/
+                        - heading "Invertir en acciones" [level=3] [ref=e507]
+                        - generic [ref=e509]:
+                          - img [ref=e514]
+                          - generic [ref=e516]:
+                            - generic [ref=e518]: economiamundial.net
+                            - generic [ref=e519]: https://www.economiamundial.net › comentarios › verificados
+                      - button "¿Por qué este anuncio?" [ref=e522] [cursor=pointer]:
+                        - img [ref=e524]
+                    - generic [ref=e529]:
+                      - text: Guías educativas para
+                      - emphasis [ref=e530]: invertir
+                      - text: — Accede a una plataforma regulada y confiable para
+                      - emphasis [ref=e531]: invertir
+                      - text: en acciones. Acceso A Una Plataforma Segura Y Autorizada. Invierte en acciones de forma segura. Regulated Platform. Personal Advisor.
+                  - generic [ref=e536]:
+                    - generic [ref=e537]:
+                      - link "Compra acciones sin comisión - Invierte desde poco dinero nomotrade.com https://www.nomotrade.com › nomo › acciones" [ref=e538] [cursor=pointer]:
+                        - /url: https://nomotrade.com/es/investing
+                        - heading "Compra acciones sin comisión - Invierte desde poco dinero" [level=3] [ref=e539]
+                        - generic [ref=e545]:
+                          - generic [ref=e547]: nomotrade.com
+                          - generic [ref=e548]: https://www.nomotrade.com › nomo › acciones
+                      - button "¿Por qué este anuncio?" [ref=e551] [cursor=pointer]:
+                        - img [ref=e553]
+                    - generic [ref=e557]: Plataforma de inversión confiable para operar acciones e índices internacionales. Comienza tu...
+                - button "Ocultar resultados patrocinados" [ref=e559] [cursor=pointer]:
+                  - separator [ref=e560]
+                  - generic [ref=e561]:
+                    - generic [ref=e562]: Ocultar resultados patrocinados
+                    - img [ref=e564]
+          - generic [ref=e569]:
+            - generic [ref=e571]:
+              - heading "Videos" [level=2] [ref=e572]
+              - button "Acerca de este resultado" [ref=e573] [cursor=pointer]:
+                - img [ref=e576]
+            - generic [ref=e579]:
+              - generic [ref=e586]:
+                - generic [ref=e587]:
+                  - link "Las 10 industrias más rentables para invertir en 2025 ... YouTube Rankia 23 jul 2025" [ref=e589] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=clxwlDtlL1E
+                    - heading "Las 10 industrias más rentables para invertir en 2025 ... YouTube Rankia 23 jul 2025" [level=3] [ref=e590]:
+                      - generic [ref=e593]: Las 10 industrias más rentables para invertir en 2025 ...
+                      - generic [ref=e595]:
+                        - generic [ref=e596]:
+                          - text: YouTube
+                          - generic [ref=e597]: · Rankia
+                        - generic [ref=e598]: 23 jul 2025
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - text: YouTube
+                            - generic: · Rankia
+                      - button "Acerca de este resultado" [ref=e599] [cursor=pointer]:
+                        - img [ref=e602]
+                - button "Las 10 industrias más rentables para invertir en 2025 ... de Rankia en YouTube. Reproducir en Google. 9:04" [ref=e604] [cursor=pointer]:
+                  - generic [ref=e605]:
+                    - img [ref=e611]
+                    - generic [ref=e614]:
+                      - generic [ref=e615]: 9:04
+                      - img [ref=e618]
+              - generic [ref=e624]:
+                - generic [ref=e625]:
+                  - link "Cómo medir si AI tiene retorno de inversión Instagram Platzi hace 11 horas" [ref=e627] [cursor=pointer]:
+                    - /url: https://www.instagram.com/reel/DY9zvlhxIo-/
+                    - heading "Cómo medir si AI tiene retorno de inversión Instagram Platzi hace 11 horas" [level=3] [ref=e628]:
+                      - generic [ref=e631]: Cómo medir si AI tiene retorno de inversión
+                      - generic [ref=e633]:
+                        - generic [ref=e634]:
+                          - text: Instagram
+                          - generic [ref=e635]: · Platzi
+                        - generic [ref=e636]: hace 11 horas
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - text: Instagram
+                            - generic: · Platzi
+                      - button "Acerca de este resultado" [ref=e637] [cursor=pointer]:
+                        - img [ref=e640]
+                - link "Cómo medir si AI tiene retorno de inversión de Platzi en Instagram. Reproducir en Instagram. 2:55" [ref=e642] [cursor=pointer]:
+                  - /url: https://www.instagram.com/reel/DY9zvlhxIo-/
+                  - generic [ref=e643]:
+                    - img [ref=e646]
+                    - generic [ref=e650]: 2:55
+              - generic [ref=e657]:
+                - generic [ref=e658]:
+                  - link "¿En qué ACCIONES invertir en 2025? - Capital Faktory ... YouTube VisualEconomik 9 jun 2025" [ref=e660] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=praZMnj8-Co
+                    - heading "¿En qué ACCIONES invertir en 2025? - Capital Faktory ... YouTube VisualEconomik 9 jun 2025" [level=3] [ref=e661]:
+                      - generic [ref=e664]: ¿En qué ACCIONES invertir en 2025? - Capital Faktory ...
+                      - generic [ref=e666]:
+                        - generic [ref=e667]:
+                          - text: YouTube
+                          - generic [ref=e668]: · VisualEconomik
+                        - generic [ref=e669]: 9 jun 2025
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - text: YouTube
+                            - generic: · VisualEconomik
+                      - button "Acerca de este resultado" [ref=e670] [cursor=pointer]:
+                        - img [ref=e673]
+                - button "¿En qué ACCIONES invertir en 2025? - Capital Faktory ... de VisualEconomik en YouTube. Reproducir en Google. 9:06" [ref=e675] [cursor=pointer]:
+                  - generic [ref=e676]:
+                    - img [ref=e682]
+                    - generic [ref=e685]:
+                      - generic [ref=e686]: 9:06
+                      - img [ref=e689]
+              - generic [ref=e697]:
+                - generic [ref=e698]:
+                  - link "5 Mejores Activos para invertir en 2025 (que te pagan cada ... YouTube Tengo un Plan 26 ago 2025" [ref=e700] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=iqFFltN0GYU
+                    - heading "5 Mejores Activos para invertir en 2025 (que te pagan cada ... YouTube Tengo un Plan 26 ago 2025" [level=3] [ref=e701]:
+                      - generic [ref=e704]: 5 Mejores Activos para invertir en 2025 (que te pagan cada ...
+                      - generic [ref=e706]:
+                        - generic [ref=e707]:
+                          - text: YouTube
+                          - generic [ref=e708]: · Tengo un Plan
+                        - generic [ref=e709]: 26 ago 2025
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - text: YouTube
+                            - generic: · Tengo un Plan
+                      - button "Acerca de este resultado" [ref=e710] [cursor=pointer]:
+                        - img [ref=e713]
+                - button "5 Mejores Activos para invertir en 2025 (que te pagan cada ... de Tengo un Plan en YouTube. Reproducir en Google. 16:11" [ref=e715] [cursor=pointer]:
+                  - generic [ref=e716]:
+                    - img [ref=e722]
+                    - generic [ref=e725]:
+                      - generic [ref=e726]: 16:11
+                      - img [ref=e729]
+            - link "Ver todos los videos" [ref=e733] [cursor=pointer]:
+              - /url: /search?sca_esv=9b1747b23a0104d9&udm=7&q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8ccDKAJ6BAgeEAQ
+              - separator [ref=e734]
+              - generic [ref=e735]:
+                - generic [ref=e736]: Ver más
+                - img [ref=e738]
+          - generic [ref=e744]:
+            - heading "Más preguntas" [level=2] [ref=e746]
+            - generic [ref=e747]:
+              - button "¿Qué empresas son recomendadas para invertir en 2025?" [ref=e753] [cursor=pointer]:
+                - generic [ref=e755]: ¿Qué empresas son recomendadas para invertir en 2025?
+                - img [ref=e758]
+              - button "¿En qué deberíamos invertir en 2025?" [ref=e767] [cursor=pointer]:
+                - generic [ref=e769]: ¿En qué deberíamos invertir en 2025?
+                - img [ref=e772]
+              - button "¿Dónde conviene invertir dinero en 2025?" [ref=e781] [cursor=pointer]:
+                - generic [ref=e783]: ¿Dónde conviene invertir dinero en 2025?
+                - img [ref=e786]
+              - button "¿Cuál es el mejor fondo de inversión en Argentina en 2025?" [ref=e795] [cursor=pointer]:
+                - generic [ref=e797]: ¿Cuál es el mejor fondo de inversión en Argentina en 2025?
+                - img [ref=e800]
+          - generic [ref=e805]:
+            - heading "Resultados web" [level=2] [ref=e806]
+            - generic [ref=e807]:
+              - generic [ref=e810]:
+                - link "Inversiones con mayor potencial Argentina - Diciembre 2025 Invertir Online https://www.invertironline.com › posts › portafolio-inv..." [ref=e812] [cursor=pointer]:
+                  - /url: https://www.invertironline.com/posts/portafolio-inversiones-mayor-potencial-argentina-diciembre-01-12-2025
+                  - heading "Inversiones con mayor potencial Argentina - Diciembre 2025" [level=3] [ref=e813]
+                  - generic [ref=e818]:
+                    - generic [ref=e820]: Invertir Online
+                    - generic [ref=e822]: https://www.invertironline.com › posts › portafolio-inv...
+                - button "Acerca de este resultado" [ref=e823] [cursor=pointer]:
+                  - img [ref=e826]
+              - generic [ref=e829]:
+                - generic [ref=e830]: 1 dic 2025 —
+                - generic [ref=e831]:
+                  - emphasis [ref=e832]: Boncer Junio 2026 (TZX26
+                  - text: ) · ON Edenor (DNC8O) · Eli Lilly (LLY) · Amazon (AMZN) ...
+              - generic [ref=e834]:
+                - text: "Falta(n): conviene ‎| Realizar una búsqueda con lo siguiente:"
+                - link "conviene" [ref=e835] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=en+qu%C3%A9+empresas+%22conviene%22+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ5t4CegQIPhAB
+          - generic [ref=e839]:
+            - generic [ref=e842]:
+              - link "¿Qué es lo que más rindió en 2025 en materia ... Bolsa de Comercio de Rosario http://www.bcr.com.ar › noticias-informativo-semanal" [ref=e844] [cursor=pointer]:
+                - /url: http://www.bcr.com.ar/es/mercados/investigacion-y-desarrollo/informativo-semanal/noticias-informativo-semanal/que-es-lo-que
+                - heading "¿Qué es lo que más rindió en 2025 en materia ..." [level=3] [ref=e845]
+                - generic [ref=e850]:
+                  - generic [ref=e852]: Bolsa de Comercio de Rosario
+                  - generic [ref=e854]: http://www.bcr.com.ar › noticias-informativo-semanal
+              - button "Acerca de este resultado" [ref=e855] [cursor=pointer]:
+                - img [ref=e858]
+            - generic [ref=e861]:
+              - generic [ref=e862]: 2 ene 2026 —
+              - generic [ref=e863]:
+                - text: Entre las
+                - emphasis [ref=e864]: empresas
+                - text: energéticas, se destaca un saldo positivo para TGN4 (Transportadora de Gas del Norte) y TGSU2 (Transportadora de Gas del Sur) ...
+          - generic [ref=e870]:
+            - generic [ref=e871]:
+              - heading "Busca productos y servicios relacionados" [level=2] [ref=e872]
+              - button "Más información sobre la fuente" [ref=e875] [cursor=pointer]:
+                - img [ref=e876]
+            - list [ref=e880]:
+              - listitem [ref=e881]:
+                - link "Mejores inversiones a corto plazo" [ref=e882] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=Mejores+inversiones+a+corto+plazo&mrq=1&mrqri=0&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAB6BAhgEAU
+                  - generic [ref=e883]: Mejores inversiones a corto plazo
+                  - img [ref=e886]
+              - listitem [ref=e888]:
+                - link "Que acciones conviene comprar" [ref=e889] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=Que+acciones+conviene+comprar&mrq=1&mrqri=1&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAF6BAhgEAY
+                  - generic [ref=e890]: Que acciones conviene comprar
+                  - img [ref=e893]
+              - listitem [ref=e895]:
+                - link "Bonos en dólares recomendados" [ref=e896] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=Bonos+en+d%C3%B3lares+recomendados&mrq=1&mrqri=2&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAJ6BAhgEAc
+                  - generic [ref=e897]: Bonos en dólares recomendados
+                  - img [ref=e900]
+              - listitem [ref=e902]:
+                - link "En que invertir en Argentina 2026" [ref=e903] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=En+que+invertir+en+Argentina+2026&mrq=1&mrqri=3&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAN6BAhgEAg
+                  - generic [ref=e904]: En que invertir en Argentina 2026
+                  - img [ref=e907]
+              - listitem [ref=e909]:
+                - link "Que FCI conviene hoy" [ref=e910] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=Que+FCI+conviene+hoy&mrq=1&mrqri=4&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAR6BAhgEAk
+                  - generic [ref=e911]: Que FCI conviene hoy
+                  - img [ref=e914]
+              - listitem [ref=e916]:
+                - link "Cartera de inversiones" [ref=e917] [cursor=pointer]:
+                  - /url: http://www.google.com/search?q=Cartera+de+inversiones&mrq=1&mrqri=5&mrqei=SZIbapGDEfWQ1sQPo4rRoA8&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQyO0OKAV6BAhgEAo
+                  - generic [ref=e918]: Cartera de inversiones
+                  - img [ref=e921]
+            - generic [ref=e925]: Estas búsquedas te ayudan a encontrar ofertas relevantes de los anunciantes
+          - generic [ref=e929]:
+            - generic [ref=e932]:
+              - link "Cuáles fueron las inversiones que más y menos rindieron ... Chequeado https://chequeado.com › Notas" [ref=e934] [cursor=pointer]:
+                - /url: https://chequeado.com/el-explicador/cuales-fueron-las-inversiones-que-mas-y-menos-rindieron-en-2025/
+                - heading "Cuáles fueron las inversiones que más y menos rindieron ..." [level=3] [ref=e935]
+                - generic [ref=e940]:
+                  - generic [ref=e942]: Chequeado
+                  - generic [ref=e944]: https://chequeado.com › Notas
+              - button "Acerca de este resultado" [ref=e945] [cursor=pointer]:
+                - img [ref=e948]
+            - generic [ref=e952]:
+              - text: En
+              - emphasis [ref=e953]: este
+              - text: sentido, los rendimientos de instrumentos en renta fija en pesos, como las Lecaps, Boncaps y Bote, se ubicaron entre un 26% y 29%. Medido en dólares, el ...
+            - generic [ref=e955]:
+              - text: "Falta(n): conviene ‎| Realizar una búsqueda con lo siguiente:"
+              - link "conviene" [ref=e956] [cursor=pointer]:
+                - /url: /search?sca_esv=9b1747b23a0104d9&q=en+qu%C3%A9+empresas+%22conviene%22+invertir+este+a%C3%B1o+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ5t4CegQINxAB
+          - generic [ref=e960]:
+            - generic [ref=e963]:
+              - link "Portafolios sugeridos Argentina - Diciembre 2025 Invertir Online https://www.invertironline.com › posts › portafolios-su..." [ref=e965] [cursor=pointer]:
+                - /url: https://www.invertironline.com/posts/portafolios-sugeridos-argentina-diciembre-01-12-2025
+                - heading "Portafolios sugeridos Argentina - Diciembre 2025" [level=3] [ref=e966]
+                - generic [ref=e971]:
+                  - generic [ref=e973]: Invertir Online
+                  - generic [ref=e975]: https://www.invertironline.com › posts › portafolios-su...
+              - button "Acerca de este resultado" [ref=e976] [cursor=pointer]:
+                - img [ref=e979]
+            - generic [ref=e982]:
+              - generic [ref=e983]: 1 dic 2025 —
+              - generic [ref=e984]:
+                - text: En
+                - emphasis [ref=e985]: este
+                - text: informe de frecuencia mensual proponemos dos portafolios
+                - emphasis [ref=e986]: que
+                - text: esperamos sirvan de guía para los inversores.
+          - generic [ref=e990]:
+            - generic [ref=e993]:
+              - 'link "Mejores inversiones 2026: cómo y dónde invertir según tu ... Finect https://www.finect.com › usuario › maitelpz › articulos" [ref=e995] [cursor=pointer]':
+                - /url: https://www.finect.com/usuario/maitelpz/articulos/mejores-inversiones-como-donde-invertir
+                - 'heading "Mejores inversiones 2026: cómo y dónde invertir según tu ..." [level=3] [ref=e996]'
+                - generic [ref=e1001]:
+                  - generic [ref=e1003]: Finect
+                  - generic [ref=e1005]: https://www.finect.com › usuario › maitelpz › articulos
+              - button "Acerca de este resultado" [ref=e1006] [cursor=pointer]:
+                - img [ref=e1009]
+            - generic [ref=e1012]:
+              - generic [ref=e1013]: 4 may 2026 —
+              - generic [ref=e1014]:
+                - emphasis [ref=e1015]: Mejores inversiones en 2026
+                - text: ": depósitos, fondos, bolsa, oro e inmobiliario explicados por perfil de riesgo. Datos actualizados y guía paso a ..."
+          - generic [ref=e1021]:
+            - generic [ref=e1024]:
+              - link "¿En qué conviene invertir en 2025 según lo que planea Milei ... Instagram · inverarg Más de 1.5 K \"me gusta\" · hace 1 año" [ref=e1026] [cursor=pointer]:
+                - /url: https://www.instagram.com/reel/DF_MxPThP6a/
+                - heading "¿En qué conviene invertir en 2025 según lo que planea Milei ..." [level=3] [ref=e1027]
+                - generic [ref=e1032]:
+                  - generic [ref=e1034]: Instagram · inverarg
+                  - generic [ref=e1036]: Más de 1.5 K "me gusta" · hace 1 año
+              - button "Acerca de este resultado" [ref=e1037] [cursor=pointer]:
+                - img [ref=e1040]
+            - generic [ref=e1042]:
+              - link "¿En qué conviene invertir en 2025 según lo que planea Milei ... de Invertir en Bolsa y Criptos en Instagram. Reproducir en Instagram. 1:05" [ref=e1043] [cursor=pointer]:
+                - /url: https://www.instagram.com/reel/DF_MxPThP6a/
+                - generic [ref=e1045]:
+                  - img [ref=e1051]
+                  - generic [ref=e1055]: 1:05
+              - generic [ref=e1057]: "✓ Fin del cepo → Empresas con fuerte comercio exterior: energéticas, exportadoras como Aluar. ✓ Menos impuestos al agro → Beneficio directo para ..."
+          - generic [ref=e1061]:
+            - generic [ref=e1064]:
+              - 'link "¿En qué conviene invertir de cara al 2025? | IOL : r/merval Reddit · r/merval Más de 60 comentarios · hace 1 año" [ref=e1066] [cursor=pointer]':
+                - /url: https://www.reddit.com/r/merval/comments/1hmrql9/en_qu%C3%A9_conviene_invertir_de_cara_al_2025_iol/
+                - 'heading "¿En qué conviene invertir de cara al 2025? | IOL : r/merval" [level=3] [ref=e1067]'
+                - generic [ref=e1072]:
+                  - generic [ref=e1074]: Reddit · r/merval
+                  - generic [ref=e1076]: Más de 60 comentarios · hace 1 año
+              - button "Acerca de este resultado" [ref=e1077] [cursor=pointer]:
+                - img [ref=e1080]
+            - generic [ref=e1084]:
+              - emphasis [ref=e1085]: All in en energéticas, GGAL, Cepu, y Loma Negra
+              - text: . Creo que esas van a andar bien. También el GD35 podría ser una buena opción, y algún cedear ...
+          - generic [ref=e1089]:
+            - generic [ref=e1092]:
+              - link "Cartera recomendada Bull Market https://bullmarket.com.ar › ... › Estrategias de inversión" [ref=e1094] [cursor=pointer]:
+                - /url: https://bullmarket.com.ar/mercados/estrategias-de-inversion/cartera-recomendada/
+                - heading "Cartera recomendada" [level=3] [ref=e1095]
+                - generic [ref=e1100]:
+                  - generic [ref=e1102]: Bull Market
+                  - generic [ref=e1104]: https://bullmarket.com.ar › ... › Estrategias de inversión
+              - button "Acerca de este resultado" [ref=e1105] [cursor=pointer]:
+                - img [ref=e1108]
+            - generic [ref=e1111]: Operá acciones, bonos, letras, opciones, ETFs, ADRs, invertí en bolsa con la comisión más baja y el mejor servicio del mercado!
+          - generic [ref=e1115]:
+            - generic [ref=e1118]:
+              - link "Comparador de tasas | Plazos fijos online en pesos BCRA https://www.bcra.gob.ar › Servicio" [ref=e1120] [cursor=pointer]:
+                - /url: https://www.bcra.gob.ar/plazos-fijos-online/
+                - heading "Comparador de tasas | Plazos fijos online en pesos" [level=3] [ref=e1121]
+                - generic [ref=e1126]:
+                  - generic [ref=e1128]: BCRA
+                  - generic [ref=e1130]: https://www.bcra.gob.ar › Servicio
+              - button "Acerca de este resultado" [ref=e1131] [cursor=pointer]:
+                - img [ref=e1134]
+            - generic [ref=e1138]:
+              - text: Presentamos la tabla comparativa de tasas para
+              - emphasis [ref=e1139]: que
+              - text: puedas elegir la propuesta
+              - emphasis [ref=e1140]: que
+              - text: más te convenga. Esta tabla está conformada por los 10 bancos con mayor ...
+          - region "Anuncios" [ref=e1144]:
+            - generic [ref=e1145]:
+              - heading "Resultados patrocinados" [level=2] [ref=e1152]
+              - generic [ref=e1153]:
+                - generic [ref=e1160]:
+                  - generic [ref=e1165]:
+                    - generic [ref=e1166]:
+                      - link "Acciones infravaloradas de Argentina - Investing.com - Radar acciones... Investing.com https://es.investing.com" [ref=e1167] [cursor=pointer]:
+                        - /url: https://es.investing.com/equities/argentina/most-undervalued
+                        - heading "Acciones infravaloradas de Argentina - Investing.com - Radar acciones..." [level=3] [ref=e1168]
+                        - generic [ref=e1174]:
+                          - generic [ref=e1176]: Investing.com
+                          - generic [ref=e1177]: https://es.investing.com
+                      - button "¿Por qué este anuncio?" [ref=e1180] [cursor=pointer]:
+                        - img [ref=e1182]
+                    - generic [ref=e1186]: Encuentre oportunidades de inversión con fuerte potencial de crecimiento
+                    - link "Supera al S&P 500 Busca rendimientos sobre el S&P 500 Impulsa tus rendimientos hoy" [ref=e1191] [cursor=pointer]:
+                      - /url: https://es.investing.com/pro/propicks/beat-sp-500
+                      - generic [ref=e1192]: Supera al S&P 500
+                      - generic [ref=e1195]: Busca rendimientos sobre el S&P 500 Impulsa tus rendimientos hoy
+                  - generic [ref=e1201]:
+                    - generic [ref=e1202]:
+                      - link "En Que Invertir En Estos Momentos | Empieza Ahora | Ránking 2026 Supercoin https://www.supercoin.it" [ref=e1203] [cursor=pointer]:
+                        - /url: https://supercoin.it/ar-trading-platform/13527
+                        - heading "En Que Invertir En Estos Momentos | Empieza Ahora | Ránking 2026" [level=3] [ref=e1204]
+                        - generic [ref=e1210]:
+                          - generic [ref=e1212]: Supercoin
+                          - generic [ref=e1213]: https://www.supercoin.it
+                      - button "¿Por qué este anuncio?" [ref=e1216] [cursor=pointer]:
+                        - img [ref=e1218]
+                    - generic [ref=e1223]:
+                      - text: Desarrolla tus conocimientos en trading en las 3 mejores plataformas para operar en 2026. En Que
+                      - emphasis [ref=e1224]: Invertir
+                      - text: En Estos Momentos. Tome control de sus...
+                    - generic [ref=e1226]:
+                      - text: ‎
+                      - link "Las 3 Mejores Plataformas 2026" [ref=e1227] [cursor=pointer]:
+                        - /url: /aclk?sa=L&ai=DChsSEwidgaCns-KUAxXeUEgAHXVaENMYACICCAIQBBoCY2U&co=1&ase=2&gclid=EAIaIQobChMInYGgp7PilAMV3lBIAB11WhDTEAMYAiACEgJP9PD_BwE&cid=CAAS0gHkaP2izuakuOlts9LL8tt_y4kYYix61WzsnUP7wtt84S4f3GcafbVt5OlWTUVCP9nn0txmDzPh8j2req2EyDnR4mkVdLhfOQq8EXO0grcExTGKAVD1tI_R8RIrXJLRdIWVPBTV_Qx4jwuX1zDoEj3Xgh8WmeLuCuDDVpVoOWj0kEPnUwwWFDgFoMlvwxtdouZsCBhL2C-_O4e2qzHBHS9KR2t3YlacrOzqE_MIe8NZFr2GjphZPgUUC4JaI44k4jKPn4fPu6qDPTgDeHKMchw4W1s&cce=2&category=acrcp_v1_32&sig=AOD64_2Y8C7LVUa5ZSHwilr9dLMypWpHgQ&adurl=&q=
+                      - text: · ‎
+                      - link "2 Mejores Brókers Para Invertir En Acciones En Argentina (2026)" [ref=e1228] [cursor=pointer]:
+                        - /url: /aclk?sa=L&ai=DChsSEwidgaCns-KUAxXeUEgAHXVaENMYACICCAIQBRoCY2U&co=1&ase=2&gclid=EAIaIQobChMInYGgp7PilAMV3lBIAB11WhDTEAMYAiADEgJRBvD_BwE&cid=CAAS0gHkaP2izuakuOlts9LL8tt_y4kYYix61WzsnUP7wtt84S4f3GcafbVt5OlWTUVCP9nn0txmDzPh8j2req2EyDnR4mkVdLhfOQq8EXO0grcExTGKAVD1tI_R8RIrXJLRdIWVPBTV_Qx4jwuX1zDoEj3Xgh8WmeLuCuDDVpVoOWj0kEPnUwwWFDgFoMlvwxtdouZsCBhL2C-_O4e2qzHBHS9KR2t3YlacrOzqE_MIe8NZFr2GjphZPgUUC4JaI44k4jKPn4fPu6qDPTgDeHKMchw4W1s&cce=2&category=acrcp_v1_32&sig=AOD64_1aK1heF50XXRJbPRhWYT7PFIadtw&adurl=&q=
+                    - generic [ref=e1230]:
+                      - generic [ref=e1231]: "Oferta:"
+                      - link "100% de descuento en Comisiones Acciones" [ref=e1232] [cursor=pointer]:
+                        - /url: https://www.google.com/aclk?sa=L&ai=DChsSEwidgaCns-KUAxXeUEgAHXVaENMYACICCAIQAhoCY2U&co=1&ase=2&gclid=EAIaIQobChMInYGgp7PilAMV3lBIAB11WhDTEAMYAiABEgKnGfD_BwE&cid=CAAS0gHkaP2izuakuOlts9LL8tt_y4kYYix61WzsnUP7wtt84S4f3GcafbVt5OlWTUVCP9nn0txmDzPh8j2req2EyDnR4mkVdLhfOQq8EXO0grcExTGKAVD1tI_R8RIrXJLRdIWVPBTV_Qx4jwuX1zDoEj3Xgh8WmeLuCuDDVpVoOWj0kEPnUwwWFDgFoMlvwxtdouZsCBhL2C-_O4e2qzHBHS9KR2t3YlacrOzqE_MIe8NZFr2GjphZPgUUC4JaI44k4jKPn4fPu6qDPTgDeHKMchw4W1s&cce=2&category=acrcp_v1_32&sig=AOD64_1qBLwf5JNY87Vr9tGeSjXek38nIA&nis=4&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQgtsBegQIahAT&adurl=
+                - button "Ocultar resultados patrocinados" [ref=e1234] [cursor=pointer]:
+                  - separator [ref=e1235]
+                  - generic [ref=e1236]:
+                    - generic [ref=e1237]: Ocultar resultados patrocinados
+                    - img [ref=e1239]
+        - generic [ref=e1242]:
+          - generic [ref=e1247]:
+            - heading "También se buscó" [level=2] [ref=e1249]
+            - generic [ref=e1251]:
+              - generic [ref=e1252]:
+                - link "Inversiones en Argentina 2025" [ref=e1256] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=Inversiones+en+Argentina+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhCEAE
+                  - generic [ref=e1257]:
+                    - generic [ref=e1262]: Inversiones en Argentina 2025
+                    - img [ref=e1266]
+                - link "Mejores inversiones 2025" [ref=e1271] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=Mejores+inversiones+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhHEAE
+                  - generic [ref=e1272]:
+                    - generic [ref=e1277]: Mejores inversiones 2025
+                    - img [ref=e1281]
+                - link "Inversiones en Argentina 2026" [ref=e1286] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=Inversiones+en+Argentina+2026&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhGEAE
+                  - generic [ref=e1287]:
+                    - generic [ref=e1292]: Inversiones en Argentina 2026
+                    - img [ref=e1296]
+                - link "En que invertir noviembre 2025" [ref=e1301] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=En+que+invertir+noviembre+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhJEAE
+                  - generic [ref=e1302]:
+                    - generic [ref=e1307]: En que invertir noviembre 2025
+                    - img [ref=e1311]
+              - generic [ref=e1313]:
+                - link "Que bonos conviene comprar hoy" [ref=e1317] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=Que+bonos+conviene+comprar+hoy&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhFEAE
+                  - generic [ref=e1318]:
+                    - generic [ref=e1323]: Que bonos conviene comprar hoy
+                    - img [ref=e1327]
+                - link "En que invertir $200.000 pesos en Argentina" [ref=e1332] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=En+que+invertir+%24200.000+pesos+en+Argentina&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhIEAE
+                  - generic [ref=e1333]:
+                    - generic [ref=e1338]: En que invertir $200.000 pesos en Argentina
+                    - img [ref=e1342]
+                - link "En que invertir diciembre 2025" [ref=e1347] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=En+que+invertir+diciembre+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhEEAE
+                  - generic [ref=e1348]:
+                    - generic [ref=e1353]: En que invertir diciembre 2025
+                    - img [ref=e1357]
+                - link "Inversiones ganadoras 2025" [ref=e1362] [cursor=pointer]:
+                  - /url: /search?sca_esv=9b1747b23a0104d9&q=Inversiones+ganadoras+2025&sa=X&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ1QJ6BAhDEAE
+                  - generic [ref=e1363]:
+                    - generic [ref=e1368]: Inversiones ganadoras 2025
+                    - img [ref=e1372]
+          - navigation [ref=e1374]:
+            - heading "Navegación de páginas" [level=1] [ref=e1375]
+            - text: "1"
+            - link "Page 2" [ref=e1378] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=10&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAE
+              - text: "2"
+            - link "Page 3" [ref=e1380] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=20&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAG
+              - text: "3"
+            - link "Page 4" [ref=e1382] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=30&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAI
+              - text: "4"
+            - link "Page 5" [ref=e1384] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=40&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAK
+              - text: "5"
+            - link "Page 6" [ref=e1386] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=50&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAM
+              - text: "6"
+            - link "Page 7" [ref=e1388] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=60&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAO
+              - text: "7"
+            - link "Page 8" [ref=e1390] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=70&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAQ
+              - text: "8"
+            - link "Page 9" [ref=e1392] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=80&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAS
+              - text: "9"
+            - link "Page 10" [ref=e1394] [cursor=pointer]:
+              - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=90&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8tMDegQIOxAU
+              - text: "10"
+            - heading "Siguiente" [level=2] [ref=e1396]:
+              - link "Siguiente" [ref=e1397] [cursor=pointer]:
+                - /url: /search?q=en+qu%C3%A9+empresas+conviene+invertir+este+a%C3%B1o+2025&sca_esv=9b1747b23a0104d9&ei=SZIbapGDEfWQ1sQPo4rRoA8&start=10&sa=N&sstk=AU9db-DmzZivY5YLujU9hlWy_9_NpNLdFEUpmlVIs3MCf-TZ8cD903cRcUw5iCTGm8MBhkt1tMvs6SpsqX4-BT2-GdZ0Y5vfHpKQfg&ved=2ahUKEwjRy5qns-KUAxV1iJUCHSNFFPQQ8NMDegQIOxAW
+                - generic [ref=e1399]: Siguiente
+        - navigation
+    - contentinfo [ref=e1400]:
+      - heading "Vínculos a pie de página" [level=1] [ref=e1401]
+      - generic [ref=e1405]:
+        - generic [ref=e1407]:
+          - text: Argentina
+          - generic [ref=e1409]:
+            - button "Merlo, Provincia de Buenos Aires - A través de tu dirección IP" [ref=e1411] [cursor=pointer]:
+              - generic [ref=e1412]: Merlo, Provincia de Buenos Aires
+              - generic [ref=e1414]:
+                - text: "-"
+                - generic [ref=e1415]: A través de tu dirección IP
+            - text: "-"
+            - button "Actualizar ubicación" [ref=e1417] [cursor=pointer]: Actualizar ubicación
+        - generic [ref=e1420]:
+          - link "Ayuda" [ref=e1421] [cursor=pointer]:
+            - /url: https://support.google.com/websearch/?p=ws_results_help&hl=es-419&fg=1
+          - link "Enviar comentarios" [ref=e1422] [cursor=pointer]:
+            - /url: "#"
+          - link "Privacidad" [ref=e1423] [cursor=pointer]:
+            - /url: https://policies.google.com/privacy?hl=es-419&fg=1
+          - link "Condiciones" [ref=e1424] [cursor=pointer]:
+            - /url: https://policies.google.com/terms?hl=es-419&fg=1

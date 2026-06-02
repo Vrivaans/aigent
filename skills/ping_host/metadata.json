@@ -1,0 +1,16 @@
+{
+  "name": "ping_host",
+  "description": "Verifica si un host o dirección IP local es alcanzable mediante ping.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "host": {
+        "type": "string",
+        "description": "El host o dirección IP a pingear."
+      }
+    },
+    "required": ["host"]
+  },
+  "script": "ping_host.py",
+  "sensitive": false
+}

@@ -12,11 +12,9 @@ import (
 type ContextKey string
 
 const IsScheduledTaskKey ContextKey = "is_scheduled_task"
+const AutoApproveToolsKey ContextKey = "auto_approve_tools"
 
 func (b *Brain) findSensitiveToolCall(ctx context.Context, toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) *ToolCall {
-	if isTask, _ := ctx.Value(IsScheduledTaskKey).(bool); isTask {
-		return nil
-	}
 	for i, tc := range toolCalls {
 		realName, ok := sanitizedToOriginal[tc.Function.Name]
 		if !ok {
@@ -27,13 +25,46 @@ func (b *Brain) findSensitiveToolCall(ctx context.Context, toolCalls []ToolCall,
 			continue
 		}
 
-		if hasAutoAllowPermission(agentID, realName) {
+		if hasAutoAllowPermission(ctx, agentID, realName) {
 			continue
 		}
 
 		return &toolCalls[i]
 	}
 	return nil
+}
+
+func (b *Brain) findSensitiveToolCalls(ctx context.Context, toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) []ToolCall {
+	var sensitive []ToolCall
+	for _, tc := range toolCalls {
+		realName, ok := sanitizedToOriginal[tc.Function.Name]
+		if !ok {
+			realName = tc.Function.Name
+		}
+		tDef, exists := b.Registry.Get(realName)
+		if !exists || !tDef.Sensitive {
+			continue
+		}
+
+		if hasAutoAllowPermission(ctx, agentID, realName) {
+			continue
+		}
+
+		sensitive = append(sensitive, tc)
+	}
+	return sensitive
+}
+
+func (b *Brain) isToolCallSensitive(ctx context.Context, tc ToolCall, sanitizedToOriginal map[string]string, agentID uint) bool {
+	realName, ok := sanitizedToOriginal[tc.Function.Name]
+	if !ok {
+		realName = tc.Function.Name
+	}
+	tDef, exists := b.Registry.Get(realName)
+	if !exists || !tDef.Sensitive {
+		return false
+	}
+	return !hasAutoAllowPermission(ctx, agentID, realName)
 }
 
 var permissionChecker = func(agentID uint, toolName string) bool {
@@ -49,7 +80,11 @@ var permissionChecker = func(agentID uint, toolName string) bool {
 	return true
 }
 
-func hasAutoAllowPermission(agentID uint, toolName string) bool {
+func hasAutoAllowPermission(ctx context.Context, agentID uint, toolName string) bool {
+	if ctx != nil && ctx.Value(AutoApproveToolsKey) == true {
+		log.Printf("🔒 Permission Bypass: Tool '%s' is auto-approved for this workflow/session context", toolName)
+		return true
+	}
 	if database.DB == nil {
 		log.Printf("🔍 DB permission check: database.DB is nil!")
 		return false

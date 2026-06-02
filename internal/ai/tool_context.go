@@ -26,8 +26,11 @@ func (b *Brain) prepareAgentToolContext(session database.Session) agentToolConte
 
 	for _, rt := range b.Registry.List() {
 		// Las herramientas nativas de Invok (memoria, intents, etc.) que empiezan con "invok_"
-		// se integran automáticamente si la conexión con Invok está configurada.
-		isInvokCoreTool := strings.HasPrefix(rt.Name, "invok_") && b.HandsAI != nil && b.HandsAI.IsConfigured()
+		// y las herramientas del sistema (tareas, workflows) son herramientas core y se exponen siempre.
+		isSystemCoreTool := (strings.HasPrefix(rt.Name, "invok_") && b.HandsAI != nil && b.HandsAI.IsConfigured()) ||
+			rt.Name == "schedule_task" ||
+			rt.Name == "save_workflow" ||
+			rt.Name == "get_workflow_guide"
 
 		switch {
 		case session.Agent == nil:
@@ -35,12 +38,12 @@ func (b *Brain) prepareAgentToolContext(session database.Session) agentToolConte
 		case session.Agent.IsDefault:
 			// Agente General: siempre todas las herramientas del registry.
 		case len(session.Agent.Tools) > 0:
-			if !allowedTools[rt.Name] && !isInvokCoreTool {
+			if !allowedTools[rt.Name] && !isSystemCoreTool {
 				continue
 			}
 		default:
 			// Agente personalizado sin tools seleccionadas: sólo las de Invok core si existen.
-			if !isInvokCoreTool {
+			if !isSystemCoreTool {
 				continue
 			}
 		}

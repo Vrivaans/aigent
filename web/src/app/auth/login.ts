@@ -1,9 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { ApiService } from '../api.service';
+import { TranslationService } from '../translation.service';
 
 @Component({
   selector: 'app-login',
@@ -13,16 +14,19 @@ import { ApiService } from '../api.service';
   styleUrls: ['./login.css']
 })
 export class LoginComponent {
+  private auth = inject(AuthService);
+  private api = inject(ApiService);
+  private router = inject(Router);
+  private translation = inject(TranslationService);
+
+  t(key: string, params?: Record<string, string>): string {
+    return this.translation.t(key, params);
+  }
+
   username = signal('');
   password = signal('');
   error = signal('');
   isLoading = signal(false);
-
-  constructor(
-    private auth: AuthService,
-    private api: ApiService,
-    private router: Router
-  ) {}
 
   async onLogin() {
     if (!this.username() || !this.password()) return;
@@ -35,7 +39,7 @@ export class LoginComponent {
       this.auth.setToken(resp.token);
       this.router.navigate(['/chat']);
     } catch (e: any) {
-      this.error.set('Credenciales incorrectas o error de servidor');
+      this.error.set(this.t('login.error_credentials'));
     } finally {
       this.isLoading.set(false);
     }

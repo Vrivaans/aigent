@@ -1,9 +1,9 @@
 <div class="providers-container">
   <div class="header">
-    <h1>Proveedores de LLM</h1>
-    <p>Gestiona tus conexiones de IA y selecciona el modelo por defecto.</p>
+    <h1>{{ t('prov.title') }}</h1>
+    <p>{{ t('prov.desc') }}</p>
     <button class="btn-primary" (click)="resetForm(); showAddForm.set(!showAddForm())">
-      {{ showAddForm() ? 'Cancelar' : '+ Añadir Proveedor' }}
+      {{ showAddForm() ? t('prov.btn_cancel') : t('prov.btn_add') }}
     </button>
   </div>
 
@@ -11,12 +11,12 @@
   <div class="modal-overlay" *ngIf="showAddForm()" (click)="showAddForm.set(false)">
     <div class="add-card" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>{{ isEditing() ? 'Editar Proveedor' : 'Nuevo Proveedor' }}</h3>
+        <h3>{{ isEditing() ? t('prov.modal_edit') : t('prov.modal_new') }}</h3>
         <button class="btn-close" (click)="showAddForm.set(false)">×</button>
       </div>
       <div class="form-grid">
         <div class="form-group">
-          <label>Tipo de Provider</label>
+          <label>{{ t('prov.lbl_type') }}</label>
           <select [(ngModel)]="newProvider.provider_type" (ngModelChange)="onProviderTypeChange()">
             <option value="zen">OpenCode Zen (modelos gratis y premium)</option>
             <option value="groq">Groq</option>
@@ -26,30 +26,30 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Nombre</label>
-          <input [(ngModel)]="newProvider.name" placeholder="Ej: Groq Official" />
+          <label>{{ t('prov.lbl_name') }}</label>
+          <input [(ngModel)]="newProvider.name" [placeholder]="t('prov.placeholder_name')" />
         </div>
         <div class="form-group">
-          <label>Base URL</label>
+          <label>{{ t('prov.lbl_url') }}</label>
           <input [(ngModel)]="newProvider.base_url" placeholder="https://..." />
         </div>
         <div class="form-group">
-          <label>API Key</label>
-          <input type="password" [(ngModel)]="newProvider.api_key" placeholder="Opcional para modelos gratis (Zen), requerida para premium" />
+          <label>{{ t('prov.lbl_key') }}</label>
+          <input type="password" [(ngModel)]="newProvider.api_key" [placeholder]="t('prov.placeholder_key')" />
         </div>
         <div class="form-group">
-          <label>Modelo Default</label>
+          <label>{{ t('prov.lbl_model') }}</label>
           @if (providerModels().length > 0) {
             <select [(ngModel)]="newProvider.default_model">
               @for (model of providerModels(); track model.id) {
-                <option [ngValue]="model.model_id">{{ model.model_id }}@if (model.is_free) { (Gratis) }</option>
+                <option [ngValue]="model.model_id">{{ model.model_id }}@if (model.is_free) { ({{ t('chat.free') }}) }</option>
               }
             </select>
           } @else {
             <input [(ngModel)]="newProvider.default_model" placeholder="llama-3.3-70b-versatile" />
           }
           @if (modelsLoading()) {
-            <span class="model-hint">Cargando modelos…</span>
+            <span class="model-hint">{{ t('prov.loading_models') }}</span>
           }
           @if (modelsError()) {
             <span class="model-hint model-hint-warn">{{ modelsError() }}</span>
@@ -58,13 +58,13 @@
       </div>
       <div class="form-actions">
         <button class="btn-submit" (click)="onSaveAndRefreshModels()">
-          {{ isEditing() ? 'Actualizar y Cargar Modelos' : 'Guardar y Cargar Modelos' }}
+          {{ t('prov.save_refresh') }}
         </button>
         <button class="btn-submit btn-secondary-action" (click)="onSaveProvider()">
-          {{ isEditing() ? 'Actualizar Modelo' : 'Guardar Modelo' }}
+          {{ t('prov.save_only') }}
         </button>
         <button class="btn-test" (click)="testProvider()" [disabled]="isTesting()">
-          {{ isTesting() ? '⏳ Probando...' : '🧪 Probar conexión' }}
+          {{ isTesting() ? t('prov.testing') : '🧪 ' + t('prov.test_conn') }}
         </button>
       </div>
       <div class="test-result" *ngIf="testResult()" [class.ok]="testResult()!.ok" [class.fail]="!testResult()!.ok">
@@ -81,7 +81,7 @@
       <div class="card-header">
         <div class="info">
           <h3>{{ p.name }}</h3>
-          <span class="badge" *ngIf="p.is_default">Default</span>
+          <span class="badge" *ngIf="p.is_default">{{ t('prov.badge_default') }}</span>
           <span class="badge provider-type" *ngIf="p.provider_type">{{ p.provider_type }}</span>
         </div>
         <div class="status-indicator" [class.active]="p.is_active"></div>
@@ -89,7 +89,7 @@
 
       <div class="details">
         <div class="detail-row">
-          <span class="label">Modelo</span>
+          <span class="label">{{ t('prov.lbl_model') }}</span>
           <span class="value">{{ p.default_model }}</span>
         </div>
         <div class="detail-row">
@@ -102,10 +102,10 @@
         <button class="btn-secondary"
                 *ngIf="!p.is_default"
                 (click)="setAsDefault(p.id, $event)">
-          Establecer como Default
+          {{ t('prov.btn_set_default') }}
         </button>
         <button class="btn-refresh" (click)="refreshModelsForCard(p, $event)">
-          🔄 Modelos
+          🔄 {{ t('prov.btn_models') }}
         </button>
         <button class="btn-danger"
                 (click)="deleteProvider(p.id, $event)">
@@ -118,26 +118,26 @@
   <!-- Nueva Sección: HandsAI Config -->
   <div class="handsai-section">
     <div class="section-header">
-      <h2>Mundo Real (HandsAI Bridge)</h2>
-      <p>Configura la conexión con tu bridge MCP para ejecutar acciones reales.</p>
+      <h2>{{ t('prov.title_bridge') }}</h2>
+      <p>{{ t('prov.desc_bridge') }}</p>
     </div>
     <div class="handsai-card">
       <div class="form-grid">
         <div class="form-group">
-          <label>URL de HandsAI</label>
+          <label>{{ t('prov.lbl_bridge_url') }}</label>
           <input [(ngModel)]="handsaiConfig().url" placeholder="http://localhost:8080/mcp" />
         </div>
         <div class="form-group">
-          <label>HandsAI Token</label>
+          <label>{{ t('prov.lbl_bridge_token') }}</label>
           <input type="password" [(ngModel)]="handsaiConfig().token" placeholder="Tu token de seguridad" />
         </div>
       </div>
       <div class="card-actions">
         <button class="btn-primary" (click)="saveHandsAIConfig()">
-          Guardar Configuración
+          {{ t('prov.btn_save_config') }}
         </button>
         <button class="btn-danger-outline" (click)="deleteHandsAIConfig()" *ngIf="handsaiConfig().url">
-          Borrar Conexión
+          {{ t('prov.btn_delete_config') }}
         </button>
       </div>
     </div>
@@ -146,29 +146,24 @@
   <!-- MCP stdio (filesystem, Playwright, etc.) -->
   <div class="handsai-section mcp-stdio-section">
     <div class="section-header">
-      <h2>MCP local (stdio)</h2>
-      <p>
-        Un proceso por servidor: <code>npx</code>, argumentos y variables de entorno opcionales.
-        Las herramientas se exponen al modelo con prefijo <code>alias_</code> (p. ej. <code>fs_read_file</code>).
-      </p>
-      <button class="btn-primary" type="button" (click)="openNewMcp()">+ Añadir servidor MCP</button>
+      <h2>{{ t('prov.title_mcp_local') }}</h2>
+      <p>{{ t('prov.desc_mcp_local') }}</p>
+      <button class="btn-primary" type="button" (click)="openNewMcp()">{{ t('prov.btn_add_mcp') }}</button>
     </div>
     <p class="mcp-security-note">
-      <strong>Seguridad:</strong> el proceso corre con el mismo usuario que el backend. Revisa rutas permitidas del servidor MCP
-      (p. ej. filesystem) y ten <strong>Node/npx en el PATH</strong> del host.
+      <strong>Seguridad:</strong> {{ t('prov.mcp_security') }}
     </p>
     <p class="mcp-help-examples">
-      Ejemplos: <code>npx -y @modelcontextprotocol/server-filesystem /ruta/permitida</code> ·
-      <code>npx -y @playwright/mcp@latest</code> (un argumento por línea: <code>-y</code>, paquete, etc.)
+      {{ t('prov.mcp_examples') }}
     </p>
     <div class="mcp-server-list" *ngIf="mcpStdioServers().length">
       <div class="mcp-server-row" *ngFor="let s of mcpStdioServers()" (click)="editMcp(s)">
         <div class="mcp-server-main">
           <span class="mcp-alias">{{ s.alias }}</span>
           <span class="mcp-cmd">{{ s.command }} {{ (s.args || []).join(' ') }}</span>
-          <span class="badge" *ngIf="!s.enabled">Desactivado</span>
+          <span class="badge" *ngIf="!s.enabled">{{ t('prov.badge_disabled') }}</span>
         </div>
-        <button class="btn-danger" type="button" (click)="deleteMcp(s, $event)" title="Eliminar">🗑️</button>
+        <button class="btn-danger" type="button" (click)="deleteMcp(s, $event)" [title]="t('agents.delete')">🗑️</button>
       </div>
     </div>
   </div>
@@ -176,26 +171,22 @@
   <!-- MCP remoto (streamable HTTP / SSE) -->
   <div class="handsai-section mcp-stdio-section mcp-stream-section">
     <div class="section-header">
-      <h2>MCP remoto (HTTP / SSE)</h2>
-      <p>
-        Servidor MCP con transporte <strong>streamable HTTP</strong> (POST + SSE), típico en VPS o SaaS.
-        Las herramientas se exponen con prefijo <code>alias_</code> como en stdio.
-      </p>
-      <button class="btn-primary" type="button" (click)="openNewMcpStream()">+ Añadir servidor remoto</button>
+      <h2>{{ t('prov.title_mcp_remote') }}</h2>
+      <p>{{ t('prov.desc_mcp_remote') }}</p>
+      <button class="btn-primary" type="button" (click)="openNewMcpStream()">{{ t('prov.btn_add_remote') }}</button>
     </div>
     <p class="mcp-help-examples">
-      URL base del endpoint MCP (sin barra final extra si tu servidor no la requiere). Cabeceras opcionales, una por línea:
-      <code>Authorization: Bearer …</code>
+      {{ t('prov.mcp_remote_help') }}
     </p>
     <div class="mcp-server-list" *ngIf="mcpStreamServers().length">
       <div class="mcp-server-row" *ngFor="let s of mcpStreamServers()" (click)="editMcpStream(s)">
         <div class="mcp-server-main">
           <span class="mcp-alias">{{ s.alias }}</span>
           <span class="mcp-cmd">{{ s.base_url }}</span>
-          <span class="badge" *ngIf="!s.enabled">Desactivado</span>
+          <span class="badge" *ngIf="!s.enabled">{{ t('prov.badge_disabled') }}</span>
           <span class="badge" *ngIf="s.disable_standalone_sse">SSE standalone off</span>
         </div>
-        <button class="btn-danger" type="button" (click)="deleteMcpStream(s, $event)" title="Eliminar">🗑️</button>
+        <button class="btn-danger" type="button" (click)="deleteMcpStream(s, $event)" [title]="t('agents.delete')">🗑️</button>
       </div>
     </div>
   </div>
@@ -203,41 +194,41 @@
   <div class="modal-overlay" *ngIf="showMcpModal()" (click)="closeMcpModal()">
     <div class="add-card mcp-modal-card" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>{{ mcpEditingId() != null ? 'Editar servidor MCP' : 'Nuevo servidor MCP' }}</h3>
+        <h3>{{ mcpEditingId() != null ? t('prov.modal_mcp_edit') : t('prov.modal_mcp_new') }}</h3>
         <button class="btn-close" type="button" (click)="closeMcpModal()">×</button>
       </div>
       <div class="form-grid">
         <div class="form-group">
-          <label>Alias (único, corto)</label>
+          <label>{{ t('prov.lbl_alias') }}</label>
           <input [(ngModel)]="mcpForm.alias" placeholder="fs, pw, …" [disabled]="mcpEditingId() != null" />
         </div>
         <div class="form-group">
-          <label>Comando</label>
+          <label>{{ t('prov.lbl_command') }}</label>
           <input [(ngModel)]="mcpForm.command" placeholder="npx" />
         </div>
         <div class="form-group full-width">
-          <label>Argumentos (una línea por argumento)</label>
+          <label>{{ t('prov.lbl_args') }}</label>
           <textarea rows="5" [(ngModel)]="mcpForm.argsText" placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;/ruta"></textarea>
         </div>
         <div class="form-group full-width">
-          <label>Variables de entorno (KEY=valor por línea; dejar <code>********</code> para conservar el valor guardado)</label>
+          <label>{{ t('prov.lbl_env') }}</label>
           <textarea rows="4" [(ngModel)]="mcpForm.envText" placeholder="API_KEY=secreto"></textarea>
         </div>
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" [(ngModel)]="mcpForm.enabled" />
-            Habilitado
+            {{ t('prov.lbl_enabled') }}
           </label>
         </div>
       </div>
       <div class="mcp-test-msg" *ngIf="mcpTestMsg()">{{ mcpTestMsg() }}</div>
       <div class="form-actions">
-        <button class="btn-submit" type="button" (click)="saveMcp()">Guardar</button>
+        <button class="btn-submit" type="button" (click)="saveMcp()">{{ t('global.save') }}</button>
         <button class="btn-test" type="button" (click)="testMcpDryRun()" [disabled]="mcpTesting()">
-          {{ mcpTesting() ? '…' : '🧪 Probar (sin guardar)' }}
+          {{ mcpTesting() ? '…' : t('prov.btn_test_dry') }}
         </button>
         <button class="btn-test" type="button" *ngIf="mcpEditingId() != null" (click)="testMcpSaved()" [disabled]="mcpTesting()">
-          Probar guardado
+          {{ t('prov.btn_test_saved') }}
         </button>
       </div>
     </div>
@@ -246,43 +237,43 @@
   <div class="modal-overlay" *ngIf="showMcpStreamModal()" (click)="closeMcpStreamModal()">
     <div class="add-card mcp-modal-card" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>{{ mcpStreamEditingId() != null ? 'Editar MCP remoto' : 'Nuevo MCP remoto' }}</h3>
+        <h3>{{ mcpStreamEditingId() != null ? t('prov.modal_remote_edit') : t('prov.modal_remote_new') }}</h3>
         <button class="btn-close" type="button" (click)="closeMcpStreamModal()">×</button>
       </div>
       <div class="form-grid">
         <div class="form-group">
-          <label>Alias (único entre stdio y remoto)</label>
+          <label>{{ t('prov.lbl_remote_alias') }}</label>
           <input [(ngModel)]="mcpStreamForm.alias" placeholder="hands_remote" [disabled]="mcpStreamEditingId() != null" />
         </div>
         <div class="form-group full-width">
-          <label>URL base del servidor MCP</label>
+          <label>{{ t('prov.lbl_remote_url') }}</label>
           <input [(ngModel)]="mcpStreamForm.baseUrl" placeholder="https://tu-servidor/mcp" />
         </div>
         <div class="form-group full-width">
-          <label>Cabeceras HTTP (opcional, una por línea; dejar <code>********</code> para conservar)</label>
+          <label>{{ t('prov.lbl_remote_headers') }}</label>
           <textarea rows="4" [(ngModel)]="mcpStreamForm.headersText" placeholder="Authorization: Bearer tu_token"></textarea>
         </div>
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" [(ngModel)]="mcpStreamForm.disableStandaloneSSE" />
-            Desactivar SSE standalone (GET largo) — si el servidor no lo soporta
+            {{ t('prov.lbl_disable_sse') }}
           </label>
         </div>
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" [(ngModel)]="mcpStreamForm.enabled" />
-            Habilitado
+            {{ t('prov.lbl_enabled') }}
           </label>
         </div>
       </div>
       <div class="mcp-test-msg" *ngIf="mcpStreamTestMsg()">{{ mcpStreamTestMsg() }}</div>
       <div class="form-actions">
-        <button class="btn-submit" type="button" (click)="saveMcpStream()">Guardar</button>
+        <button class="btn-submit" type="button" (click)="saveMcpStream()">{{ t('global.save') }}</button>
         <button class="btn-test" type="button" (click)="testMcpStreamDryRun()" [disabled]="mcpStreamTesting()">
-          {{ mcpStreamTesting() ? '…' : '🧪 Probar (sin guardar)' }}
+          {{ mcpStreamTesting() ? '…' : t('prov.btn_test_dry') }}
         </button>
         <button class="btn-test" type="button" *ngIf="mcpStreamEditingId() != null" (click)="testMcpStreamSaved()" [disabled]="mcpStreamTesting()">
-          Probar guardado
+          {{ t('prov.btn_test_saved') }}
         </button>
       </div>
     </div>
@@ -290,7 +281,7 @@
 
   <div class="empty-state" *ngIf="providers().length === 0 && !showAddForm()">
     <div class="icon">🤖</div>
-    <h2>No hay proveedores registrados</h2>
-    <p>Añade tu primera conexión a Groq o OpenRouter para empezar.</p>
+    <h2>{{ t('prov.empty_title') }}</h2>
+    <p>{{ t('prov.empty_desc') }}</p>
   </div>
 </div>
