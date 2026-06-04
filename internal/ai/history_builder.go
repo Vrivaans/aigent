@@ -2,7 +2,7 @@ package ai
 
 func buildRuntimeMessages(systemPrompt string, chatHistory []ChatMessage, newUserMsg string) []ChatMessage {
 	messages := []ChatMessage{{Role: "system", Content: systemPrompt}}
-	
+
 	for _, msg := range chatHistory {
 		content := msg.Content
 		if content == "" {

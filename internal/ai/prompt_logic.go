@@ -19,7 +19,9 @@ import (
 	tasksvc "aigent/internal/tasks"
 	"aigent/internal/utils"
 
+	"github.com/pgvector/pgvector-go"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"gorm.io/gorm"
 )
 
 // Brain es el orquestador principal que une el LLM (OpenRouter) con el motor de acciones (HandsAI)
@@ -810,6 +812,13 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 	log.Printf("🌐 Provider inicial: %s | Model: %s | URL: %s", currentProvider.Name, defaultModel, currentProvider.BaseURL)
 
 	systemPrompt := buildSystemPromptForSession(session)
+	if newUserMsg != "" {
+		if ragContext := b.retrieveRAGContext(ctx, newUserMsg); ragContext != "" {
+			systemPrompt += ragContext
+			log.Printf("📚 RAG context retrieved and appended to system prompt:\n%s", ragContext)
+		}
+	}
+
 	// 2. Sincronizar Herramientas MCP
 	if err := b.SyncTools(ctx); err != nil {
 		log.Printf("⚠️ SyncTools Warning: %v", err)
@@ -1180,6 +1189,13 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 	log.Printf("🌐 Stream Provider inicial: %s | Model: %s | URL: %s", currentProvider.Name, defaultModel, currentProvider.BaseURL)
 
 	systemPrompt := buildSystemPromptForSession(session)
+	if newUserMsg != "" {
+		if ragContext := b.retrieveRAGContext(ctx, newUserMsg); ragContext != "" {
+			systemPrompt += ragContext
+			log.Printf("📚 Stream RAG context retrieved and appended to system prompt:\n%s", ragContext)
+		}
+	}
+
 	// 2. Sincronizar Herramientas MCP
 	if err := b.SyncTools(ctx); err != nil {
 		log.Printf("⚠️ SyncTools Warning: %v", err)
@@ -1204,6 +1220,10 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 	var lastChoice *ChoiceMessage
 
 	for i := 0; i < maxIterations; i++ {
+		if ctx.Err() != nil {
+			log.Printf("⚠️ Stream: Context cancelled before starting iteration %d. Aborting.", i+1)
+			return nil, ctx.Err()
+		}
 		// Reconstruir la lista de mensajes optimizada y compactada en memoria para esta iteración
 		sessMsgs := activeSess.GetMessages()
 		runtimeMessages := buildRuntimeMessages(systemPrompt, sessMsgs, "")
@@ -1232,6 +1252,11 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 
 		reader := bufio.NewReader(streamBody)
 		for {
+			if ctx.Err() != nil {
+				log.Printf("⚠️ Stream: Context cancelled during stream body read loop. Aborting.")
+				streamBody.Close()
+				return nil, ctx.Err()
+			}
 			lineBytes, err := reader.ReadBytes('\n')
 			if err != nil {
 				if err == io.EOF {
@@ -1281,6 +1306,11 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 			}
 		}
 		streamBody.Close()
+
+		if ctx.Err() != nil {
+			log.Printf("⚠️ Stream: Context cancelled after stream body read loop. Aborting.")
+			return nil, ctx.Err()
+		}
 
 		// Reconstruir la lista de ToolCalls finalizada
 		var toolCalls []ToolCall
@@ -1446,4 +1476,80 @@ func accumulateToolCallSnippet(accumulated map[int]*ToolCall, snippet ToolCallSn
 			tc.Function.Arguments += snippet.Function.Arguments
 		}
 	}
+}
+
+// retrieveRAGContext searches for similar document chunks in the database and returns a formatted system context.
+func (b *Brain) retrieveRAGContext(ctx context.Context, queryText string) string {
+	if queryText == "" {
+		return ""
+	}
+
+	// 1. Get active provider designated for embeddings
+	var provider database.LLMProvider
+	if err := database.DB.Where("is_active = ? AND is_embeddings = ?", true, true).First(&provider).Error; err != nil {
+		log.Printf("⚠️ RAG: No active LLM provider found to generate embeddings: %v", err)
+		return ""
+	}
+
+	embeddingModel := "text-embedding-3-small"
+	if provider.DefaultModel != "" {
+		embeddingModel = provider.DefaultModel
+	} else {
+		provName := strings.ToLower(provider.Name)
+		provURL := strings.ToLower(provider.BaseURL)
+		if strings.Contains(provName, "gemini") || strings.Contains(provURL, "gemini") {
+			embeddingModel = "text-embedding-004"
+		}
+	}
+
+	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+	apiKey, err := utils.Decrypt(provider.APIKey, masterKey)
+	if err != nil {
+		log.Printf("⚠️ RAG: Failed to decrypt provider API key: %v", err)
+		return ""
+	}
+
+	log.Printf("🔍 RAG: Generating query embedding for: %q using model: %s (%s)", queryText, embeddingModel, provider.Name)
+
+	// 2. Generate embedding for query
+	client := NewClient(apiKey, provider.BaseURL)
+	vector, err := client.CreateEmbeddings(ctx, queryText, embeddingModel)
+	if err != nil {
+		log.Printf("⚠️ RAG: Failed to generate query embedding: %v", err)
+		return ""
+	}
+
+	log.Printf("🔍 RAG: Successfully generated query embedding vector of size %d. Querying vector database...", len(vector))
+
+	// 3. Query PostgreSQL using pgvector cosine similarity
+	var chunks []database.DocumentChunk
+	limit := 3
+	err = database.DB.Order(gorm.Expr("embedding <=> ?", pgvector.NewVector(vector))).
+		Limit(limit).
+		Find(&chunks).Error
+	if err != nil {
+		log.Printf("⚠️ RAG: Database vector search failed: %v", err)
+		return ""
+	}
+
+	log.Printf("🔍 RAG: Vector search returned %d relevant chunks", len(chunks))
+
+	if len(chunks) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n\n=== CONTEXTO DE CONOCIMIENTO RELEVANTE (RAG) ===\n")
+	sb.WriteString("Usa la siguiente información del repositorio de conocimiento para responder la pregunta del usuario:\n")
+	for i, chunk := range chunks {
+		preview := chunk.Content
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		preview = strings.ReplaceAll(preview, "\n", " ")
+		log.Printf("📚 RAG Chunk %d [Source: %s]: %s", i+1, chunk.Source, preview)
+		sb.WriteString(fmt.Sprintf("--- FRAGMENTO %d (Origen: %s) ---\n%s\n", i+1, chunk.Source, chunk.Content))
+	}
+	sb.WriteString("================================================\n")
+	return sb.String()
 }

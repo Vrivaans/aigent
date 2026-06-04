@@ -186,6 +186,7 @@ func autoMigrate(db *gorm.DB) error {
 		&McpStreamServer{},
 		&Workflow{},
 		&WorkflowRun{},
+		&DocumentChunk{},
 	)
 }
 

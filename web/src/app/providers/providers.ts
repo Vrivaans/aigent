@@ -31,7 +31,8 @@ export class Providers implements OnInit {
     base_url: 'https://opencode.ai/zen/v1',
     api_key: '',
     default_model: 'big-pickle',
-    provider_type: 'zen'
+    provider_type: 'zen',
+    is_embeddings: false
   };
 
   providerModels = signal<ModelInfo[]>([]);
@@ -443,7 +444,8 @@ export class Providers implements OnInit {
           base_url: p.base_url,
           api_key: '********',
           default_model: p.default_model,
-          provider_type: p.provider_type
+          provider_type: p.provider_type,
+          is_embeddings: p.is_embeddings
         };
         this.showAddForm.set(true);
       }
@@ -458,7 +460,8 @@ export class Providers implements OnInit {
       base_url: p.base_url,
       api_key: '********',
       default_model: p.default_model,
-      provider_type: p.provider_type
+      provider_type: p.provider_type,
+      is_embeddings: p.is_embeddings
     };
     this.loadProviderModels();
     this.showAddForm.set(true);
@@ -472,7 +475,8 @@ export class Providers implements OnInit {
       base_url: 'https://opencode.ai/zen/v1',
       api_key: '',
       default_model: 'big-pickle',
-      provider_type: 'zen'
+      provider_type: 'zen',
+      is_embeddings: false
     };
     this.providerModels.set([]);
     this.modelsError.set(null);

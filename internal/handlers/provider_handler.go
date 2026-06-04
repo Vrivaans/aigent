@@ -24,6 +24,7 @@ type ProviderRequest struct {
 	APIKey       string `json:"api_key"`
 	DefaultModel string `json:"default_model"`
 	ProviderType string `json:"provider_type"`
+	IsEmbeddings bool   `json:"is_embeddings"`
 }
 
 func providerPresets() []fiber.Map {
@@ -105,6 +106,7 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 		APIKey:       encryptedKey,
 		DefaultModel: req.DefaultModel,
 		ProviderType: req.ProviderType,
+		IsEmbeddings: req.IsEmbeddings,
 	}
 
 	if err := database.DB.Create(&provider).Error; err != nil {
@@ -145,6 +147,7 @@ func HandleUpdateProvider(c *fiber.Ctx) error {
 	provider.Name = strings.TrimSpace(req.Name)
 	provider.BaseURL = strings.TrimSpace(req.BaseURL)
 	provider.DefaultModel = strings.TrimSpace(req.DefaultModel)
+	provider.IsEmbeddings = req.IsEmbeddings
 	if req.ProviderType != "" {
 		provider.ProviderType = strings.TrimSpace(req.ProviderType)
 	}

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -201,12 +202,16 @@ func (h *ChatHandler) HandleChatStream(c *fiber.Ctx) error {
 			_ = w.Flush()
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(c.Context(), 5*time.Minute)
 		defer cancel()
 
 		respMsg, err := h.Brain.ProcessChatInteractionStream(ctx, session.ID, req.Message, sendEvent)
 		if err != nil {
 			log.Printf("⚠️ Stream interaction error: %v", err)
+			if errors.Is(err, context.Canceled) {
+				// Don't save system message or send events (client is already disconnected)
+				return
+			}
 			sendEvent("error", map[string]string{"message": err.Error()})
 
 			sysMsg := database.ChatMessage{
@@ -687,4 +692,37 @@ func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(response)
+}
+
+// DeleteMessagesFrom deletes a user message and all subsequent messages in a session.
+func (h *ChatHandler) DeleteMessagesFrom(c *fiber.Ctx) error {
+	sessionID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid session ID"})
+	}
+	messageID, err := c.ParamsInt("message_id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid message ID"})
+	}
+
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Delete all messages with ID >= messageID for this session
+		if err := tx.Where("session_id = ? AND id >= ?", sessionID, messageID).Delete(&database.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		// 2. Delete any pending actions that are currently PENDING for this session
+		if err := tx.Where("session_id = ? AND status = ?", sessionID, "PENDING").Delete(&database.PendingAction{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete messages: " + err.Error()})
+	}
+
+	// Clear memory cache so next request reloads from DB
+	ai.GetSessionManager().ClearSession(uint(sessionID))
+
+	return c.JSON(fiber.Map{"status": "deleted"})
 }

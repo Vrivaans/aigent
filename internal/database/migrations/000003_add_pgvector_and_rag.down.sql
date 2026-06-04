@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS document_chunks;
+DROP EXTENSION IF EXISTS vector;

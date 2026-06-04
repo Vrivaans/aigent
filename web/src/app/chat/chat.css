@@ -352,6 +352,25 @@ textarea {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.input-wrapper button.btn-attach {
+  margin-left: 0;
+  margin-right: 8px;
+}
+
+.input-wrapper button.btn-attach.uploading {
+  color: var(--accent) !important;
+  animation: pulse-upload 1.5s infinite ease-in-out;
+  pointer-events: none;
+  opacity: 1 !important;
+  border-color: var(--accent) !important;
+}
+
+@keyframes pulse-upload {
+  0% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.7; }
+}
+
 .input-wrapper button:not([disabled]):hover {
   background-color: var(--accent);
   color: #050505;
@@ -700,4 +719,57 @@ textarea {
     width: 100%;
     height: 50%;
   }
+}
+
+/* Stop button and Edit prompt styles */
+.input-wrapper button.btn-stop {
+  color: #ff7b72;
+  border-color: rgba(248, 81, 73, 0.4);
+  background-color: rgba(248, 81, 73, 0.1);
+}
+
+.input-wrapper button.btn-stop:hover {
+  background-color: #ff7b72;
+  color: #050505;
+  border-color: #ff7b72;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(248, 81, 73, 0.35);
+}
+
+.message.user .content {
+  position: relative;
+  padding-right: 32px !important;
+}
+
+.btn-edit-message {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none !important;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  width: 22px !important;
+  height: 22px !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+.message.user:hover .btn-edit-message {
+  opacity: 0.6;
+}
+
+.btn-edit-message:hover {
+  opacity: 1 !important;
+  color: var(--accent) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }

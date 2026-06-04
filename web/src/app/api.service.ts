@@ -78,6 +78,7 @@ export interface LLMProvider {
   provider_type: string;
   is_active: boolean;
   is_default: boolean;
+  is_embeddings: boolean;
 }
 
 export interface ModelInfo {
@@ -289,7 +290,8 @@ export class ApiService {
     sessionId: number,
     message: string,
     modelOverride?: string,
-    onEvent?: (event: string, data: any) => void
+    onEvent?: (event: string, data: any) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     const body: any = { message };
     if (modelOverride) { body.model_override = modelOverride; }
@@ -303,7 +305,8 @@ export class ApiService {
     const response = await fetch(`${this.baseUrl}/sessions/${sessionId}/chat/stream`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal
     });
 
     if (!response.ok) {
@@ -350,6 +353,10 @@ export class ApiService {
         }
       }
     }
+  }
+
+  async deleteChatMessagesFrom(sessionId: number, messageId: number): Promise<{ status: string }> {
+    return this.request(`/sessions/${sessionId}/messages/${messageId}`, { method: 'DELETE' });
   }
 
   async confirmAction(sessionId: number, pendingId: number, approved: boolean, alwaysAllow = false): Promise<any> {
@@ -703,5 +710,35 @@ export class ApiService {
 
   async getWorkflowRun(runId: number): Promise<WorkflowRunResponse> {
     return this.request(`/workflows/runs/${runId}`);
+  }
+
+  async uploadKnowledgeFile(
+    file: File,
+    chunkSize: number = 500,
+    chunkOverlap: number = 50,
+    embeddingModel: string = 'text-embedding-3-small'
+  ): Promise<{ status: string; message: string; chunks: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('chunk_size', chunkSize.toString());
+    formData.append('chunk_overlap', chunkOverlap.toString());
+    formData.append('embedding_model', embeddingModel);
+
+    const token = localStorage.getItem('aigent_token');
+    const headers: Record<string, string> = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const res = await fetch(`${this.baseUrl}/rag/upload`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to upload document');
+    }
+    return data;
   }
 }

@@ -210,3 +210,55 @@ func (c *OpenRouterClient) CreateChatCompletionStream(ctx context.Context, req C
 
 	return resp.Body, nil
 }
+
+// CreateEmbeddings generates vector embeddings for a given input string.
+// It maps to an OpenAI-compatible /embeddings endpoint.
+func (c *OpenRouterClient) CreateEmbeddings(ctx context.Context, text string, model string) ([]float32, error) {
+	if model == "" {
+		model = "text-embedding-3-small" // Default embedding model
+	}
+
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"model": model,
+		"input": text,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal embeddings request: %w", err)
+	}
+
+	url := c.BaseURL + "/embeddings"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("embeddings API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("embeddings API error %d: %s", resp.StatusCode, string(b))
+	}
+
+	var result struct {
+		Data []struct {
+			Embedding []float32 `json:"embedding"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode embeddings response: %w", err)
+	}
+
+	if len(result.Data) == 0 {
+		return nil, fmt.Errorf("no embedding returned in response data")
+	}
+
+	return result.Data[0].Embedding, nil
+}
