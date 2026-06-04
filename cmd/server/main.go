@@ -220,6 +220,7 @@ func main() {
 	api.Patch("/sessions/:id/llm/reset", chatHandler.ResetSessionLLMOverride)
 	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
 	api.Post("/sessions/:id/chat/stream", chatHandler.HandleChatStream)
+	api.Delete("/sessions/:id/messages/:message_id", chatHandler.DeleteMessagesFrom)
 	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
@@ -293,6 +294,11 @@ func main() {
 	api.Get("/permissions", handlers.HandleListPermissions)
 	api.Delete("/permissions/:id", handlers.HandleDeletePermission)
 	api.Post("/permissions/:id/pause", handlers.HandleTogglePausePermission)
+
+	// RAG / Knowledge Base
+	api.Post("/rag/upload", handlers.UploadKnowledgeFile)
+	api.Get("/rag/search", handlers.SearchKnowledge)
+	api.Post("/rag/search", handlers.SearchKnowledge)
 
 	// Serve Static Angular Files
 	app.Static("/", "./web/dist/web/browser")

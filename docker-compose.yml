@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: aigent-db
     environment:
       POSTGRES_USER: postgres

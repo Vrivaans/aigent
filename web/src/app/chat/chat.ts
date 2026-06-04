@@ -30,6 +30,7 @@ import { TranslationService } from '../translation.service';
 export class Chat implements OnInit, OnChanges, AfterViewChecked {
   private api = inject(ApiService);
   public translation = inject(TranslationService);
+  private abortController: AbortController | null = null;
 
   t(key: string, params?: Record<string, string>): string {
     return this.translation.t(key, params);
@@ -42,6 +43,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   messages = signal<ChatMessageUI[]>([]);
   inputText = signal('');
   isThinking = signal(false);
+  isUploading = signal(false);
 
   agents = signal<Agent[]>([]);
   modelGroups = signal<ModelGroup[]>([]);
@@ -201,6 +203,9 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     };
     this.messages.update(m => [...m, assistantMsg]);
 
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
     try {
       await this.api.sendChatMessageStream(
         currentSessionId,
@@ -279,7 +284,8 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
               )
             );
           }
-        }
+        },
+        signal
       );
 
       // Sincronizar artefactos finales
@@ -290,6 +296,10 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       }
       this.scrollToBottom();
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.log('Stream generation aborted by user');
+        return;
+      }
       console.error(e);
       const detail = e instanceof Error ? e.message : this.t('global.unknown_error');
       // Limpiar mensaje del asistente si quedó vacío por error inicial
@@ -302,7 +312,53 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       }]);
       this.scrollToBottom();
     } finally {
+      this.abortController = null;
       this.isThinking.set(false);
+    }
+  }
+
+  stopGeneration() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    this.isThinking.set(false);
+
+    // Remove the last assistant message from UI
+    this.messages.update(list => {
+      if (list.length > 0 && list[list.length - 1].role === 'assistant') {
+        return list.slice(0, list.length - 1);
+      }
+      return list;
+    });
+  }
+
+  async editMessage(msg: ChatMessageUI) {
+    if (!this.session?.id || this.isThinking()) return;
+
+    // 1. Copy message content to input box
+    this.inputText.set(msg.content);
+
+    // 2. Call backend to delete all messages from this message onwards
+    try {
+      await this.api.deleteChatMessagesFrom(this.session.id, msg.id);
+
+      // 3. Remove them from the frontend state
+      const idx = this.messages().findIndex(m => m.id === msg.id);
+      if (idx !== -1) {
+        this.messages.set(this.messages().slice(0, idx));
+      }
+
+      // Reload artifacts since history changed
+      const arts = await this.api.getSessionArtifacts(this.session.id);
+      this.artifacts.set(arts);
+      if (arts.length > 0) {
+        this.activeArtifact.set(arts[arts.length - 1]);
+      } else {
+        this.activeArtifact.set(null);
+      }
+    } catch (e) {
+      console.error('Failed to edit/truncate message:', e);
     }
   }
 
@@ -405,6 +461,61 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     const text = this.t('chat.node_clicked_prompt', { node: nodeLabel });
     this.inputText.set(text);
     await this.sendMessage();
+  }
+
+  async onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    this.isUploading.set(true);
+
+    const uploadingText = this.t('chat.uploading_placeholder');
+
+    // Add optimist loading system message
+    const tempMsgId = Date.now();
+    this.messages.update(m => [...m, {
+      id: tempMsgId,
+      role: 'system',
+      content: `📎 ${uploadingText}`,
+      created_at: new Date().toISOString()
+    }]);
+    this.scrollToBottom();
+
+    try {
+      // Perform upload with standard chunking configurations
+      const res = await this.api.uploadKnowledgeFile(file, 500, 50);
+      
+      // Update loading message with success confirmation
+      this.messages.update(list => 
+        list.map(msg => 
+          msg.id === tempMsgId
+            ? { 
+                ...msg, 
+                content: `✅ ${this.t('chat.upload_success', { name: file.name, chunks: res.chunks.toString() })}` 
+              }
+            : msg
+        )
+      );
+    } catch (e: any) {
+      console.error(e);
+      const detail = e?.message || this.t('global.unknown_error');
+      // Update loading message with error description
+      this.messages.update(list => 
+        list.map(msg => 
+          msg.id === tempMsgId
+            ? { 
+                ...msg, 
+                content: `❌ ${this.t('chat.upload_error', { error: detail })}` 
+              }
+            : msg
+        )
+      );
+    } finally {
+      this.isUploading.set(false);
+      input.value = ''; // Clear file input selection
+      this.scrollToBottom();
+    }
   }
 
   onKeyDown(event: KeyboardEvent) {

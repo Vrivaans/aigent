@@ -3,6 +3,7 @@ package database
 import (
 	"time"
 
+	"github.com/pgvector/pgvector-go"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -126,6 +127,7 @@ type LLMProvider struct {
 	ProviderType string         `gorm:"size:50;default:'custom'" json:"provider_type"` // zen, groq, openrouter, openai, custom
 	IsActive     bool           `json:"is_active" gorm:"default:true"`
 	IsDefault    bool           `json:"is_default" gorm:"default:false"`
+	IsEmbeddings bool           `json:"is_embeddings" gorm:"default:false"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
@@ -216,4 +218,13 @@ type WorkflowRun struct {
 	Logs          string    `gorm:"type:text" json:"logs,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// DocumentChunk represents a chunked document segment with its embedding vector
+type DocumentChunk struct {
+	ID        uint            `gorm:"primaryKey" json:"id"`
+	Source    string          `gorm:"size:255;not null;index" json:"source"`
+	Content   string          `gorm:"type:text;not null" json:"content"`
+	Embedding pgvector.Vector `gorm:"type:vector" json:"-"`
+	CreatedAt time.Time       `json:"created_at"`
 }
