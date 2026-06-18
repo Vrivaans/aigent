@@ -192,6 +192,68 @@ func (m *Manifest) ResolvedStreamConfig(params map[string]string) (baseURL strin
 	return m.Stream.BaseURL, headers, m.Stream.DisableStandaloneSSE, nil
 }
 
+// RequiredParamKeys lists {{placeholder}} names used in stdio args/env.
+func (m *Manifest) RequiredParamKeys() []string {
+	if m == nil || m.Stdio == nil {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	var keys []string
+	collect := func(values ...string) {
+		for _, raw := range values {
+			for _, match := range placeholderRE.FindAllStringSubmatch(raw, -1) {
+				key := match[1]
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				keys = append(keys, key)
+			}
+		}
+	}
+	collect(m.Stdio.Args...)
+	for _, v := range m.Stdio.Env {
+		collect(v)
+	}
+	return keys
+}
+
+// PublicView is the catalog entry returned by the list API.
+type PublicView struct {
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Description    string            `json:"description"`
+	Version        string            `json:"version"`
+	Transport      string            `json:"transport"`
+	DefaultAlias   string            `json:"default_alias"`
+	Tags           []string          `json:"tags"`
+	ParamDefaults  map[string]string `json:"param_defaults"`
+	RequiredParams []string          `json:"required_params"`
+}
+
+// PublicView returns a safe summary for catalog listing.
+func (m *Manifest) PublicView() PublicView {
+	if m == nil {
+		return PublicView{}
+	}
+	defaults := map[string]string{}
+	for k, v := range m.ParamDefaults {
+		defaults[k] = v
+	}
+	tags := append([]string(nil), m.Tags...)
+	return PublicView{
+		ID:             m.ID,
+		Name:           m.Name,
+		Description:    m.Description,
+		Version:        m.Version,
+		Transport:      m.Transport,
+		DefaultAlias:   m.DefaultAlias,
+		Tags:           tags,
+		ParamDefaults:  defaults,
+		RequiredParams: m.RequiredParamKeys(),
+	}
+}
+
 func mergeParams(defaults, overrides map[string]string) map[string]string {
 	out := map[string]string{}
 	for k, v := range defaults {

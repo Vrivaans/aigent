@@ -70,3 +70,20 @@ func (c *Catalog) LoadByID(id string) (*Manifest, error) {
 	}
 	return m, nil
 }
+
+// ListManifests loads and validates all manifests in the catalog directory.
+func (c *Catalog) ListManifests() ([]PublicView, error) {
+	ids, err := c.ListIDs()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]PublicView, 0, len(ids))
+	for _, id := range ids {
+		m, err := c.LoadByID(id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m.PublicView())
+	}
+	return out, nil
+}

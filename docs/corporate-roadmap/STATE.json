@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "phase": "6-mcp-catalog",
-  "current_slice": "19-mcp-catalog-ui",
+  "phase": "7-multi-tenant",
+  "current_slice": "20-tenant-model-migration",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -22,10 +22,11 @@
     "15-secret-rotation-doc-env",
     "16-scc-e2e-cache-test",
     "17-scc-provider-adapters",
-    "18-mcp-manifest-format"
+    "18-mcp-manifest-format",
+    "19-mcp-catalog-ui"
   ],
-  "last_commit": "35665a3",
-  "last_iteration_at": "2026-06-19T01:00:00Z",
+  "last_commit": "521f972",
+  "last_iteration_at": "2026-06-19T02:05:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

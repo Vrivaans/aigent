@@ -127,3 +127,46 @@ func TestCatalogLoadByIDMismatch(t *testing.T) {
 		t.Fatal("expected id mismatch error")
 	}
 }
+
+func TestRequiredParamKeysFromStdioArgs(t *testing.T) {
+	m := &mcpcatalog.Manifest{
+		Stdio: &mcpcatalog.StdioSpec{
+			Args: []string{"{{allowed_dir}}", "static"},
+		},
+	}
+	keys := m.RequiredParamKeys()
+	if len(keys) != 1 || keys[0] != "allowed_dir" {
+		t.Fatalf("keys = %v", keys)
+	}
+}
+
+func TestListManifestsFromDir(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	write("filesystem.json", `{
+		"id": "filesystem",
+		"name": "Filesystem",
+		"version": "1.0.0",
+		"transport": "stdio",
+		"stdio": {"command": "npx", "args": ["{{allowed_dir}}"]},
+		"param_defaults": {"allowed_dir": "."}
+	}`)
+	write("playwright.json", `{
+		"id": "playwright",
+		"name": "Playwright",
+		"version": "1.0.0",
+		"transport": "stream",
+		"stream": {"base_url": "http://127.0.0.1:8931/mcp"}
+	}`)
+	entries, err := mcpcatalog.NewCatalog(dir).ListManifests()
+	if err != nil {
+		t.Fatalf("ListManifests: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+}

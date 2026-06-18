@@ -150,6 +150,77 @@
     </div>
   </div>
 
+  <!-- MCP Catalog templates -->
+  <div class="handsai-section mcp-catalog-section">
+    <div class="section-header">
+      <h2>{{ t('prov.title_mcp_catalog') }}</h2>
+      <p>{{ t('prov.desc_mcp_catalog') }}</p>
+    </div>
+    @if (catalogLoading()) {
+      <p class="catalog-loading">{{ t('prov.catalog_loading') }}</p>
+    } @else if (catalogError()) {
+      <p class="catalog-error">{{ catalogError() }}</p>
+    } @else if (!mcpCatalog().length) {
+      <p class="catalog-empty">{{ t('prov.catalog_empty') }}</p>
+    } @else {
+      <div class="mcp-catalog-grid">
+        @for (entry of mcpCatalog(); track entry.id) {
+          <div class="mcp-catalog-card">
+            <div class="catalog-card-header">
+              <h3>{{ entry.name }}</h3>
+              <span class="badge catalog-transport">{{ entry.transport }}</span>
+            </div>
+            <p class="catalog-desc">{{ entry.description }}</p>
+            <div class="catalog-meta">
+              <span>{{ t('prov.catalog_version', { version: entry.version }) }}</span>
+              <span>{{ t('prov.catalog_alias', { alias: entry.default_alias }) }}</span>
+            </div>
+            @if (catalogParamKeys(entry).length) {
+              <div class="catalog-params">
+                @for (key of catalogParamKeys(entry); track key) {
+                  <label class="catalog-param-label">
+                    {{ key }}
+                    <input
+                      [(ngModel)]="catalogParams[entry.id][key]"
+                      [placeholder]="entry.param_defaults[key] || ''"
+                      [disabled]="!canWriteMcp() || catalogInstallingId() === entry.id"
+                    />
+                  </label>
+                }
+              </div>
+            }
+            @if (catalogStatusFor(entry.id).state === 'installed' || isCatalogInstalled(entry)) {
+              <span class="catalog-status installed">{{ t('prov.catalog_status_installed') }}</span>
+            } @else if (catalogStatusFor(entry.id).state === 'installing') {
+              <span class="catalog-status installing">{{ t('prov.catalog_status_installing') }}</span>
+            } @else if (catalogStatusFor(entry.id).state === 'error') {
+              <span class="catalog-status error">{{ t('prov.catalog_status_error') }}</span>
+            }
+            @if (catalogStatusFor(entry.id).message) {
+              <p class="catalog-sync-msg" [class.error]="catalogStatusFor(entry.id).state === 'error'">
+                {{ catalogStatusFor(entry.id).message }}
+              </p>
+            }
+            <div class="catalog-actions">
+              @if (canWriteMcp()) {
+                <button
+                  class="btn-primary"
+                  type="button"
+                  (click)="installCatalogEntry(entry)"
+                  [disabled]="catalogInstallingId() === entry.id || isCatalogInstalled(entry)"
+                >
+                  {{ catalogInstallingId() === entry.id ? t('prov.catalog_installing') : t('prov.catalog_install') }}
+                </button>
+              } @else {
+                <p class="catalog-readonly">{{ t('prov.catalog_readonly') }}</p>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
   <!-- MCP stdio (filesystem, Playwright, etc.) -->
   <div class="handsai-section mcp-stdio-section">
     <div class="section-header">

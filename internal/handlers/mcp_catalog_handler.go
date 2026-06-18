@@ -38,6 +38,15 @@ func (h *McpCatalogHandler) catalog() *mcpcatalog.Catalog {
 	return mcpcatalog.NewCatalog(h.CatalogDir)
 }
 
+// List returns bundled MCP catalog templates (manifest summaries).
+func (h *McpCatalogHandler) List(c *fiber.Ctx) error {
+	entries, err := h.catalog().ListManifests()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(entries)
+}
+
 func (h *McpCatalogHandler) triggerReloadAndSync() {
 	if h.Brain == nil {
 		return

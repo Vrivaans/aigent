@@ -133,6 +133,26 @@ export interface McpStreamServer {
   updated_at?: string;
 }
 
+export interface McpCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  transport: 'stdio' | 'stream';
+  default_alias: string;
+  tags: string[];
+  param_defaults: Record<string, string>;
+  required_params: string[];
+}
+
+export interface McpCatalogInstallResult {
+  status: string;
+  transport: string;
+  manifest_id: string;
+  alias: string;
+  id: number;
+}
+
 export interface PendingApproval {
   id: number;
   session_id: number;
@@ -800,6 +820,26 @@ export class ApiService {
     }
     if (!res.ok) throw new Error(data.error || 'Test failed');
     return data;
+  }
+
+  async listMcpCatalog(): Promise<McpCatalogEntry[]> {
+    return this.request('/catalog/mcp');
+  }
+
+  async installMcpCatalog(body: {
+    manifest_id: string;
+    alias?: string;
+    params?: Record<string, string>;
+    enabled?: boolean;
+  }): Promise<McpCatalogInstallResult> {
+    return this.request('/catalog/mcp/install', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }
+
+  async syncActiveTools(): Promise<void> {
+    await this.request('/active-tools?refresh=true');
   }
 
   // --- Workflows ---

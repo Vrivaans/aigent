@@ -37,7 +37,13 @@ func setupMcpCatalogInstallTest(t *testing.T) *fiber.App {
 	database.DB = db
 	restoreAudit := audit.SetDBForTest(db)
 	auth.PermissionChecker = func(userID uint, resource, action string) (bool, error) {
-		return resource == "mcp" && action == "write", nil
+		if resource == "mcp" && action == "write" {
+			return true, nil
+		}
+		if resource == "mcp" && action == "read" {
+			return true, nil
+		}
+		return false, nil
 	}
 	t.Cleanup(func() {
 		auth.PermissionChecker = nil
@@ -80,6 +86,7 @@ func setupMcpCatalogInstallTest(t *testing.T) *fiber.App {
 		return c.Next()
 	})
 	app.Post("/api/catalog/mcp/install", auth.RequirePermissionMiddleware("mcp", "write"), handler.Install)
+	app.Get("/api/catalog/mcp", auth.RequirePermissionMiddleware("mcp", "read"), handler.List)
 
 	return app
 }
@@ -111,6 +118,18 @@ func TestMcpCatalogInstallFilesystem(t *testing.T) {
 	}
 	if row.Command != "npx" || len(args) != 3 || args[2] != "/tmp/aigent-test" {
 		t.Fatalf("unexpected stdio config: command=%q args=%v", row.Command, args)
+	}
+}
+
+func TestMcpCatalogListTemplates(t *testing.T) {
+	app := setupMcpCatalogInstallTest(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/catalog/mcp", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, readMcpCatalogBody(t, resp))
 	}
 }
 

@@ -316,6 +316,7 @@ func main() {
 		StdioMgr:  mcpStdioMgr,
 		StreamMgr: mcpStreamMgr,
 	}
+	mcpRead.Get("/catalog/mcp", mcpCatalogHandler.List)
 	mcpWrite.Post("/catalog/mcp/install", mcpCatalogHandler.Install)
 
 	taskHandler := &handlers.TaskHandler{}

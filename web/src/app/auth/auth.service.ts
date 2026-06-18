@@ -37,6 +37,10 @@ export class AuthService {
     return this.hasRole('admin') || this.hasRole('auditor');
   }
 
+  canWriteMcp(): boolean {
+    return this.hasRole('admin') || this.hasRole('operator');
+  }
+
   setToken(token: string) {
     localStorage.setItem(this.TOKEN_KEY, token);
     this.isLoggedIn.set(true);

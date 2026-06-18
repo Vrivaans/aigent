@@ -1,7 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService, LLMProvider, McpStdioServer, McpStreamServer, ModelInfo } from '../api.service';
+import { ApiService, LLMProvider, McpCatalogEntry, McpStdioServer, McpStreamServer, ModelInfo } from '../api.service';
+import { AuthService } from '../auth/auth.service';
 import { TranslationService } from '../translation.service';
 
 @Component({
@@ -13,6 +14,7 @@ import { TranslationService } from '../translation.service';
 })
 export class Providers implements OnInit {
   private api = inject(ApiService);
+  private auth = inject(AuthService);
   private translation = inject(TranslationService);
 
   t(key: string, params?: Record<string, string>): string {
@@ -79,9 +81,21 @@ export class Providers implements OnInit {
   mcpStreamTestMsg = signal<string | null>(null);
   mcpStreamTesting = signal(false);
 
+  mcpCatalog = signal<McpCatalogEntry[]>([]);
+  catalogLoading = signal(false);
+  catalogError = signal<string | null>(null);
+  catalogInstallingId = signal<string | null>(null);
+  catalogStatus = signal<Record<string, { state: 'idle' | 'installing' | 'installed' | 'error'; message?: string }>>({});
+  catalogParams: Record<string, Record<string, string>> = {};
+
+  canWriteMcp(): boolean {
+    return this.auth.canWriteMcp();
+  }
+
   async ngOnInit() {
     await this.loadProviders();
     await this.loadHandsAIConfig();
+    await this.loadMcpCatalog();
     await this.loadMcpStdio();
     await this.loadMcpStream();
   }
@@ -112,6 +126,121 @@ export class Providers implements OnInit {
     } catch {
       this.mcpStreamServers.set([]);
     }
+  }
+
+  async loadMcpCatalog() {
+    this.catalogLoading.set(true);
+    this.catalogError.set(null);
+    try {
+      const entries = await this.api.listMcpCatalog();
+      for (const entry of entries) {
+        const params: Record<string, string> = { ...(entry.param_defaults || {}) };
+        for (const key of entry.required_params || []) {
+          if (params[key] === undefined) {
+            params[key] = '';
+          }
+        }
+        this.catalogParams[entry.id] = params;
+      }
+      this.mcpCatalog.set(entries);
+    } catch (e: any) {
+      this.mcpCatalog.set([]);
+      this.catalogError.set(e?.message || this.t('prov.catalog_err_load'));
+    } finally {
+      this.catalogLoading.set(false);
+    }
+  }
+
+  catalogParamKeys(entry: McpCatalogEntry): string[] {
+    if (entry.required_params?.length) {
+      return entry.required_params;
+    }
+    return Object.keys(entry.param_defaults || {});
+  }
+
+  isCatalogInstalled(entry: McpCatalogEntry): boolean {
+    const alias = entry.default_alias;
+    if (entry.transport === 'stdio') {
+      return this.mcpStdioServers().some((s) => s.alias === alias);
+    }
+    return this.mcpStreamServers().some((s) => s.alias === alias);
+  }
+
+  catalogStatusFor(id: string): { state: 'idle' | 'installing' | 'installed' | 'error'; message?: string } {
+    const fromMap = this.catalogStatus()[id];
+    if (fromMap) {
+      return fromMap;
+    }
+    const entry = this.mcpCatalog().find((e) => e.id === id);
+    if (entry && this.isCatalogInstalled(entry)) {
+      return { state: 'installed' };
+    }
+    return { state: 'idle' };
+  }
+
+  async installCatalogEntry(entry: McpCatalogEntry) {
+    if (!this.canWriteMcp()) {
+      return;
+    }
+    this.catalogInstallingId.set(entry.id);
+    this.setCatalogStatus(entry.id, { state: 'installing' });
+    try {
+      const params = { ...(this.catalogParams[entry.id] || entry.param_defaults || {}) };
+      const result = await this.api.installMcpCatalog({
+        manifest_id: entry.id,
+        params
+      });
+      if (entry.transport === 'stdio') {
+        await this.loadMcpStdio();
+        try {
+          const test = await this.api.testMcpStdioSaved(result.id);
+          const toolCount = test.tools?.length ?? 0;
+          this.setCatalogStatus(entry.id, {
+            state: 'installed',
+            message: this.t('prov.catalog_sync_ok', { count: '' + toolCount })
+          });
+        } catch (e: any) {
+          this.setCatalogStatus(entry.id, {
+            state: 'installed',
+            message: this.t('prov.catalog_sync_err', { error: e?.message || this.t('global.unknown_error') })
+          });
+        }
+      } else {
+        await this.loadMcpStream();
+        try {
+          const test = await this.api.testMcpStreamSaved(result.id);
+          const toolCount = test.tools?.length ?? 0;
+          this.setCatalogStatus(entry.id, {
+            state: 'installed',
+            message: this.t('prov.catalog_sync_ok', { count: '' + toolCount })
+          });
+        } catch (e: any) {
+          this.setCatalogStatus(entry.id, {
+            state: 'installed',
+            message: this.t('prov.catalog_sync_err', { error: e?.message || this.t('global.unknown_error') })
+          });
+        }
+      }
+      try {
+        await this.api.syncActiveTools();
+      } catch {
+        /* non-fatal */
+      }
+    } catch (e: any) {
+      this.setCatalogStatus(entry.id, {
+        state: 'error',
+        message: e?.message || this.t('global.unknown_error')
+      });
+    } finally {
+      this.catalogInstallingId.set(null);
+    }
+  }
+
+  private setCatalogStatus(
+    id: string,
+    status: { state: 'idle' | 'installing' | 'installed' | 'error'; message?: string }
+  ) {
+    this.catalogStatus.update((map) => ({ ...map, [id]: status }));
   }
 
   headersMapToText(h: Record<string, string> | undefined): string {
