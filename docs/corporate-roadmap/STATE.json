@@ -5,7 +5,7 @@
   "status": "pending",
   "blockers": [],
   "completed": ["01-users-table", "02-roles-permissions-model", "03-auth-jwt-claims"],
-  "last_commit": null,
+  "last_commit": "c96d631",
   "last_iteration_at": "2026-06-18T22:09:45Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
