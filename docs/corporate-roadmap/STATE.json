@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "phase": "4-secrets",
-  "current_slice": "15-secret-rotation-doc-env",
+  "phase": "5-scc",
+  "current_slice": "16-scc-e2e-cache-test",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -18,10 +18,11 @@
     "11-approval-actor-id",
     "12-approval-policies-basic",
     "13-approval-audit-link",
-    "14-separate-jwt-encryption-keys"
+    "14-separate-jwt-encryption-keys",
+    "15-secret-rotation-doc-env"
   ],
-  "last_commit": "ba37b27",
-  "last_iteration_at": "2026-06-18T23:00:00Z",
+  "last_commit": "41cfc8f",
+  "last_iteration_at": "2026-06-18T23:15:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

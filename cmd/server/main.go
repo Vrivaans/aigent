@@ -16,6 +16,7 @@ import (
 	"aigent/internal/mcpstdio"
 	"aigent/internal/mcpstream"
 	"aigent/internal/scheduler"
+	"aigent/internal/secrets"
 	"aigent/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -35,7 +36,7 @@ func main() {
 	if err := auth.ValidateStartupSecrets(); err != nil {
 		log.Fatalf("FATAL: %v", err)
 	}
-	encryptionKey := os.Getenv("DB_ENCRYPTION_KEY")
+	encryptionKey := secrets.DBEncryptionKey()
 	adminUser := os.Getenv("ADMIN_USERNAME")
 	adminPass := os.Getenv("ADMIN_PASSWORD")
 	if adminUser == "" || adminPass == "" {

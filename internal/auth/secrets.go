@@ -3,20 +3,21 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
+
+	"aigent/internal/secrets"
 )
 
 const (
-	envDBEncryptionKey = "DB_ENCRYPTION_KEY"
-	envJWTSecret       = "JWT_SECRET"
+	envDBEncryptionKey = secrets.KeyDBEncryption
+	envJWTSecret       = secrets.KeyJWTSecret
 	minJWTSecretLen    = 16
 	dbEncryptionKeyLen = 32
 )
 
 // JWTSecretKey returns the HS256 signing key for session JWTs.
 func JWTSecretKey() []byte {
-	return []byte(strings.TrimSpace(os.Getenv(envJWTSecret)))
+	return []byte(strings.TrimSpace(secrets.JWTSecret()))
 }
 
 // ValidateDBEncryptionKey ensures the AES-256-GCM master key length is correct.
@@ -41,10 +42,10 @@ func ValidateJWTSecret(secret string) error {
 
 // ValidateStartupSecrets checks both secrets before the server accepts traffic.
 func ValidateStartupSecrets() error {
-	if err := ValidateDBEncryptionKey(os.Getenv(envDBEncryptionKey)); err != nil {
+	if err := ValidateDBEncryptionKey(secrets.DBEncryptionKey()); err != nil {
 		return err
 	}
-	if err := ValidateJWTSecret(os.Getenv(envJWTSecret)); err != nil {
+	if err := ValidateJWTSecret(secrets.JWTSecret()); err != nil {
 		return err
 	}
 	return nil

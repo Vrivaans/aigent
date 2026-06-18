@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 
 	"aigent/internal/ai"
 	"aigent/internal/audit"
 	"aigent/internal/database"
 	"aigent/internal/mcpstdio"
+	"aigent/internal/secrets"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -42,9 +42,9 @@ func (h *McpStdioConfigHandler) triggerReloadAndSync() {
 }
 
 func (h *McpStdioConfigHandler) List(c *fiber.Ctx) error {
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(masterKey) != 32 {
-		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	var rows []database.McpStdioServer
 	if err := database.DB.Order("id asc").Find(&rows).Error; err != nil {
@@ -76,9 +76,9 @@ func (h *McpStdioConfigHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *McpStdioConfigHandler) Create(c *fiber.Ctx) error {
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(masterKey) != 32 {
-		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	var req mcpStdioRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -131,9 +131,9 @@ func (h *McpStdioConfigHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *McpStdioConfigHandler) Update(c *fiber.Ctx) error {
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(masterKey) != 32 {
-		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	id := c.Params("id")
 	var cur database.McpStdioServer
@@ -249,9 +249,9 @@ func (h *McpStdioConfigHandler) TestDryRun(c *fiber.Ctx) error {
 }
 
 func (h *McpStdioConfigHandler) TestSaved(c *fiber.Ctx) error {
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(masterKey) != 32 {
-		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	id := c.Params("id")
 	var row database.McpStdioServer

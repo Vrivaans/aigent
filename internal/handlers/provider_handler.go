@@ -7,10 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 
 	"aigent/internal/audit"
 	"aigent/internal/database"
+	"aigent/internal/secrets"
 	"aigent/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -91,9 +91,9 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 		req.BaseURL = database.ProviderPresetBaseURL(req.ProviderType)
 	}
 
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(masterKey) != 32 {
-		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	encryptedKey, err := utils.Encrypt(req.APIKey, masterKey)
@@ -164,7 +164,10 @@ func HandleUpdateProvider(c *fiber.Ctx) error {
 	// Solo actualizar APIKey si se proporcionó una nueva
 	req.APIKey = strings.TrimSpace(req.APIKey)
 	if req.APIKey != "" && req.APIKey != "********" {
-		masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+		masterKey, err := secrets.RequireDBEncryptionKey()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 		encryptedKey, err := utils.Encrypt(req.APIKey, masterKey)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Encryption failed"})
@@ -216,7 +219,10 @@ func HandleTestProvider(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
 	}
 
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	apiKey, err := utils.Decrypt(provider.APIKey, masterKey)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"ok": false, "error": "Failed to decrypt API key: " + err.Error()})
@@ -241,10 +247,12 @@ func HandleTestProviderConfig(c *fiber.Ctx) error {
 	if apiKey == "********" && req.ID > 0 {
 		var provider database.LLMProvider
 		if err := database.DB.First(&provider, req.ID).Error; err == nil {
-			masterKey := os.Getenv("DB_ENCRYPTION_KEY")
-			decrypted, err := utils.Decrypt(provider.APIKey, masterKey)
-			if err == nil {
-				apiKey = decrypted
+			masterKey, keyErr := secrets.RequireDBEncryptionKey()
+			if keyErr == nil {
+				decrypted, err := utils.Decrypt(provider.APIKey, masterKey)
+				if err == nil {
+					apiKey = decrypted
+				}
 			}
 		}
 	}
@@ -412,7 +420,10 @@ func HandleRefreshProviderModels(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
 	}
 
-	masterKey := os.Getenv("DB_ENCRYPTION_KEY")
+	masterKey, err := secrets.RequireDBEncryptionKey()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	apiKey, err := utils.Decrypt(provider.APIKey, masterKey)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"ok": false, "error": "Failed to decrypt API key: " + err.Error()})
