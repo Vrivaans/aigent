@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// User represents a login account (RBAC roles come in a later slice).
+// User represents a login account with optional RBAC roles.
 type User struct {
 	ID           uint      `gorm:"primarykey" json:"id"`
 	Username     string    `gorm:"size:255;uniqueIndex;not null" json:"username"`
@@ -16,6 +16,31 @@ type User struct {
 	IsActive     bool      `gorm:"not null;default:true" json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	Roles        []Role    `gorm:"many2many:user_roles;" json:"roles,omitempty"`
+}
+
+// Role groups permissions assigned to users.
+type Role struct {
+	ID          uint             `gorm:"primarykey" json:"id"`
+	Name        string           `gorm:"size:64;uniqueIndex;not null" json:"name"`
+	Description string           `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+	Permissions []RolePermission `gorm:"foreignKey:RoleID;constraint:OnDelete:CASCADE;" json:"permissions,omitempty"`
+}
+
+// RolePermission maps a role to a resource/action pair (e.g. agents + create).
+type RolePermission struct {
+	ID       uint   `gorm:"primarykey" json:"id"`
+	RoleID   uint   `gorm:"not null;index;uniqueIndex:idx_role_resource_action" json:"role_id"`
+	Resource string `gorm:"size:64;not null;uniqueIndex:idx_role_resource_action" json:"resource"`
+	Action   string `gorm:"size:64;not null;uniqueIndex:idx_role_resource_action" json:"action"`
+}
+
+// UserRole links users to roles (many-to-many join table).
+type UserRole struct {
+	UserID uint `gorm:"primaryKey" json:"user_id"`
+	RoleID uint `gorm:"primaryKey" json:"role_id"`
 }
 
 // Agent represents a specialized AI persona with its own model and toolset

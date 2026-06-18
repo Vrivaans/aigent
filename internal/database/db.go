@@ -153,6 +153,12 @@ func autoMigrate(db *gorm.DB) error {
 	if err := SeedAdminUser(db); err != nil {
 		return err
 	}
+	if err := db.AutoMigrate(&Role{}, &RolePermission{}, &UserRole{}); err != nil {
+		return err
+	}
+	if err := SeedRolesAndPermissions(db); err != nil {
+		return err
+	}
 
 	// 1.5 Migrate Model table (depends on LLMProvider)
 	if err := db.AutoMigrate(&Model{}); err != nil {
