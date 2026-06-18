@@ -208,7 +208,10 @@ func main() {
 	// Protected routes (require JWT)
 	api.Use(auth.NewAuthMiddleware())
 
-	api.Get("/active-tools", func(c *fiber.Ctx) error {
+	permRead := auth.RequirePermissionMiddleware
+	permWrite := auth.RequirePermissionMiddleware
+
+	api.Get("/active-tools", permRead("agents", "read"), func(c *fiber.Ctx) error {
 		ctx := c.Context()
 		if c.Query("refresh") == "true" || c.Query("sync") == "true" {
 			brain.ReloadMCPIntegrations(ctx)
@@ -216,101 +219,116 @@ func main() {
 		}
 		return c.JSON(brain.Registry.List())
 	})
+
 	chatHandler := &handlers.ChatHandler{Brain: brain}
-	api.Get("/sessions", chatHandler.GetSessions)
-	api.Post("/sessions", chatHandler.CreateSession)
-	api.Delete("/sessions/:id", chatHandler.DeleteSession)
-	api.Patch("/sessions/:id/agent", chatHandler.UpdateSessionAgent)
-	api.Patch("/sessions/:id/llm/reset", chatHandler.ResetSessionLLMOverride)
-	api.Post("/sessions/:id/chat", chatHandler.HandleChat)
-	api.Post("/sessions/:id/chat/stream", chatHandler.HandleChatStream)
-	api.Delete("/sessions/:id/messages/:message_id", chatHandler.DeleteMessagesFrom)
-	api.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
-	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
-	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
-	api.Get("/approvals", chatHandler.GetPendingApprovals)
+	chatRead := api.Group("", permRead("chat", "read"))
+	chatWrite := api.Group("", permWrite("chat", "write"))
 
-	// Smart Context Cache endpoints
-	api.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
-	api.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)
-	api.Post("/sessions/:id/files", handlers.UploadSessionFile)
-	api.Get("/sessions/:id/files", handlers.GetSessionFiles)
-	api.Delete("/sessions/:id/files/:file_id", handlers.DeleteSessionFile)
-	api.Get("/workspace/browse", handlers.BrowseWorkspaceDirectories)
+	chatRead.Get("/sessions", chatHandler.GetSessions)
+	chatWrite.Post("/sessions", chatHandler.CreateSession)
+	chatWrite.Delete("/sessions/:id", chatHandler.DeleteSession)
+	chatWrite.Patch("/sessions/:id/agent", chatHandler.UpdateSessionAgent)
+	chatWrite.Patch("/sessions/:id/llm/reset", chatHandler.ResetSessionLLMOverride)
+	chatWrite.Post("/sessions/:id/chat", chatHandler.HandleChat)
+	chatWrite.Post("/sessions/:id/chat/stream", chatHandler.HandleChatStream)
+	chatWrite.Delete("/sessions/:id/messages/:message_id", chatHandler.DeleteMessagesFrom)
+	chatWrite.Post("/sessions/:id/confirm/:pending_id", chatHandler.HandleConfirm)
+	chatRead.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
+	chatRead.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
+	chatRead.Get("/approvals", chatHandler.GetPendingApprovals)
 
-	// LLM Provider Management
+	chatWrite.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
+	chatWrite.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)
+	chatWrite.Post("/sessions/:id/files", handlers.UploadSessionFile)
+	chatRead.Get("/sessions/:id/files", handlers.GetSessionFiles)
+	chatWrite.Delete("/sessions/:id/files/:file_id", handlers.DeleteSessionFile)
+	chatRead.Get("/workspace/browse", handlers.BrowseWorkspaceDirectories)
+
 	agentHandler := &handlers.AgentHandler{Brain: brain}
-	admin := api.Group("/admin")
+	adminRead := api.Group("/admin", permRead("agents", "read"))
+	adminWrite := api.Group("/admin", permWrite("agents", "write"))
 
-	api.Get("/providers", handlers.HandleListProviders)
-	api.Get("/providers/presets", handlers.HandleGetPrefilledProviders)
-	api.Post("/providers", handlers.HandleCreateProvider)
-	api.Patch("/providers/:id", handlers.HandleUpdateProvider)
-	api.Patch("/providers/:id/set-default", handlers.HandleSetDefaultProvider)
-	api.Delete("/providers/:id", handlers.HandleDeleteProvider)
-	api.Post("/providers/test", handlers.HandleTestProviderConfig)
-	api.Post("/providers/:id/test", handlers.HandleTestProvider)
-	api.Get("/providers/:id/models", handlers.HandleGetProviderModels)
-	api.Post("/providers/:id/models/refresh", handlers.HandleRefreshProviderModels)
-	api.Get("/models", handlers.HandleGetAllModels)
+	providersRead := api.Group("", permRead("providers", "read"))
+	providersWrite := api.Group("", permWrite("providers", "write"))
 
-	// Agent management
-	admin.Get("/agents", agentHandler.GetAgents)
-	admin.Get("/agents/:id", agentHandler.GetAgent)
-	admin.Post("/agents", agentHandler.CreateAgent)
-	admin.Put("/agents/:id", agentHandler.UpdateAgent)
-	admin.Delete("/agents/:id", agentHandler.DeleteAgent)
+	providersRead.Get("/providers", handlers.HandleListProviders)
+	providersRead.Get("/providers/presets", handlers.HandleGetPrefilledProviders)
+	providersWrite.Post("/providers", handlers.HandleCreateProvider)
+	providersWrite.Patch("/providers/:id", handlers.HandleUpdateProvider)
+	providersWrite.Patch("/providers/:id/set-default", handlers.HandleSetDefaultProvider)
+	providersWrite.Delete("/providers/:id", handlers.HandleDeleteProvider)
+	providersWrite.Post("/providers/test", handlers.HandleTestProviderConfig)
+	providersWrite.Post("/providers/:id/test", handlers.HandleTestProvider)
+	providersRead.Get("/providers/:id/models", handlers.HandleGetProviderModels)
+	providersWrite.Post("/providers/:id/models/refresh", handlers.HandleRefreshProviderModels)
+	providersRead.Get("/models", handlers.HandleGetAllModels)
 
-	// HandsAI Config Management
+	adminRead.Get("/agents", agentHandler.GetAgents)
+	adminRead.Get("/agents/:id", agentHandler.GetAgent)
+	adminWrite.Post("/agents", agentHandler.CreateAgent)
+	adminWrite.Put("/agents/:id", agentHandler.UpdateAgent)
+	adminWrite.Delete("/agents/:id", agentHandler.DeleteAgent)
+
 	configHandler := &handlers.ConfigHandler{Brain: brain}
-	api.Get("/config/handsai", configHandler.GetHandsAIConfig)
-	api.Patch("/config/handsai", configHandler.UpdateHandsAIConfig)
-	api.Delete("/config/handsai", configHandler.DeleteHandsAIConfig)
+	mcpRead := api.Group("", permRead("mcp", "read"))
+	mcpWrite := api.Group("", permWrite("mcp", "write"))
+
+	mcpRead.Get("/config/handsai", configHandler.GetHandsAIConfig)
+	mcpWrite.Patch("/config/handsai", configHandler.UpdateHandsAIConfig)
+	mcpWrite.Delete("/config/handsai", configHandler.DeleteHandsAIConfig)
 
 	mcpStdioHandler := &handlers.McpStdioConfigHandler{Brain: brain, Manager: mcpStdioMgr}
-	api.Get("/config/mcp-stdio", mcpStdioHandler.List)
-	api.Post("/config/mcp-stdio", mcpStdioHandler.Create)
-	api.Post("/config/mcp-stdio/test", mcpStdioHandler.TestDryRun)
-	api.Patch("/config/mcp-stdio/:id", mcpStdioHandler.Update)
-	api.Delete("/config/mcp-stdio/:id", mcpStdioHandler.Delete)
-	api.Post("/config/mcp-stdio/:id/test", mcpStdioHandler.TestSaved)
+	mcpRead.Get("/config/mcp-stdio", mcpStdioHandler.List)
+	mcpWrite.Post("/config/mcp-stdio", mcpStdioHandler.Create)
+	mcpWrite.Post("/config/mcp-stdio/test", mcpStdioHandler.TestDryRun)
+	mcpWrite.Patch("/config/mcp-stdio/:id", mcpStdioHandler.Update)
+	mcpWrite.Delete("/config/mcp-stdio/:id", mcpStdioHandler.Delete)
+	mcpWrite.Post("/config/mcp-stdio/:id/test", mcpStdioHandler.TestSaved)
 
 	mcpStreamHandler := &handlers.McpStreamConfigHandler{Brain: brain, Manager: mcpStreamMgr}
-	api.Get("/config/mcp-stream", mcpStreamHandler.List)
-	api.Post("/config/mcp-stream", mcpStreamHandler.Create)
-	api.Post("/config/mcp-stream/test", mcpStreamHandler.TestDryRun)
-	api.Patch("/config/mcp-stream/:id", mcpStreamHandler.Update)
-	api.Delete("/config/mcp-stream/:id", mcpStreamHandler.Delete)
-	api.Post("/config/mcp-stream/:id/test", mcpStreamHandler.TestSaved)
+	mcpRead.Get("/config/mcp-stream", mcpStreamHandler.List)
+	mcpWrite.Post("/config/mcp-stream", mcpStreamHandler.Create)
+	mcpWrite.Post("/config/mcp-stream/test", mcpStreamHandler.TestDryRun)
+	mcpWrite.Patch("/config/mcp-stream/:id", mcpStreamHandler.Update)
+	mcpWrite.Delete("/config/mcp-stream/:id", mcpStreamHandler.Delete)
+	mcpWrite.Post("/config/mcp-stream/:id/test", mcpStreamHandler.TestSaved)
 
 	taskHandler := &handlers.TaskHandler{}
-	api.Get("/tasks", taskHandler.GetTasks)
-	api.Post("/tasks", taskHandler.CreateTask)
-	api.Delete("/tasks/:id", taskHandler.DeleteTask)
+	tasksRead := api.Group("", permRead("tasks", "read"))
+	tasksWrite := api.Group("", permWrite("tasks", "write"))
+	tasksRead.Get("/tasks", taskHandler.GetTasks)
+	tasksWrite.Post("/tasks", taskHandler.CreateTask)
+	tasksWrite.Delete("/tasks/:id", taskHandler.DeleteTask)
 
 	ruleHandler := &handlers.RuleHandler{}
-	api.Get("/rules", ruleHandler.GetRules)
-	api.Post("/rules", ruleHandler.CreateRule)
-	api.Delete("/rules/:id", ruleHandler.DeleteRule)
+	rulesRead := api.Group("", permRead("rules", "read"))
+	rulesWrite := api.Group("", permWrite("rules", "write"))
+	rulesRead.Get("/rules", ruleHandler.GetRules)
+	rulesWrite.Post("/rules", ruleHandler.CreateRule)
+	rulesWrite.Delete("/rules/:id", ruleHandler.DeleteRule)
 
 	workflowHandler := &handlers.WorkflowHandler{}
-	api.Get("/workflows", workflowHandler.GetWorkflows)
-	api.Get("/workflows/:id", workflowHandler.GetWorkflow)
-	api.Post("/workflows", workflowHandler.CreateWorkflow)
-	api.Post("/workflows/reload", workflowHandler.ReloadWorkflows)
-	api.Delete("/workflows/:id", workflowHandler.DeleteWorkflow)
-	api.Post("/workflows/:id/run", workflowHandler.RunWorkflow)
-	api.Get("/workflows/:id/runs", workflowHandler.GetWorkflowRuns)
-	api.Get("/workflows/runs/:run_id", workflowHandler.GetWorkflowRun)
+	wfRead := api.Group("", permRead("workflows", "read"))
+	wfWrite := api.Group("", permWrite("workflows", "write"))
+	wfRead.Get("/workflows", workflowHandler.GetWorkflows)
+	wfRead.Get("/workflows/:id", workflowHandler.GetWorkflow)
+	wfWrite.Post("/workflows", workflowHandler.CreateWorkflow)
+	wfWrite.Post("/workflows/reload", workflowHandler.ReloadWorkflows)
+	wfWrite.Delete("/workflows/:id", workflowHandler.DeleteWorkflow)
+	wfWrite.Post("/workflows/:id/run", workflowHandler.RunWorkflow)
+	wfRead.Get("/workflows/:id/runs", workflowHandler.GetWorkflowRuns)
+	wfRead.Get("/workflows/runs/:run_id", workflowHandler.GetWorkflowRun)
 
-	api.Get("/permissions", handlers.HandleListPermissions)
-	api.Delete("/permissions/:id", handlers.HandleDeletePermission)
-	api.Post("/permissions/:id/pause", handlers.HandleTogglePausePermission)
+	permRoutesRead := api.Group("", permRead("permissions", "read"))
+	permRoutesWrite := api.Group("", permWrite("permissions", "write"))
+	permRoutesRead.Get("/permissions", handlers.HandleListPermissions)
+	permRoutesWrite.Delete("/permissions/:id", handlers.HandleDeletePermission)
+	permRoutesWrite.Post("/permissions/:id/pause", handlers.HandleTogglePausePermission)
 
-	// RAG / Knowledge Base
-	api.Post("/rag/upload", handlers.UploadKnowledgeFile)
-	api.Get("/rag/search", handlers.SearchKnowledge)
-	api.Post("/rag/search", handlers.SearchKnowledge)
+	ragWrite := api.Group("", permWrite("providers", "write"))
+	ragWrite.Post("/rag/upload", handlers.UploadKnowledgeFile)
+	ragWrite.Get("/rag/search", handlers.SearchKnowledge)
+	ragWrite.Post("/rag/search", handlers.SearchKnowledge)
 
 	// Serve Static Angular Files
 	app.Static("/", "./web/dist/web/browser")
