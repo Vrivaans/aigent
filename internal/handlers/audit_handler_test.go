@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"aigent/internal/audit"
 	"aigent/internal/auth"
 	"aigent/internal/database"
 	"aigent/internal/handlers"
@@ -142,5 +144,89 @@ func TestAuditorCanListAuditEventsWithFilters(t *testing.T) {
 	}
 	if count != 3 {
 		t.Fatalf("expected 3 rows in db, got %d", count)
+	}
+}
+
+func TestAuditorCanExportCSV(t *testing.T) {
+	_, _, auditorID, _ := setupAuditListTestDB(t)
+
+	handler := &handlers.AuditHandler{}
+	app := fiber.New()
+	app.Use(audit.CorrelationMiddleware())
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{UserID: auditorID, Username: "auditor1", Roles: []string{"auditor"}})
+		return c.Next()
+	})
+	app.Get("/api/audit/events/export", auth.RequirePermissionMiddleware("audit", "export"), handler.ExportEvents)
+
+	req := httptest.NewRequest("GET", "/api/audit/events/export?format=csv", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(body))
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/csv") {
+		t.Fatalf("expected text/csv, got %q", ct)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "provider.create") {
+		t.Fatalf("csv missing expected action: %q", string(body))
+	}
+}
+
+func TestExportCreatesAuditEvent(t *testing.T) {
+	db, _, auditorID, _ := setupAuditListTestDB(t)
+	restore := audit.SetDBForTest(db)
+	defer restore()
+
+	handler := &handlers.AuditHandler{}
+	app := fiber.New()
+	app.Use(audit.CorrelationMiddleware())
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{UserID: auditorID, Username: "auditor1", Roles: []string{"auditor"}})
+		return c.Next()
+	})
+	app.Get("/api/audit/events/export", auth.RequirePermissionMiddleware("audit", "export"), handler.ExportEvents)
+
+	req := httptest.NewRequest("GET", "/api/audit/events/export?format=csv", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	_, _ = io.ReadAll(resp.Body)
+
+	var exportRows []database.AuditEvent
+	if err := db.Where("action = ?", "audit.export").Find(&exportRows).Error; err != nil {
+		t.Fatalf("find export audit: %v", err)
+	}
+	if len(exportRows) != 1 {
+		t.Fatalf("expected 1 audit.export row, got %d", len(exportRows))
+	}
+}
+
+func TestViewerCannotExportAuditEvents(t *testing.T) {
+	_, viewerID, _, _ := setupAuditListTestDB(t)
+
+	handler := &handlers.AuditHandler{}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{UserID: viewerID, Username: "viewer1", Roles: []string{"viewer"}})
+		return c.Next()
+	})
+	app.Get("/api/audit/events/export", auth.RequirePermissionMiddleware("audit", "export"), handler.ExportEvents)
+
+	req := httptest.NewRequest("GET", "/api/audit/events/export?format=csv", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
 }

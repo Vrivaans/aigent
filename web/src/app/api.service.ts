@@ -511,6 +511,21 @@ export class ApiService {
     return this.request(`/audit/events${qs ? `?${qs}` : ''}`);
   }
 
+  async exportAuditEventsCSV(params: Record<string, string | number> = {}): Promise<Blob> {
+    const query = new URLSearchParams({ format: 'csv' });
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== '' && value !== undefined && value !== null) {
+        query.set(key, String(value));
+      }
+    }
+    const res = await this.fetchApi(`/audit/events/export?${query.toString()}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Failed to export audit events');
+    }
+    return res.blob();
+  }
+
   async getTasks(): Promise<Task[]> {
     return this.request('/tasks');
   }

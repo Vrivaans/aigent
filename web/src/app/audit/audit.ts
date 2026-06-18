@@ -24,6 +24,7 @@ export class AuditComponent implements OnInit {
   limit = signal(50);
   offset = signal(0);
   isLoading = signal(false);
+  isExporting = signal(false);
 
   filters = {
     from: '',
@@ -53,16 +54,22 @@ export class AuditComponent implements OnInit {
     }
   }
 
-  private async fetchPage(offset: number): Promise<AuditEventsPage> {
-    const params: Record<string, string | number> = {
-      limit: this.limit(),
-      offset
-    };
+  private filterParams(): Record<string, string | number> {
+    const params: Record<string, string | number> = {};
     if (this.filters.from.trim()) params['from'] = this.filters.from.trim();
     if (this.filters.to.trim()) params['to'] = this.filters.to.trim();
     if (this.filters.actorUserId.trim()) params['actor_user_id'] = this.filters.actorUserId.trim();
     if (this.filters.action.trim()) params['action'] = this.filters.action.trim();
     if (this.filters.resourceType.trim()) params['resource_type'] = this.filters.resourceType.trim();
+    return params;
+  }
+
+  private async fetchPage(offset: number): Promise<AuditEventsPage> {
+    const params: Record<string, string | number> = {
+      limit: this.limit(),
+      offset,
+      ...this.filterParams()
+    };
     return this.api.getAuditEvents(params);
   }
 
@@ -97,5 +104,23 @@ export class AuditComponent implements OnInit {
       end: '' + end,
       total: '' + this.total()
     });
+  }
+
+  async exportCsv() {
+    this.isExporting.set(true);
+    try {
+      const blob = await this.api.exportAuditEventsCSV(this.filterParams());
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `audit-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export audit CSV:', err);
+      alert(this.t('audit.error_export'));
+    } finally {
+      this.isExporting.set(false);
+    }
   }
 }

@@ -9,6 +9,10 @@
 }
 
 .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
@@ -65,7 +69,7 @@
   align-items: end;
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary, .btn-secondary, .btn-export {
   padding: 10px 14px;
   border-radius: 10px;
   font-size: 0.85rem;
@@ -84,7 +88,13 @@
   color: #fff;
 }
 
-.btn-primary:disabled, .btn-secondary:disabled {
+.btn-export {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.btn-primary:disabled, .btn-secondary:disabled, .btn-export:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -55,6 +55,7 @@ Route enforcement added in `cmd/server/main.go` (slice `05-protect-admin-routes`
 | `POST/GET /api/rag/*` | `providers:write` (knowledge ingestion) |
 | `GET/POST/PATCH /api/admin/users*`, `GET /api/admin/roles` | **admin** role (`RequireRoleMiddleware`) |
 | `GET /api/audit/events` | `audit:read` |
+| `GET /api/audit/events/export?format=csv` | `audit:export` |
 
 ## Wildcard matching
 

@@ -4,6 +4,9 @@
       <h2 class="view-title">{{ t('audit.title') }}</h2>
       <p class="view-desc">{{ t('audit.desc') }}</p>
     </div>
+    <button type="button" class="btn-export" (click)="exportCsv()" [disabled]="isLoading() || isExporting()">
+      {{ isExporting() ? t('audit.exporting') : t('audit.btn_export') }}
+    </button>
   </div>
 
   <form class="filters-form" (ngSubmit)="applyFilters()">

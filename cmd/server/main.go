@@ -338,6 +338,8 @@ func main() {
 	auditHandler := &handlers.AuditHandler{}
 	auditRead := api.Group("", permRead("audit", "read"))
 	auditRead.Get("/audit/events", auditHandler.ListEvents)
+	auditExport := api.Group("", permRead("audit", "export"))
+	auditExport.Get("/audit/events/export", auditHandler.ExportEvents)
 
 	ragWrite := api.Group("", permWrite("providers", "write"))
 	ragWrite.Post("/rag/upload", handlers.UploadKnowledgeFile)
