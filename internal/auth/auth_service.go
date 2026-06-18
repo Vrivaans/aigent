@@ -15,10 +15,11 @@ type Claims struct {
 	UserID   uint     `json:"user_id"`
 	Username string   `json:"username"`
 	Roles    []string `json:"roles"`
+	TenantID uint     `json:"tenant_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uint, username string, roles []string) (string, error) {
+func GenerateToken(userID uint, username string, roles []string, tenantID uint) (string, error) {
 	if userID == 0 {
 		return "", errors.New("user_id is required")
 	}
@@ -33,6 +34,7 @@ func GenerateToken(userID uint, username string, roles []string) (string, error)
 		UserID:   userID,
 		Username: username,
 		Roles:    roles,
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},

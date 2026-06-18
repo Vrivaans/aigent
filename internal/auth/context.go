@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	localUserID   = "user_id"
-	localUsername = "username"
-	localRoles    = "roles"
+	localUserID    = "user_id"
+	localUsername  = "username"
+	localRoles     = "roles"
+	localTenantID  = "tenant_id"
 )
 
 // PermissionChecker resolves whether a user may perform resource/action.
@@ -21,6 +22,7 @@ func SetRequestUser(c *fiber.Ctx, claims *Claims) {
 	c.Locals(localUserID, claims.UserID)
 	c.Locals(localUsername, claims.Username)
 	c.Locals(localRoles, claims.Roles)
+	c.Locals(localTenantID, claims.TenantID)
 }
 
 // GetUserID returns the authenticated user id from Fiber locals.
@@ -44,6 +46,16 @@ func GetRoles(c *fiber.Ctx) []string {
 		return nil
 	}
 	return roles
+}
+
+// GetTenantID returns tenant_id from JWT claims stored in Fiber locals.
+func GetTenantID(c *fiber.Ctx) (uint, bool) {
+	v := c.Locals(localTenantID)
+	if v == nil {
+		return 0, false
+	}
+	id, ok := v.(uint)
+	return id, ok && id > 0
 }
 
 // enforcePermission writes JSON error responses when access is denied.

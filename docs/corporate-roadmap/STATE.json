@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "7-multi-tenant",
-  "current_slice": "20-tenant-model-migration",
+  "current_slice": "21-tenant-scoped-queries",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -23,10 +23,11 @@
     "16-scc-e2e-cache-test",
     "17-scc-provider-adapters",
     "18-mcp-manifest-format",
-    "19-mcp-catalog-ui"
+    "19-mcp-catalog-ui",
+    "20-tenant-model-migration"
   ],
-  "last_commit": "521f972",
-  "last_iteration_at": "2026-06-19T02:05:00Z",
+  "last_commit": "c3504a7",
+  "last_iteration_at": "2026-06-19T03:10:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

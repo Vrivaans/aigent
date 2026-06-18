@@ -43,7 +43,7 @@ func TestJWTUsesJWTSecretNotEncryptionKey(t *testing.T) {
 	t.Setenv("DB_ENCRYPTION_KEY", "12345678901234567890123456789012")
 	t.Setenv("JWT_SECRET", "dedicated_jwt_signing_secret")
 
-	token, err := GenerateToken(7, "alice", []string{"operator"})
+	token, err := GenerateToken(7, "alice", []string{"operator"}, 3)
 	if err != nil {
 		t.Fatalf("GenerateToken: %v", err)
 	}

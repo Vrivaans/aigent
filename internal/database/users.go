@@ -34,7 +34,13 @@ func SeedAdminUser(db *gorm.DB) error {
 		return fmt.Errorf("failed to hash admin password: %w", err)
 	}
 
+	var tenantID *uint
+	if id, err := DefaultTenantID(db); err == nil {
+		tenantID = &id
+	}
+
 	user := User{
+		TenantID:     tenantID,
 		Username:     adminUser,
 		PasswordHash: hash,
 		IsActive:     true,

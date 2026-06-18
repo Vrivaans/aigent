@@ -14,8 +14,11 @@ func openTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&User{}); err != nil {
+	if err := db.AutoMigrate(&Tenant{}, &User{}); err != nil {
 		t.Fatalf("automigrate User: %v", err)
+	}
+	if _, err := EnsureDefaultTenant(db); err != nil {
+		t.Fatalf("EnsureDefaultTenant: %v", err)
 	}
 	return db
 }

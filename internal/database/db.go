@@ -141,6 +141,13 @@ func RunMigrations(cfg Config) error {
 func autoMigrate(db *gorm.DB) error {
 	log.Println("Running AutoMigration for GORM models...")
 
+	if err := db.AutoMigrate(&Tenant{}); err != nil {
+		return err
+	}
+	if _, err := EnsureDefaultTenant(db); err != nil {
+		return err
+	}
+
 	// 1. Migrate LLMProvider first (base for Agent)
 	if err := db.AutoMigrate(&LLMProvider{}); err != nil {
 		return err
@@ -187,7 +194,7 @@ func autoMigrate(db *gorm.DB) error {
 	db.Exec(`SELECT setval('agents_id_seq', (SELECT COALESCE(MAX(id), 1) FROM agents));`)
 
 	// 4. Migrate the rest (Session, Rules, etc.)
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&Rule{},
 		&Task{},
 		&Session{},
@@ -204,7 +211,11 @@ func autoMigrate(db *gorm.DB) error {
 		&DocumentChunk{},
 		&AuditEvent{},
 		&ApprovalPolicy{},
-	)
+	); err != nil {
+		return err
+	}
+
+	return BackfillTenantIDs(db)
 }
 
 // SeedDefaultAgent ensures the "General" agent exists in the database
@@ -213,8 +224,13 @@ func SeedDefaultAgent(db *gorm.DB) error {
 	db.Model(&Agent{}).Where("id = ?", 1).Count(&count)
 	if count == 0 {
 		log.Println("Seeding default 'General' agent...")
+		var tenantID *uint
+		if id, err := DefaultTenantID(db); err == nil {
+			tenantID = &id
+		}
 		agent := Agent{
 			ID:          1,
+			TenantID:    tenantID,
 			Name:        "General",
 			Description: "Agente multipropósito con acceso completo a todas las herramientas configuradas.",
 			IsDefault:   true,

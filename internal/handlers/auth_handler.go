@@ -48,7 +48,15 @@ func HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 
-	token, err := auth.GenerateToken(user.ID, user.Username, roles)
+	tenantID, err := database.ResolveUserTenantID(database.DB, user)
+	if err != nil {
+		log.Printf("[login] failed to resolve tenant for user %d: %v", user.ID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Login failed",
+		})
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.Username, roles, tenantID)
 	if err != nil {
 		log.Printf("[login] GenerateToken error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

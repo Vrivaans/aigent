@@ -8,9 +8,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// Tenant groups users and core configuration for multi-tenant isolation.
+type Tenant struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	Slug      string    `gorm:"size:64;uniqueIndex;not null" json:"slug"`
+	Name      string    `gorm:"size:255;not null" json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // User represents a login account with optional RBAC roles.
 type User struct {
 	ID           uint      `gorm:"primarykey" json:"id"`
+	TenantID     *uint     `gorm:"index" json:"tenant_id,omitempty"`
+	Tenant       *Tenant   `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Username     string    `gorm:"size:255;uniqueIndex;not null" json:"username"`
 	PasswordHash string    `gorm:"type:text;not null" json:"-"`
 	IsActive     bool      `gorm:"not null;default:true" json:"is_active"`
@@ -62,6 +73,8 @@ type AuditEvent struct {
 // Agent represents a specialized AI persona with its own model and toolset
 type Agent struct {
 	ID            uint        `gorm:"primarykey" json:"id"`
+	TenantID      *uint       `gorm:"index" json:"tenant_id,omitempty"`
+	Tenant        *Tenant     `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Name          string      `gorm:"size:255;not null" json:"name"`
 	Description   string      `gorm:"type:text" json:"description"`
 	LLMProviderID *uint       `json:"llm_provider_id"`
@@ -123,6 +136,8 @@ type Rule struct {
 
 type Session struct {
 	ID                    uint         `gorm:"primarykey" json:"id"`
+	TenantID              *uint        `gorm:"index" json:"tenant_id,omitempty"`
+	Tenant                *Tenant      `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Title                 string       `gorm:"size:255;not null" json:"title"`
 	AgentID               uint         `gorm:"not null;default:1" json:"agent_id"`
 	Agent                 *Agent       `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
@@ -199,6 +214,8 @@ type ApprovalPolicy struct {
 
 type LLMProvider struct {
 	ID           uint           `gorm:"primarykey" json:"id"`
+	TenantID     *uint          `gorm:"index" json:"tenant_id,omitempty"`
+	Tenant       *Tenant        `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Name         string         `json:"name" gorm:"unique"`
 	BaseURL      string         `json:"base_url"`
 	APIKey       string         `json:"api_key"` // Encrypted
@@ -244,6 +261,8 @@ func ProviderPresetBaseURL(providerType string) string {
 // HandsAIConfig stores the connection settings for the real-world tool execution engine
 type HandsAIConfig struct {
 	ID        uint           `gorm:"primarykey" json:"id"`
+	TenantID  *uint          `gorm:"index" json:"tenant_id,omitempty"`
+	Tenant    *Tenant        `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Username  string         `json:"username" gorm:"uniqueIndex"`
 	URL       string         `json:"url"`
 	Token     string         `json:"token"` // Encrypted with AES-256 via DB_ENCRYPTION_KEY
