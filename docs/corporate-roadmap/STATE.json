@@ -5,7 +5,7 @@
   "status": "pending",
   "blockers": [],
   "completed": ["01-users-table", "02-roles-permissions-model"],
-  "last_commit": null,
+  "last_commit": "a8cde05",
   "last_iteration_at": "2026-06-18T22:07:25Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
