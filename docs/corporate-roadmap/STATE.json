@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "phase": "5-scc",
-  "current_slice": "17-scc-provider-adapters",
+  "phase": "6-mcp-catalog",
+  "current_slice": "18-mcp-manifest-format",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -20,10 +20,11 @@
     "13-approval-audit-link",
     "14-separate-jwt-encryption-keys",
     "15-secret-rotation-doc-env",
-    "16-scc-e2e-cache-test"
+    "16-scc-e2e-cache-test",
+    "17-scc-provider-adapters"
   ],
-  "last_commit": "a0e7e77",
-  "last_iteration_at": "2026-06-18T23:52:00Z",
+  "last_commit": "e278160",
+  "last_iteration_at": "2026-06-19T00:15:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

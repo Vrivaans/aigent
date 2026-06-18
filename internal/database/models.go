@@ -133,6 +133,9 @@ type Session struct {
 	ContextSummary        string       `gorm:"type:text" json:"context_summary,omitempty"`
 	SessionGoals          string       `gorm:"type:text" json:"session_goals,omitempty"`
 	WorkspacePath         string       `gorm:"size:512" json:"workspace_path,omitempty"`
+	Layer2Hash            string       `gorm:"size:64;index" json:"layer2_hash,omitempty"`
+	ProviderCacheID       string       `gorm:"size:512" json:"provider_cache_id,omitempty"`
+	CacheExpiresAt        *time.Time   `json:"cache_expires_at,omitempty"`
 	CreatedAt             time.Time    `json:"created_at"`
 	UpdatedAt             time.Time    `json:"updated_at"`
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"aigent/internal/database"
+	"aigent/internal/ai/cache"
 )
 
 func buildRuntimeMessages(systemPrompt string, chatHistory []ChatMessage, newUserMsg string) []ChatMessage {
@@ -196,54 +197,48 @@ func buildLayer2ContentFromSession(session database.Session, sessionFiles []data
 
 // Layer2SHA256 returns the full SHA-256 hex digest of Layer 2 content (cache invalidation key).
 func Layer2SHA256(session database.Session, sessionFiles []database.SessionFile, workspaceContent string) string {
-	content := buildLayer2Content(session, sessionFiles, workspaceContent)
+	return layer2HashFromContent(buildLayer2Content(session, sessionFiles, workspaceContent))
+}
+
+func layer2HashFromContent(content string) string {
+	if content == "" {
+		return ""
+	}
 	sum := sha256.Sum256([]byte(content))
 	return fmt.Sprintf("%x", sum)
 }
 
-func logLayer2Hash(cap2Content string, isAnthropic bool) {
+func logLayer2Hash(cap2Content string, plan cache.Layer2Plan) {
 	if cap2Content == "" {
 		return
 	}
 	h := sha256.Sum256([]byte(cap2Content))
-	log.Printf("🔒 SmartContextCache: Layer 2 SHA-256 Hash = %s | Anthropic Cache = %t", fmt.Sprintf("%x", h)[:8], isAnthropic)
+	log.Printf("🔒 SmartContextCache: Layer 2 SHA-256 Hash = %s | strategy = %s", fmt.Sprintf("%x", h)[:8], plan.Strategy)
 }
 
-// buildRuntimeMessagesWithCache compone los mensajes en tres capas jerárquicas y activa caching explícito si el proveedor es Anthropic.
+// buildRuntimeMessagesWithCache compone los mensajes en tres capas jerárquicas usando el plan del adaptador SCC.
 func buildRuntimeMessagesWithCache(
 	systemPrompt string,
-	session database.Session,
-	sessionFiles []database.SessionFile,
+	layer2Content string,
+	plan cache.Layer2Plan,
 	chatHistory []ChatMessage,
 	newUserMsg string,
-	providerName string,
 ) []ChatMessage {
 	var messages []ChatMessage
 
-	// Capa 1: Núcleo del Sistema (System prompt base)
-	// Contiene personalidad de AIgent,MCP Tools, y especificación de RuleGo.
 	messages = append(messages, ChatMessage{Role: "system", Content: systemPrompt})
 
-	cap2Content := buildLayer2ContentFromSession(session, sessionFiles)
-
-	// Inyectar Capa 2 como mensaje de sistema separado si tiene contenido
-	if cap2Content != "" {
-		providerLower := strings.ToLower(providerName)
-		isAnthropic := strings.Contains(providerLower, "anthropic") || strings.Contains(providerLower, "claude")
-
+	if layer2Content != "" && plan.IncludeInMessages {
 		var cc *CacheControl
-		if isAnthropic {
-			// Inyectar marca de control de caché efímero para Anthropic Claude
-			cc = &CacheControl{Type: "ephemeral"}
+		if plan.CacheControlType != "" {
+			cc = &CacheControl{Type: plan.CacheControlType}
 		}
-
 		messages = append(messages, ChatMessage{
 			Role:         "system",
-			Content:      "=== CONTEXTO DE SESIÓN Y ARCHIVOS DE CACHÉ ===\n" + cap2Content,
+			Content:      "=== CONTEXTO DE SESIÓN Y ARCHIVOS DE CACHÉ ===\n" + layer2Content,
 			CacheControl: cc,
 		})
-
-		logLayer2Hash(cap2Content, isAnthropic)
+		logLayer2Hash(layer2Content, plan)
 	}
 
 	// Capa 3: Cola de Historial Dinámico e Interacción (Alta Volatilidad)

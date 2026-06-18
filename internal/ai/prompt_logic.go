@@ -795,6 +795,7 @@ func sanitizeRecursive(val interface{}, argMap map[string]string) interface{} {
 
 // ProcessChatInteraction ejecuta The Brain Loop: Rules + Tools -> LLM -> Execution
 func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chatHistory []database.ChatMessage, newUserMsg string) (*ChoiceMessage, []database.ChatMessage, error) {
+	ctx = context.WithValue(ctx, "session_id", sessionID)
 	// 0. Obtener Sesión para saber el Agente asociado
 	var session database.Session
 	if err := database.DB.Preload("Agent").Preload("Agent.LLMProvider").Preload("Agent.Tools").First(&session, sessionID).Error; err != nil {
@@ -839,19 +840,34 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 		activeSess.AddMessage("user", newUserMsg, "", "")
 	}
 
+	// Cargar archivos de contexto de sesión
+	var sessionFiles []database.SessionFile
+	if err := database.DB.Where("session_id = ?", sessionID).Find(&sessionFiles).Error; err != nil {
+		log.Printf("⚠️ SmartContextCache: Failed to fetch session files for session #%d: %v", sessionID, err)
+	}
+
 	maxIterations := 5
 	for i := 0; i < maxIterations; i++ {
+		currentProvider := providerCandidates[activeProviderIdx]
+		defaultModel := modelForActiveProvider(&session, currentProvider)
+		apiKey, decErr := utils.Decrypt(currentProvider.APIKey, masterKey)
+		if decErr != nil {
+			return nil, nil, fmt.Errorf("no se pudo desencriptar API key del proveedor: %w", decErr)
+		}
+		sccPlan, layer2Content := b.prepareSCC(ctx, &session, sessionFiles, currentProvider, defaultModel, apiKey)
+
 		// Reconstruir la lista de mensajes optimizada y compactada en memoria para esta iteración
 		sessMsgs := activeSess.GetMessages()
-		runtimeMessages := buildRuntimeMessages(systemPrompt, sessMsgs, "")
+		runtimeMessages := buildRuntimeMessagesWithCache(systemPrompt, layer2Content, sccPlan, sessMsgs, "")
 		optimizedMessages := pruneMessagesInMemory(runtimeMessages, activeSess.ContextSummary)
 
 		log.Printf("🤖 [Iter %d/%d] Calling LLM with %d messages (optimized), %d tools", i+1, maxIterations, len(optimizedMessages), len(openRouterTools))
 
 		req := ChatCompletionRequest{
-			Model:    defaultModel,
-			Messages: optimizedMessages,
-			Tools:    openRouterTools,
+			Model:         defaultModel,
+			Messages:      optimizedMessages,
+			Tools:         openRouterTools,
+			CachedContent: sccPlan.CachedContentName,
 		}
 
 		// Debug: mostrar qué mensajes llevan de contexto al LLM en esta iteración
@@ -1172,6 +1188,7 @@ func getToolNames(tools []Tool) []string {
 }
 
 func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint, newUserMsg string, onEvent func(eventType string, data interface{})) (*ChoiceMessage, error) {
+	ctx = context.WithValue(ctx, "session_id", sessionID)
 	// 0. Obtener Sesión para saber el Agente asociado
 	var session database.Session
 	if err := database.DB.Preload("Agent").Preload("Agent.LLMProvider").Preload("Agent.Tools").First(&session, sessionID).Error; err != nil {
@@ -1216,6 +1233,12 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 		activeSess.AddMessage("user", newUserMsg, "", "")
 	}
 
+	// Cargar archivos de contexto de sesión
+	var sessionFiles []database.SessionFile
+	if err := database.DB.Where("session_id = ?", sessionID).Find(&sessionFiles).Error; err != nil {
+		log.Printf("⚠️ SmartContextCache: Failed to fetch session files for stream session #%d: %v", sessionID, err)
+	}
+
 	maxIterations := 5
 	var lastChoice *ChoiceMessage
 
@@ -1224,17 +1247,26 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 			log.Printf("⚠️ Stream: Context cancelled before starting iteration %d. Aborting.", i+1)
 			return nil, ctx.Err()
 		}
+		currentProvider := providerCandidates[activeProviderIdx]
+		defaultModel := modelForActiveProvider(&session, currentProvider)
+		apiKey, decErr := utils.Decrypt(currentProvider.APIKey, masterKey)
+		if decErr != nil {
+			return nil, fmt.Errorf("no se pudo desencriptar API key del proveedor: %w", decErr)
+		}
+		sccPlan, layer2Content := b.prepareSCC(ctx, &session, sessionFiles, currentProvider, defaultModel, apiKey)
+
 		// Reconstruir la lista de mensajes optimizada y compactada en memoria para esta iteración
 		sessMsgs := activeSess.GetMessages()
-		runtimeMessages := buildRuntimeMessages(systemPrompt, sessMsgs, "")
+		runtimeMessages := buildRuntimeMessagesWithCache(systemPrompt, layer2Content, sccPlan, sessMsgs, "")
 		optimizedMessages := pruneMessagesInMemory(runtimeMessages, activeSess.ContextSummary)
 
 		log.Printf("🤖 [Stream Iter %d/%d] Calling LLM with %d messages (optimized), %d tools", i+1, maxIterations, len(optimizedMessages), len(openRouterTools))
 
 		req := ChatCompletionRequest{
-			Model:    defaultModel,
-			Messages: optimizedMessages,
-			Tools:    openRouterTools,
+			Model:         defaultModel,
+			Messages:      optimizedMessages,
+			Tools:         openRouterTools,
+			CachedContent: sccPlan.CachedContentName,
 		}
 
 		streamBody, switchNotice, err := b.createChatCompletionStreamWithFallback(ctx, req, &session, providerCandidates, &activeProviderIdx, masterKey)

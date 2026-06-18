@@ -41,6 +41,7 @@ type ChatCompletionRequest struct {
 	Tools            []Tool        `json:"tools,omitempty"`
 	Stream           bool          `json:"stream,omitempty"`
 	IncludeReasoning bool          `json:"include_reasoning,omitempty"`
+	CachedContent    string        `json:"cached_content,omitempty"`
 }
 
 type CacheControl struct {

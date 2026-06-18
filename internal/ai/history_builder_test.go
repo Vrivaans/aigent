@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"aigent/internal/ai/cache"
 	"aigent/internal/database"
 )
 
@@ -71,7 +72,12 @@ func TestLayer2HashChangesWhenWorkspaceChanges(t *testing.T) {
 func TestBuildRuntimeMessagesWithCacheIncludesLayer2(t *testing.T) {
 	session := database.Session{SessionGoals: "test goals"}
 	files := []database.SessionFile{{Filename: "doc.md", Content: "hello"}}
-	msgs := buildRuntimeMessagesWithCache("sys", session, files, nil, "hi", "openai")
+	layer2 := buildLayer2Content(session, files, "")
+	plan := cache.Layer2Plan{
+		IncludeInMessages: true,
+		Strategy:          string(cache.FamilyPrefixStable),
+	}
+	msgs := buildRuntimeMessagesWithCache("sys", layer2, plan, nil, "hi")
 	if len(msgs) < 2 {
 		t.Fatalf("expected at least system + layer2, got %d messages", len(msgs))
 	}
