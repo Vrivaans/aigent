@@ -43,6 +43,22 @@ type UserRole struct {
 	RoleID uint `gorm:"primaryKey" json:"role_id"`
 }
 
+// AuditEvent is an append-only audit log row. Application code must not update or delete rows.
+type AuditEvent struct {
+	ID            uint      `gorm:"primarykey" json:"id"`
+	OccurredAt    time.Time `gorm:"not null;index" json:"occurred_at"`
+	ActorUserID   *uint     `gorm:"index" json:"actor_user_id,omitempty"`
+	Action        string    `gorm:"size:128;not null;index" json:"action"`
+	ResourceType  string    `gorm:"size:64;not null;index:idx_audit_resource,priority:1" json:"resource_type"`
+	ResourceID    string    `gorm:"size:64;not null;index:idx_audit_resource,priority:2" json:"resource_id"`
+	SessionID     *uint     `gorm:"index" json:"session_id,omitempty"`
+	IP            string    `gorm:"size:45" json:"ip,omitempty"`
+	UserAgent     string    `gorm:"type:text" json:"user_agent,omitempty"`
+	PayloadBefore *string   `gorm:"type:text" json:"payload_before,omitempty"`
+	PayloadAfter  *string   `gorm:"type:text" json:"payload_after,omitempty"`
+	CorrelationID string    `gorm:"size:64;index" json:"correlation_id,omitempty"`
+}
+
 // Agent represents a specialized AI persona with its own model and toolset
 type Agent struct {
 	ID            uint        `gorm:"primarykey" json:"id"`
