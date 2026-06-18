@@ -20,8 +20,13 @@ type CreateAgentRequest struct {
 }
 
 func (h *AgentHandler) GetAgents(c *fiber.Ctx) error {
+	db, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var agents []database.Agent
-	if err := database.DB.Preload("LLMProvider").Order("id asc").Find(&agents).Error; err != nil {
+	if err := db.Preload("LLMProvider").Order("id asc").Find(&agents).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	if len(agents) == 0 {
@@ -57,8 +62,11 @@ func (h *AgentHandler) GetAgents(c *fiber.Ctx) error {
 
 func (h *AgentHandler) GetAgent(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var agent database.Agent
-	if err := database.DB.Preload("Tools").Preload("LLMProvider").First(&agent, id).Error; err != nil {
+	agent, err := loadAgentForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+	if err := database.DB.Preload("Tools").Preload("LLMProvider").First(&agent, agent.ID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Agent not found"})
 	}
 	return c.JSON(agent)
@@ -70,17 +78,23 @@ func (h *AgentHandler) CreateAgent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid format"})
 	}
 
+	tenantID, err := requireTenantID(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	agent := database.Agent{
 		Name:          req.Name,
 		Description:   req.Description,
 		LLMProviderID: req.LLMProviderID,
+		TenantID:      database.TenantPtr(tenantID),
 	}
 	
 	if req.LLMProviderID != nil && *req.LLMProviderID == 0 {
 		agent.LLMProviderID = nil
 	}
 
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&agent).Error; err != nil {
 			return err
 		}
@@ -106,6 +120,10 @@ func (h *AgentHandler) CreateAgent(c *fiber.Ctx) error {
 
 func (h *AgentHandler) UpdateAgent(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if _, err := loadAgentForTenant(c, id); err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var req CreateAgentRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid format"})
@@ -160,6 +178,9 @@ func (h *AgentHandler) UpdateAgent(c *fiber.Ctx) error {
 
 func (h *AgentHandler) DeleteAgent(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if _, err := loadAgentForTenant(c, id); err != nil {
+		return respondFiberError(c, err)
+	}
 	if id == "1" {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Cannot delete General agent"})
 	}

@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"errors"
 	"strings"
 
 	"aigent/internal/auth"
 	"aigent/internal/database"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
 
 type UserHandler struct{}
@@ -55,8 +53,13 @@ func loadUserRoleNames(userID uint) ([]string, error) {
 }
 
 func (h *UserHandler) GetUsers(c *fiber.Ctx) error {
+	db, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var users []database.User
-	if err := database.DB.Order("username asc").Find(&users).Error; err != nil {
+	if err := db.Order("username asc").Find(&users).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -93,7 +96,13 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		isActive = *req.IsActive
 	}
 
+	tenantID, err := requireTenantID(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	user := database.User{
+		TenantID:     database.TenantPtr(tenantID),
 		Username:     username,
 		PasswordHash: hash,
 		IsActive:     isActive,
@@ -116,12 +125,9 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var user database.User
-	if err := database.DB.First(&user, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	user, err := loadUserForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	var req UpdateUserRequest
@@ -150,12 +156,9 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 func (h *UserHandler) UpdateUserRoles(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var user database.User
-	if err := database.DB.First(&user, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	user, err := loadUserForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	var req UpdateUserRolesRequest

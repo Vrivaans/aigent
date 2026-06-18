@@ -21,8 +21,11 @@ type HandsAIConfigRequest struct {
 
 func (h *ConfigHandler) GetHandsAIConfig(c *fiber.Ctx) error {
 	var config database.HandsAIConfig
-	// Use Unscoped to verify even if we used soft deletes previously.
-	if err := database.DB.Unscoped().First(&config).Error; err != nil {
+	db, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+	if err := db.Unscoped().First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return c.JSON(fiber.Map{
 				"url":          "",
@@ -57,9 +60,14 @@ func (h *ConfigHandler) UpdateHandsAIConfig(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "DB_ENCRYPTION_KEY must be 32 characters"})
 	}
 
+	tenantID, err := requireTenantID(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var config database.HandsAIConfig
-	// Use Unscoped to find even 'deleted' records and reuse (undelete) them
-	result := database.DB.Unscoped().First(&config)
+	db := database.ForTenant(database.DB, tenantID)
+	result := db.Unscoped().First(&config)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return c.Status(500).JSON(fiber.Map{"error": result.Error.Error()})
@@ -79,6 +87,7 @@ func (h *ConfigHandler) UpdateHandsAIConfig(c *fiber.Ctx) error {
 
 	var savedErr error
 	if result.Error == gorm.ErrRecordNotFound {
+		config.TenantID = database.TenantPtr(tenantID)
 		savedErr = database.DB.Create(&config).Error
 	} else {
 		// Reset DeletedAt if it was set (undeleting the record)
@@ -107,9 +116,11 @@ func (h *ConfigHandler) UpdateHandsAIConfig(c *fiber.Ctx) error {
 }
 
 func (h *ConfigHandler) DeleteHandsAIConfig(c *fiber.Ctx) error {
-	// Perform a HARD DELETE (Unscoped) to permanently remove the row from the database.
-	// This prevents unique key collisions on the 'username' field with 'ghost' soft-deleted rows.
-	if err := database.DB.Unscoped().Where("1 = 1").Delete(&database.HandsAIConfig{}).Error; err != nil {
+	db, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+	if err := db.Unscoped().Delete(&database.HandsAIConfig{}).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 

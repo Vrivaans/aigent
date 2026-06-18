@@ -60,6 +60,17 @@ func main() {
 		return database.UserHasPermission(database.DB, userID, resource, action)
 	}
 
+	auth.TenantResolver = func(userID uint, claimTenantID uint) (uint, error) {
+		if claimTenantID > 0 {
+			return claimTenantID, nil
+		}
+		var user database.User
+		if err := database.DB.First(&user, userID).Error; err != nil {
+			return database.DefaultTenantID(database.DB)
+		}
+		return database.ResolveUserTenantID(database.DB, &user)
+	}
+
 	// 3. Inicializar integraciones (HandsAI y LLM)
 	// La configuración de HandsAI viene EXCLUSIVAMENTE de la base de datos.
 	// No hay fallback a variables de entorno — debe configurarse desde la UI.
@@ -210,6 +221,7 @@ func main() {
 
 	// Protected routes (require JWT)
 	api.Use(auth.NewAuthMiddleware())
+	api.Use(auth.TenantMiddleware())
 
 	permRead := auth.RequirePermissionMiddleware
 	permWrite := auth.RequirePermissionMiddleware
@@ -286,6 +298,12 @@ func main() {
 	adminOnly.Post("/approval-policies", approvalPolicyHandler.Create)
 	adminOnly.Patch("/approval-policies/:id", approvalPolicyHandler.Update)
 	adminOnly.Delete("/approval-policies/:id", approvalPolicyHandler.Delete)
+
+	tenantHandler := &handlers.TenantHandler{}
+	adminOnly.Get("/tenants", tenantHandler.List)
+	adminOnly.Get("/tenants/:id", tenantHandler.Get)
+	adminOnly.Post("/tenants", tenantHandler.Create)
+	adminOnly.Patch("/tenants/:id", tenantHandler.Update)
 
 	configHandler := &handlers.ConfigHandler{Brain: brain}
 	mcpRead := api.Group("", permRead("mcp", "read"))

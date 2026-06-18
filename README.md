@@ -115,6 +115,10 @@ AIgent was designed for efficiency and security:
 
 1. **Why Go?**: Low latency and a small memory footprint compared to heavier runtimes. Most VPS resources go to agent reasoning and tool processing via HandsAI.
 2. **Proactive security (AES-256-GCM)**: Since we handle real credentials, we use dynamic symmetric encryption. API keys never live in plain text, even in fixed environment variables after initial setup. Session JWTs are signed with a separate `JWT_SECRET` (see `docs/corporate-roadmap/SECRETS.md`).
+
+### Corporate roadmap (complete)
+
+Phases 1–7 of the enterprise roadmap are implemented: RBAC, audit trail, approvals, secrets separation, Smart Context Cache, MCP catalog, and multi-tenant data isolation (`tenant_id` on core tables, JWT claims, scoped queries). See [docs/corporate-roadmap/ROADMAP.md](docs/corporate-roadmap/ROADMAP.md) and [docs/corporate-roadmap/STATE.json](docs/corporate-roadmap/STATE.json).
 3. **Chain-of-thought resilience**: Loop Resume detects pause states and resumes inference after human approval, so complex processes (e.g. "Create in Odoo → Create in Trello") are not lost.
 4. **Modular brain runtime**: Chat processing is split into prompt building, tool context, provider runtime, and tool execution modules to reduce coupling and ease evolution.
 

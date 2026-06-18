@@ -43,8 +43,13 @@ func HandleGetPrefilledProviders(c *fiber.Ctx) error {
 }
 
 func HandleListProviders(c *fiber.Ctx) error {
+	db, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var providers []database.LLMProvider
-	if err := database.DB.Find(&providers).Error; err != nil {
+	if err := db.Find(&providers).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -101,6 +106,11 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to encrypt API key"})
 	}
 
+	tenantID, err := requireTenantID(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	provider := database.LLMProvider{
 		Name:         req.Name,
 		BaseURL:      req.BaseURL,
@@ -108,6 +118,7 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 		DefaultModel: req.DefaultModel,
 		ProviderType: req.ProviderType,
 		IsEmbeddings: req.IsEmbeddings,
+		TenantID:     database.TenantPtr(tenantID),
 	}
 
 	if err := database.DB.Create(&provider).Error; err != nil {
@@ -128,12 +139,18 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 
 func HandleSetDefaultProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if _, err := loadProviderForTenant(c, id); err != nil {
+		return respondFiberError(c, err)
+	}
 
-	// Resetear otros defaults
-	database.DB.Model(&database.LLMProvider{}).Where("1 = 1").Update("is_default", false)
+	db, tenantID, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
 
-	// Marcar este como default
-	if err := database.DB.Model(&database.LLMProvider{}).Where("id = ?", id).Update("is_default", true).Error; err != nil {
+	db.Model(&database.LLMProvider{}).Where("tenant_id = ?", tenantID).Update("is_default", false)
+
+	if err := db.Model(&database.LLMProvider{}).Where("id = ?", id).Update("is_default", true).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -142,16 +159,16 @@ func HandleSetDefaultProvider(c *fiber.Ctx) error {
 
 func HandleUpdateProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
+	provider, err := loadProviderForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+	before := provider
+
 	var req ProviderRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid body"})
 	}
-
-	var provider database.LLMProvider
-	if err := database.DB.First(&provider, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
-	}
-	before := provider
 
 	provider.Name = strings.TrimSpace(req.Name)
 	provider.BaseURL = strings.TrimSpace(req.BaseURL)
@@ -194,9 +211,9 @@ func HandleUpdateProvider(c *fiber.Ctx) error {
 
 func HandleDeleteProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var provider database.LLMProvider
-	if err := database.DB.First(&provider, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
+	provider, err := loadProviderForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 	if err := database.DB.Delete(&database.LLMProvider{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -214,9 +231,9 @@ func HandleDeleteProvider(c *fiber.Ctx) error {
 func HandleTestProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	var provider database.LLMProvider
-	if err := database.DB.First(&provider, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
+	provider, err := loadProviderForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	masterKey, err := secrets.RequireDBEncryptionKey()
@@ -404,6 +421,9 @@ func fetchAndStoreModels(providerID uint, baseURL, apiKey, providerType string) 
 
 func HandleGetProviderModels(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if _, err := loadProviderForTenant(c, id); err != nil {
+		return respondFiberError(c, err)
+	}
 
 	var models []database.Model
 	if err := database.DB.Where("provider_id = ?", id).Order("is_free desc, model_id asc").Find(&models).Error; err != nil {
@@ -415,9 +435,9 @@ func HandleGetProviderModels(c *fiber.Ctx) error {
 func HandleRefreshProviderModels(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	var provider database.LLMProvider
-	if err := database.DB.First(&provider, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
+	provider, err := loadProviderForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	masterKey, err := secrets.RequireDBEncryptionKey()

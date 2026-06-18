@@ -18,13 +18,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupConfirmTestDB(t *testing.T) (*gorm.DB, uint, uint) {
+func setupConfirmTestDB(t *testing.T) (*gorm.DB, uint, uint, uint) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(
+		&database.Tenant{},
 		&database.User{},
 		&database.Agent{},
 		&database.Session{},
@@ -34,15 +35,21 @@ func setupConfirmTestDB(t *testing.T) (*gorm.DB, uint, uint) {
 		t.Fatalf("automigrate: %v", err)
 	}
 
-	operator := database.User{Username: "operator1", PasswordHash: "x", IsActive: true}
+	tenant := database.Tenant{Slug: "default", Name: "Default"}
+	if err := db.Create(&tenant).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	tid := database.TenantPtr(tenant.ID)
+
+	operator := database.User{Username: "operator1", PasswordHash: "x", IsActive: true, TenantID: tid}
 	if err := db.Create(&operator).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	agent := database.Agent{Name: "General", IsDefault: true}
+	agent := database.Agent{Name: "General", IsDefault: true, TenantID: tid}
 	if err := db.Create(&agent).Error; err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
-	session := database.Session{Title: "Test", AgentID: agent.ID}
+	session := database.Session{Title: "Test", AgentID: agent.ID, TenantID: tid}
 	if err := db.Create(&session).Error; err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -75,11 +82,11 @@ func setupConfirmTestDB(t *testing.T) (*gorm.DB, uint, uint) {
 		database.DB = nil
 	})
 
-	return db, operator.ID, toReject.ID
+	return db, tenant.ID, operator.ID, toReject.ID
 }
 
 func TestHandleConfirmRejectSetsResolver(t *testing.T) {
-	db, operatorID, pendingID := setupConfirmTestDB(t)
+	db, tenantID, operatorID, pendingID := setupConfirmTestDB(t)
 	handler := &handlers.ChatHandler{}
 
 	app := fiber.New()
@@ -88,6 +95,7 @@ func TestHandleConfirmRejectSetsResolver(t *testing.T) {
 			UserID:   operatorID,
 			Username: "operator1",
 			Roles:    []string{"operator"},
+			TenantID: tenantID,
 		})
 		return c.Next()
 	})
@@ -147,6 +155,7 @@ func TestHandleConfirmAuditLinksChatMessage(t *testing.T) {
 		t.Fatalf("open sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(
+		&database.Tenant{},
 		&database.User{},
 		&database.Agent{},
 		&database.Session{},
@@ -157,15 +166,21 @@ func TestHandleConfirmAuditLinksChatMessage(t *testing.T) {
 		t.Fatalf("automigrate: %v", err)
 	}
 
-	operator := database.User{Username: "operator1", PasswordHash: "x", IsActive: true}
+	tenant := database.Tenant{Slug: "default", Name: "Default"}
+	if err := db.Create(&tenant).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	tid := database.TenantPtr(tenant.ID)
+
+	operator := database.User{Username: "operator1", PasswordHash: "x", IsActive: true, TenantID: tid}
 	if err := db.Create(&operator).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	agent := database.Agent{Name: "General", IsDefault: true}
+	agent := database.Agent{Name: "General", IsDefault: true, TenantID: tid}
 	if err := db.Create(&agent).Error; err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
-	session := database.Session{Title: "Audit link", AgentID: agent.ID}
+	session := database.Session{Title: "Audit link", AgentID: agent.ID, TenantID: tid}
 	if err := db.Create(&session).Error; err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -204,6 +219,7 @@ func TestHandleConfirmAuditLinksChatMessage(t *testing.T) {
 			UserID:   operator.ID,
 			Username: "operator1",
 			Roles:    []string{"operator"},
+			TenantID: tenant.ID,
 		})
 		return c.Next()
 	})
@@ -239,17 +255,23 @@ func TestHandleGetHistoryExposesResolver(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&database.Agent{}, &database.Session{}, &database.ChatMessage{}, &database.PendingAction{}); err != nil {
+	if err := db.AutoMigrate(&database.Tenant{}, &database.Agent{}, &database.Session{}, &database.ChatMessage{}, &database.PendingAction{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	database.DB = db
 	t.Cleanup(func() { database.DB = nil })
 
-	agent := database.Agent{Name: "General", IsDefault: true}
+	tenant := database.Tenant{Slug: "default", Name: "Default"}
+	if err := db.Create(&tenant).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	tid := database.TenantPtr(tenant.ID)
+
+	agent := database.Agent{Name: "General", IsDefault: true, TenantID: tid}
 	if err := db.Create(&agent).Error; err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
-	session := database.Session{Title: "History", AgentID: agent.ID}
+	session := database.Session{Title: "History", AgentID: agent.ID, TenantID: tid}
 	if err := db.Create(&session).Error; err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -281,6 +303,10 @@ func TestHandleGetHistoryExposesResolver(t *testing.T) {
 
 	handler := &handlers.ChatHandler{}
 	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{TenantID: tenant.ID})
+		return c.Next()
+	})
 	app.Get("/sessions/:id/chat", handler.HandleGetHistory)
 
 	req := httptest.NewRequest("GET", "/sessions/1/chat", nil)

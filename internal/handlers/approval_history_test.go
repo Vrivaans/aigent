@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"aigent/internal/auth"
 	"aigent/internal/database"
 	"aigent/internal/handlers"
 
@@ -20,18 +21,23 @@ func TestGetApprovalHistoryReturnsUsername(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&database.User{}, &database.Agent{}, &database.Session{}, &database.PendingAction{}); err != nil {
+	if err := db.AutoMigrate(&database.Tenant{}, &database.User{}, &database.Agent{}, &database.Session{}, &database.PendingAction{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
-	resolver := database.User{Username: "alice", PasswordHash: "x", IsActive: true}
+	tenant := database.Tenant{Slug: "default", Name: "Default"}
+	if err := db.Create(&tenant).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	tid := database.TenantPtr(tenant.ID)
+	resolver := database.User{Username: "alice", PasswordHash: "x", IsActive: true, TenantID: tid}
 	if err := db.Create(&resolver).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	agent := database.Agent{Name: "General", IsDefault: true}
+	agent := database.Agent{Name: "General", IsDefault: true, TenantID: tid}
 	if err := db.Create(&agent).Error; err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
-	session := database.Session{Title: "Done", AgentID: agent.ID}
+	session := database.Session{Title: "Done", AgentID: agent.ID, TenantID: tid}
 	if err := db.Create(&session).Error; err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -54,6 +60,10 @@ func TestGetApprovalHistoryReturnsUsername(t *testing.T) {
 
 	handler := &handlers.ChatHandler{}
 	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{TenantID: tenant.ID})
+		return c.Next()
+	})
 	app.Get("/approvals/history", handler.GetApprovalHistory)
 
 	req := httptest.NewRequest("GET", "/approvals/history", nil)

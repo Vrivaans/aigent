@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"aigent/internal/ai"
@@ -39,9 +40,9 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	}
 
 	// Validate Session
-	var session database.Session
-	if err := database.DB.First(&session, sessionID).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	session, err := loadSessionForTenant(c, sessionID)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	// Update title if it's the first message
@@ -144,9 +145,9 @@ func (h *ChatHandler) HandleChatStream(c *fiber.Ctx) error {
 	}
 
 	// Validate Session
-	var session database.Session
-	if err := database.DB.First(&session, sessionID).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	session, err := loadSessionForTenant(c, sessionID)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	// Update title if it's the first message
@@ -301,6 +302,11 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Action not found"})
 	}
 
+	session, err := loadSessionForTenantUint(c, pending.SessionID)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	if !req.Approved {
 		if err := resolvePendingAction(c, &pending, "REJECTED"); err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
@@ -422,11 +428,8 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 	emitApprovalAudit(c, "approval.approve", pending)
 
-	var session database.Session
-	if err := database.DB.First(&session, pending.SessionID).Error; err == nil {
-		if req.AlwaysAllow {
-			AutoSaveToolPermission(c, session.AgentID, tDef.Name)
-		}
+	if req.AlwaysAllow {
+		AutoSaveToolPermission(c, session.AgentID, tDef.Name)
 	}
 
 	// Guardamos el resultado de la tool para que el siguiente chat lo vea en contexto
@@ -518,6 +521,9 @@ type ChatMessageResponse struct {
 // GetHistory expone el chat de una sesion enriquecido con acciones pendientes
 func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
+	if _, err := loadSessionForTenant(c, sessionID); err != nil {
+		return respondFiberError(c, err)
+	}
 	var recentHistory []database.ChatMessage
 	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at desc").Limit(50).Find(&recentHistory).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -587,8 +593,13 @@ func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
 	excludeCron := c.Query("exclude_cron") == "true"
 	excludeWorkflows := c.Query("exclude_workflows") == "true"
 
+	query, _, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var sessions []database.Session
-	query := database.DB.Preload("Agent")
+	query = query.Preload("Agent")
 	if excludeCron {
 		query = query.Where("title NOT LIKE ?", "Cron: %")
 	}
@@ -603,9 +614,14 @@ func (h *ChatHandler) GetSessions(c *fiber.Ctx) error {
 
 // CreateSession crea una nueva sesión de chat mapeada por default al Agent 1 (General)
 func (h *ChatHandler) CreateSession(c *fiber.Ctx) error {
+	tenantID, err := requireTenantID(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
 	session := database.Session{
-		Title:   "Nueva conversación",
-		AgentID: 1, // Por defecto al Agente General
+		Title:    "Nueva conversación",
+		AgentID:  1,
+		TenantID: database.TenantPtr(tenantID),
 	}
 	if err := database.DB.Create(&session).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create session"})
@@ -625,9 +641,9 @@ func (h *ChatHandler) UpdateSessionAgent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	var session database.Session
-	if err := database.DB.First(&session, id).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	session, err := loadSessionForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	session.AgentID = req.AgentID
@@ -642,9 +658,9 @@ func (h *ChatHandler) UpdateSessionAgent(c *fiber.Ctx) error {
 func (h *ChatHandler) ResetSessionLLMOverride(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	var session database.Session
-	if err := database.DB.First(&session, id).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Session not found"})
+	session, err := loadSessionForTenant(c, id)
+	if err != nil {
+		return respondFiberError(c, err)
 	}
 
 	if err := database.DB.Model(&database.Session{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
@@ -660,6 +676,9 @@ func (h *ChatHandler) ResetSessionLLMOverride(c *fiber.Ctx) error {
 // DeleteSession borra una sesión y sus datos asociados (Hard Delete)
 func (h *ChatHandler) DeleteSession(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if _, err := loadSessionForTenant(c, id); err != nil {
+		return respondFiberError(c, err)
+	}
 
 	// Usar Transacción para asegurar que todo se borre o nada
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -714,6 +733,9 @@ func processAndSaveArtifacts(sessionID uint, content string) (string, []database
 // GetSessionArtifacts retrieves all artifacts created within a session
 func (h *ChatHandler) GetSessionArtifacts(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
+	if _, err := loadSessionForTenant(c, sessionID); err != nil {
+		return respondFiberError(c, err)
+	}
 	var artifacts []database.Artifact
 	if err := database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Find(&artifacts).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -753,8 +775,16 @@ func buildPendingApprovalResponse(p database.PendingAction) PendingApprovalRespo
 
 // GetPendingApprovals retorna todas las aprobaciones pendientes del sistema
 func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
+	_, tenantID, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var pendings []database.PendingAction
-	if err := database.DB.Where("status = ?", "PENDING").Order("created_at desc").Find(&pendings).Error; err != nil {
+	if err := tenantPendingQuery(database.DB, tenantID).
+		Where("pending_actions.status = ?", "PENDING").
+		Order("pending_actions.created_at desc").
+		Find(&pendings).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -769,9 +799,17 @@ func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
 // GetApprovalHistory retorna aprobaciones resueltas recientes con el username del resolver.
 func (h *ChatHandler) GetApprovalHistory(c *fiber.Ctx) error {
 	const limit = 50
+	_, tenantID, err := scopedDB(c)
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+
 	var resolved []database.PendingAction
-	if err := database.DB.Where("status IN ?", []string{"APPROVED", "REJECTED"}).
-		Order("resolved_at desc").Limit(limit).Find(&resolved).Error; err != nil {
+	if err := tenantPendingQuery(database.DB, tenantID).
+		Where("pending_actions.status IN ?", []string{"APPROVED", "REJECTED"}).
+		Order("pending_actions.resolved_at desc").
+		Limit(limit).
+		Find(&resolved).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -812,6 +850,9 @@ func (h *ChatHandler) DeleteMessagesFrom(c *fiber.Ctx) error {
 	sessionID, err := c.ParamsInt("id")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid session ID"})
+	}
+	if _, err := loadSessionForTenant(c, strconv.Itoa(sessionID)); err != nil {
+		return respondFiberError(c, err)
 	}
 	messageID, err := c.ParamsInt("message_id")
 	if err != nil {
