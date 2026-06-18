@@ -114,7 +114,7 @@ AIgent acts as the agentic brain operating on top of HandsAI. It does not just e
 AIgent was designed for efficiency and security:
 
 1. **Why Go?**: Low latency and a small memory footprint compared to heavier runtimes. Most VPS resources go to agent reasoning and tool processing via HandsAI.
-2. **Proactive security (AES-256-GCM)**: Since we handle real credentials, we use dynamic symmetric encryption. API keys never live in plain text, even in fixed environment variables after initial setup.
+2. **Proactive security (AES-256-GCM)**: Since we handle real credentials, we use dynamic symmetric encryption. API keys never live in plain text, even in fixed environment variables after initial setup. Session JWTs are signed with a separate `JWT_SECRET` (see `docs/corporate-roadmap/SECRETS.md`).
 3. **Chain-of-thought resilience**: Loop Resume detects pause states and resumes inference after human approval, so complex processes (e.g. "Create in Odoo → Create in Trello") are not lost.
 4. **Modular brain runtime**: Chat processing is split into prompt building, tool context, provider runtime, and tool execution modules to reduce coupling and ease evolution.
 
@@ -248,7 +248,7 @@ See `docs/smart-context-cache-specification.md` for the full technical design (p
 
 ### Deployment Steps
 
-1. **Configuration**: Copy the example file and set your `DB_ENCRYPTION_KEY` (a 32-character random string) plus `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+1. **Configuration**: Copy the example file and set `DB_ENCRYPTION_KEY` (exactly 32 characters for AES-256), `JWT_SECRET` (session signing, at least 16 characters), plus `ADMIN_USERNAME` and `ADMIN_PASSWORD`. See [docs/corporate-roadmap/SECRETS.md](docs/corporate-roadmap/SECRETS.md) for migration from older single-key setups.
    ```bash
    cp .env.example .env
    ```

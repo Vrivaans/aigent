@@ -6,8 +6,21 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func jwtParseWithKey(tokenString string, key []byte) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+	return nil, jwt.ErrTokenInvalidClaims
+}
+
 func TestGenerateAndValidateTokenWithClaims(t *testing.T) {
-	t.Setenv("DB_ENCRYPTION_KEY", "12345678901234567890123456789012")
+	setTestSecrets(t)
 
 	roles := []string{"admin", "operator"}
 	token, err := GenerateToken(42, "admin", roles)
@@ -31,7 +44,7 @@ func TestGenerateAndValidateTokenWithClaims(t *testing.T) {
 }
 
 func TestValidateTokenRejectsMissingUserID(t *testing.T) {
-	t.Setenv("DB_ENCRYPTION_KEY", "12345678901234567890123456789012")
+	setTestSecrets(t)
 
 	legacy := &Claims{
 		UserID:   0,
@@ -39,7 +52,7 @@ func TestValidateTokenRejectsMissingUserID(t *testing.T) {
 		Roles:    []string{},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, legacy)
-	tokenString, err := token.SignedString(jwtSecretKey())
+	tokenString, err := token.SignedString(JWTSecretKey())
 	if err != nil {
 		t.Fatalf("sign legacy token: %v", err)
 	}
@@ -49,7 +62,7 @@ func TestValidateTokenRejectsMissingUserID(t *testing.T) {
 }
 
 func TestGenerateTokenRequiresUserID(t *testing.T) {
-	t.Setenv("DB_ENCRYPTION_KEY", "12345678901234567890123456789012")
+	setTestSecrets(t)
 
 	if _, err := GenerateToken(0, "admin", nil); err == nil {
 		t.Fatal("expected error when user_id is zero")

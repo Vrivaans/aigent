@@ -31,11 +31,11 @@ func main() {
 		log.Println("Note: No .env file found, using system environment variables")
 	}
 
-	// 1.5 Validar llave de cifrado y credenciales
-	encryptionKey := os.Getenv("DB_ENCRYPTION_KEY")
-	if len(encryptionKey) != 32 {
-		log.Fatalf("FATAL: DB_ENCRYPTION_KEY must be exactly 32 characters long (for AES-256). Current length: %d", len(encryptionKey))
+	// 1.5 Validar secretos y credenciales
+	if err := auth.ValidateStartupSecrets(); err != nil {
+		log.Fatalf("FATAL: %v", err)
 	}
+	encryptionKey := os.Getenv("DB_ENCRYPTION_KEY")
 	adminUser := os.Getenv("ADMIN_USERNAME")
 	adminPass := os.Getenv("ADMIN_PASSWORD")
 	if adminUser == "" || adminPass == "" {

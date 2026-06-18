@@ -114,7 +114,7 @@ AIgent actúa como el cerebro agéntico que opera sobre HandsAI. No solo ejecuta
 AIgent fue diseñado pensando en eficiencia y seguridad:
 
 1. **¿Por qué Go?**: Baja latencia y mínima huella de memoria frente a runtimes más pesados. La mayor parte de los recursos del VPS se dedica al razonamiento del agente y al procesamiento de herramientas vía HandsAI.
-2. **Seguridad proactiva (AES-256-GCM)**: Al manejar credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano.
+2. **Seguridad proactiva (AES-256-GCM)**: Al manejar credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano. Los JWT de sesión se firman con un `JWT_SECRET` separado (ver `docs/corporate-roadmap/SECRETS.md`).
 3. **Resiliencia en el Chain-of-Thought**: Loop Resume detecta estados de pausa y reanuda la inferencia tras la aprobación humana, garantizando que procesos complejos no se pierdan.
 4. **Brain runtime modular**: El procesamiento del chat se divide en módulos de prompt, contexto de tools, runtime de proveedores y ejecución de tool-calls para reducir acoplamiento.
 
@@ -248,7 +248,7 @@ Ver `docs/smart-context-cache-specification.md` para el diseño técnico complet
 
 ### Pasos para el despliegue
 
-1. **Configuración**: Copiá el archivo de ejemplo y configurá tu `DB_ENCRYPTION_KEY` (cadena de 32 caracteres aleatorios) más `ADMIN_USERNAME` y `ADMIN_PASSWORD`.
+1. **Configuración**: Copiá el archivo de ejemplo y configurá `DB_ENCRYPTION_KEY` (exactamente 32 caracteres para AES-256), `JWT_SECRET` (firma de sesión, mínimo 16 caracteres), más `ADMIN_USERNAME` y `ADMIN_PASSWORD`. Ver [docs/corporate-roadmap/SECRETS.md](docs/corporate-roadmap/SECRETS.md) para migrar desde setups antiguos con una sola clave.
    ```bash
    cp .env.example .env
    ```

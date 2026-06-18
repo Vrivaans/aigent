@@ -2,14 +2,13 @@ package auth
 
 import (
 	"errors"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 func jwtSecretKey() []byte {
-	return []byte(os.Getenv("DB_ENCRYPTION_KEY"))
+	return JWTSecretKey()
 }
 
 type Claims struct {

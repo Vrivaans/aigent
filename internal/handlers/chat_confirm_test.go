@@ -142,7 +142,7 @@ func TestHandleConfirmRejectSetsResolver(t *testing.T) {
 }
 
 func TestHandleConfirmAuditLinksChatMessage(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

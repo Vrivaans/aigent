@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "4-secrets",
-  "current_slice": "14-separate-jwt-encryption-keys",
+  "current_slice": "15-secret-rotation-doc-env",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -17,10 +17,11 @@
     "10-audit-export-endpoint",
     "11-approval-actor-id",
     "12-approval-policies-basic",
-    "13-approval-audit-link"
+    "13-approval-audit-link",
+    "14-separate-jwt-encryption-keys"
   ],
-  "last_commit": "47d83a8",
-  "last_iteration_at": "2026-06-18T22:44:40Z",
+  "last_commit": "ba37b27",
+  "last_iteration_at": "2026-06-18T23:00:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",
