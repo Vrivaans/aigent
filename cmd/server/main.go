@@ -269,6 +269,14 @@ func main() {
 	adminWrite.Put("/agents/:id", agentHandler.UpdateAgent)
 	adminWrite.Delete("/agents/:id", agentHandler.DeleteAgent)
 
+	userHandler := &handlers.UserHandler{}
+	adminOnly := api.Group("/admin", auth.RequireRoleMiddleware("admin"))
+	adminOnly.Get("/users", userHandler.GetUsers)
+	adminOnly.Post("/users", userHandler.CreateUser)
+	adminOnly.Patch("/users/:id", userHandler.UpdateUser)
+	adminOnly.Patch("/users/:id/roles", userHandler.UpdateUserRoles)
+	adminOnly.Get("/roles", userHandler.GetRoles)
+
 	configHandler := &handlers.ConfigHandler{Brain: brain}
 	mcpRead := api.Group("", permRead("mcp", "read"))
 	mcpWrite := api.Group("", permWrite("mcp", "write"))

@@ -18,6 +18,21 @@ export class AuthService {
     return localStorage.getItem(this.TOKEN_KEY);
   }
 
+  getRoles(): string[] {
+    const token = this.getToken();
+    if (!token) return [];
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return Array.isArray(payload.roles) ? payload.roles : [];
+    } catch {
+      return [];
+    }
+  }
+
+  hasRole(role: string): boolean {
+    return this.getRoles().includes(role);
+  }
+
   setToken(token: string) {
     localStorage.setItem(this.TOKEN_KEY, token);
     this.isLoggedIn.set(true);

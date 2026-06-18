@@ -176,6 +176,20 @@ export interface WorkflowRunResponse extends WorkflowRun {
   mermaid: string;
 }
 
+export interface AppUser {
+  id: number;
+  username: string;
+  is_active: boolean;
+  roles: string[];
+  created_at: string;
+}
+
+export interface AppRole {
+  id: number;
+  name: string;
+  description: string;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -440,6 +454,28 @@ export class ApiService {
   async deleteAgent(id: number) {
     return this.request(`/admin/agents/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  async getAdminUsers(): Promise<AppUser[]> {
+    return this.request('/admin/users');
+  }
+
+  async getAdminRoles(): Promise<AppRole[]> {
+    return this.request('/admin/roles');
+  }
+
+  async createAdminUser(data: { username: string; password: string; roles?: string[] }): Promise<AppUser> {
+    return this.request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateAdminUserRoles(userId: number, roles: string[]): Promise<AppUser> {
+    return this.request(`/admin/users/${userId}/roles`, {
+      method: 'PATCH',
+      body: JSON.stringify({ roles })
     });
   }
 

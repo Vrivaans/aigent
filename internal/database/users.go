@@ -62,3 +62,39 @@ func AuthenticateUser(db *gorm.DB, username, password string) (*User, error) {
 	}
 	return &user, nil
 }
+
+// SetUserRoles replaces all role assignments for a user.
+func SetUserRoles(db *gorm.DB, userID uint, roleNames []string) error {
+	if len(roleNames) == 0 {
+		return fmt.Errorf("at least one role is required")
+	}
+
+	var roles []Role
+	if err := db.Where("name IN ?", roleNames).Find(&roles).Error; err != nil {
+		return err
+	}
+	if len(roles) != len(roleNames) {
+		return fmt.Errorf("one or more roles were not found")
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userID).Delete(&UserRole{}).Error; err != nil {
+			return err
+		}
+		for _, role := range roles {
+			if err := tx.Create(&UserRole{UserID: userID, RoleID: role.ID}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ListRoles returns all roles ordered by name.
+func ListRoles(db *gorm.DB) ([]Role, error) {
+	var roles []Role
+	if err := db.Order("name asc").Find(&roles).Error; err != nil {
+		return nil, err
+	}
+	return roles, nil
+}

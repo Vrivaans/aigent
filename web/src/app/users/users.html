@@ -1,0 +1,88 @@
+<div class="users-panel">
+  <div class="panel-header">
+    <div class="header-main">
+      <h2 class="view-title">{{ t('users.title') }}</h2>
+      <p class="view-desc">{{ t('users.desc') }}</p>
+    </div>
+    <button class="btn-create" (click)="toggleCreateForm()" [disabled]="isSaving()">
+      {{ showCreateForm() ? t('users.btn_cancel') : t('users.btn_create') }}
+    </button>
+  </div>
+
+  @if (showCreateForm()) {
+    <form class="create-form" (ngSubmit)="createUser()">
+      <div class="form-row">
+        <label>{{ t('users.lbl_username') }}</label>
+        <input type="text" [(ngModel)]="newUser.username" name="username" required>
+      </div>
+      <div class="form-row">
+        <label>{{ t('users.lbl_password') }}</label>
+        <input type="password" [(ngModel)]="newUser.password" name="password" required>
+      </div>
+      <div class="form-row">
+        <label>{{ t('users.lbl_role') }}</label>
+        <select [(ngModel)]="newUser.role" name="role">
+          @for (r of roles(); track r.id) {
+            <option [value]="r.name">{{ r.name }}</option>
+          }
+        </select>
+      </div>
+      <button type="submit" class="btn-submit" [disabled]="isSaving()">
+        {{ t('users.btn_save') }}
+      </button>
+    </form>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner">⏳</span> {{ t('users.loading') }}
+    </div>
+  } @else {
+    <div class="users-table-wrap">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>{{ t('users.col_username') }}</th>
+            <th>{{ t('users.col_roles') }}</th>
+            <th>{{ t('users.col_status') }}</th>
+            <th>{{ t('users.col_actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+            <tr>
+              <td class="username-cell">{{ u.username }}</td>
+              <td>
+                <select
+                  [ngModel]="roleEdits()[u.id]"
+                  (ngModelChange)="setRoleEdit(u.id, $event)"
+                  [name]="'role-' + u.id">
+                  @for (r of roles(); track r.id) {
+                    <option [value]="r.name">{{ r.name }}</option>
+                  }
+                </select>
+              </td>
+              <td>
+                <span class="status-badge" [class.active]="u.is_active">
+                  {{ u.is_active ? t('users.status_active') : t('users.status_inactive') }}
+                </span>
+              </td>
+              <td>
+                <button
+                  class="btn-save-roles"
+                  (click)="saveUserRoles(u)"
+                  [disabled]="isSaving()">
+                  {{ t('users.btn_save_roles') }}
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty-cell">{{ t('users.empty') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

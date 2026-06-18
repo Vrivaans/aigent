@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "phase": "1-rbac",
-  "current_slice": "06-auth-ui-minimal",
+  "phase": "2-audit",
+  "current_slice": "07-audit-events-table",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -9,10 +9,11 @@
     "02-roles-permissions-model",
     "03-auth-jwt-claims",
     "04-rbac-middleware",
-    "05-protect-admin-routes"
+    "05-protect-admin-routes",
+    "06-auth-ui-minimal"
   ],
-  "last_commit": "e3cb239",
-  "last_iteration_at": "2026-06-18T22:15:47Z",
+  "last_commit": "dad6185",
+  "last_iteration_at": "2026-06-18T22:21:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

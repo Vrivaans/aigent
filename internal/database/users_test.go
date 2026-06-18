@@ -83,3 +83,33 @@ func TestAuthenticateUser(t *testing.T) {
 		t.Fatalf("expected ErrInvalidCredentials for unknown user, got %v", err)
 	}
 }
+
+func TestSetUserRoles(t *testing.T) {
+	t.Setenv("ADMIN_USERNAME", "admin")
+	t.Setenv("ADMIN_PASSWORD", "admin-pass")
+
+	db := openTestDB(t)
+	if err := db.AutoMigrate(&Role{}, &RolePermission{}, &UserRole{}); err != nil {
+		t.Fatalf("automigrate roles: %v", err)
+	}
+	if err := SeedRolesAndPermissions(db); err != nil {
+		t.Fatalf("SeedRolesAndPermissions: %v", err)
+	}
+
+	user := User{Username: "newop", PasswordHash: "hash", IsActive: true}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	if err := SetUserRoles(db, user.ID, []string{"operator"}); err != nil {
+		t.Fatalf("SetUserRoles: %v", err)
+	}
+
+	names, err := GetUserRoleNames(db, user.ID)
+	if err != nil {
+		t.Fatalf("GetUserRoleNames: %v", err)
+	}
+	if len(names) != 1 || names[0] != "operator" {
+		t.Fatalf("expected [operator], got %v", names)
+	}
+}
