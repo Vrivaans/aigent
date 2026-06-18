@@ -1,206 +1,280 @@
-# AIgent: El Orquestador de Agentes Digitales 🤖🚀
+# AIgent: The Digital Agent Orchestrator 🤖🚀
 
 [![Hackaton CubePath 2026](https://img.shields.io/badge/Hackaton-CubePath_2026-blueviolet?style=for-the-badge)](https://github.com/midudev/hackaton-cubepath-2026)
 [![Powered by Go](https://img.shields.io/badge/Powered_by-Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 [![Angular 21](https://img.shields.io/badge/Angular-21-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.io/)
 
-**AIgent** es un operador  diseñado para actuar como un puente seguro y resiliente entre el usuario y sus herramientas de trabajo (operando las tools de HandsAI principalmente). A diferencia de los chatbots tradicionales, AIgent no solo habla: **ejecuta**. El propósito es que el agente pueda operar herramientas de forma autónoma y segura, y que esas herramientas sean software de terceros.
+**English** · [Español](README-es.md)
+
+**AIgent** is an operator designed to act as a secure, resilient bridge between the user and their work tools (primarily HandsAI tools). Unlike traditional chatbots, AIgent does not just talk — it **executes**. The goal is for the agent to operate third-party software autonomously and safely.
 
 ---
 
-## 🎬 Demo y capturas
+## 🎬 Demo & Screenshots
 
 | | |
 |:--|:--|
-| **Video (YouTube)** | [Demo en vivo — ejecución de herramientas en tiempo real](https://youtu.be/N7zXwUHNL5k) |
+| **Video (YouTube)** | [Live demo — real-time tool execution](https://youtu.be/N7zXwUHNL5k) |
 
-### Interfaz y flujo principal
+### Main UI & Flow
 
-#### Chat: el agente ejecuta herramientas en tiempo real (filesystem)
+#### Chat: the agent executes tools in real time (filesystem)
 
-![Chat: el agente puede operar el filesystem](docs/img/vista%20chat%20puede%20operar%20filesystem.png)
+![Chat: the agent can operate the filesystem](docs/img/vista%20chat%20puede%20operar%20filesystem.png)
 
-#### Agentes especializados
+#### Specialized agents
 
-![Vista de agentes](docs/img/vista%20de%20agentes.png)
+![Agents view](docs/img/vista%20de%20agentes.png)
 
-#### Reglas para el comportamiento del agente
+#### Rules for agent behavior
 
-![Vista de reglas](docs/img/vista%20de%20reglas%20para%20agentes.png)
+![Rules view](docs/img/vista%20de%20reglas%20para%20agentes.png)
 
-#### Proveedores de LLM
+#### LLM providers
 
-![Vista de proveedores LLM](docs/img/vista%20de%20proveedores%20llm.png)
+![LLM providers view](docs/img/vista%20de%20proveedores%20llm.png)
 
-#### Catálogo de herramientas
+#### Tool catalog
 
-![Vista del catálogo de tools](docs/img/vista%20de%20tools.png)
+![Tool catalog view](docs/img/vista%20de%20tools.png)
 
-### Integración MCP (stdio y HTTP streamable)
+### MCP Integration (stdio & HTTP streamable)
 
-#### Nuevo servidor MCP stdio registrado y detectado
+#### New MCP stdio server registered and detected
 
-![Nuevo servidor MCP stdio detectado](docs/img/vista%20nuevo%20servidor%20mcp%20stdio%20-%20detectado.png)
+![New MCP stdio server detected](docs/img/vista%20nuevo%20servidor%20mcp%20stdio%20-%20detectado.png)
 
-#### Detección del servidor MCP stdio
+#### MCP stdio server detection
 
-![Detección del MCP server stdio](docs/img/vista%20detecta%20el%20mcp%20server%20stdio.png)
+![MCP stdio server detection](docs/img/vista%20detecta%20el%20mcp%20server%20stdio.png)
 
-#### Tools del MCP stdio (ejemplo: filesystem)
+#### MCP stdio tools (example: filesystem)
 
-![Tools MCP stdio — filesystem](docs/img/vista%20detecta%20tools%20mcp%20stdio%20-%20filesystem.png)
+![MCP stdio tools — filesystem](docs/img/vista%20detecta%20tools%20mcp%20stdio%20-%20filesystem.png)
 
-#### Servidor MCP streamable (HTTP)
+#### MCP streamable server (HTTP)
 
-![Detección MCP server streamable HTTP](docs/img/vista%20detecta%20mcp%20server%20streamable%20http.png)
+![MCP streamable HTTP server detection](docs/img/vista%20detecta%20mcp%20server%20streamable%20http.png)
 
-#### MCP streamable HTTP con Playwright
+#### MCP streamable HTTP with Playwright
 
 ![MCP streamable HTTP — Playwright](docs/img/vista%20detecta%20mcp%20stremablehttp%20-%20playwright.png)
 
-## 💡 El problema que resuelve
+---
 
-La mayoría de los agentes de IA saben *hablar*, pero no saben *hacer*.
-Conectar un LLM a sistemas reales —un CRM, un ERP, un gestor de tareas— requiere
-integraciones manuales, exponer credenciales al modelo, y lidiar con flujos que se
-rompen cuando algo falla a mitad del camino o muchos MCP servers.
+## 💡 The Problem It Solves
 
-**AIgent** resuelve esto en dos capas:
+Most AI agents know how to *talk*, but not how to *act*.
+Connecting an LLM to real systems — a CRM, an ERP, a task manager — requires manual integrations, exposing credentials to the model, and dealing with flows that break halfway through or across many MCP servers.
 
-### 🖐️ Capa de ejecución: HandsAI
-[HandsAI](https://vrivaans.github.io/handsai-presentation/) es el puente entre el
-agente y el mundo real. Registrás cualquier API REST una vez, y HandsAI la expone
-como herramienta MCP. El agente nunca ve URLs, tokens ni credenciales — HandsAI
-los inyecta de forma transparente en cada llamada y protege las respuestas contra
-inyecciones de prompt.
+**AIgent** solves this in two layers:
 
-> *Si AIgent es el cerebro, HandsAI son las manos.*
+### 🖐️ Execution layer: HandsAI
+[HandsAI](https://vrivaans.github.io/handsai-presentation/) is the bridge between the agent and the real world. Register any REST API once, and HandsAI exposes it as an MCP tool. The agent never sees URLs, tokens, or credentials — HandsAI injects them transparently on every call and protects responses against prompt injection.
 
-### 🧠 Capa de orquestación: AIgent
-AIgent actúa como el cerebro agéntico que opera sobre HandsAI. No solo ejecuta
-herramientas: encadena operaciones complejas entre sistemas distintos
-(ej: Odoo → Trello → Bluesky), gestiona las API Keys y Tokens de forma
-cifrada con AES-256-GCM, y nunca se detiene ante una confirmación sensible gracias
-al **Loop Resume** — un mecanismo que reanuda automáticamente el hilo de
-razonamiento del agente tras la aprobación humana.
+> *If AIgent is the brain, HandsAI is the hands.*
 
-### Los tres problemas que resuelve AIgent
-1. **Seguridad**: Las credenciales nunca viajan al modelo. Ni las de las APIs externas
-   (HandsAI) ni las de los proveedores de IA (AIgent).
-2. **Resiliencia**: Los flujos multi-paso no se pierden. El agente retoma exactamente
-   donde lo dejó tras una confirmación.
-3. **Orquestación**: Un solo agente puede operar herramientas de CRM, ERP y
-   productividad sin que el humano intervenga en cada paso.
+### 🧠 Orchestration layer: AIgent
+AIgent acts as the agentic brain operating on top of HandsAI. It does not just execute tools: it chains complex operations across different systems (e.g. Odoo → Trello → Bluesky), manages API keys and tokens encrypted with AES-256-GCM, and never stops at a sensitive confirmation thanks to **Loop Resume** — a mechanism that automatically resumes the agent's reasoning thread after human approval.
+
+### The three problems AIgent solves
+1. **Security**: Credentials never reach the model — neither external API credentials (HandsAI) nor AI provider keys (AIgent).
+2. **Resilience**: Multi-step flows are not lost. The agent picks up exactly where it left off after a confirmation.
+3. **Orchestration**: A single agent can operate CRM, ERP, and productivity tools without the human intervening at every step.
 
 ---
 
-## 🌟 Características Principales
+## 🌟 Key Features
 
-- **🛡️ Seguridad**: Almacenamiento de API Keys y Tokens del Bridge cifrado dinámicamente con **AES-256-GCM**. Tus llaves nunca se guardan en texto plano en la base de datos ni en archivos de configuración.
-- **⚙️ Configuración Dinámica**: Gestión de conexiones a proveedores (Groq, OpenRouter) y puentes (HandsAI) directamente desde la UI. Los cambios se aplican en caliente sin reiniciar el servidor.
-- **🔄 Resiliencia Agéntica (Loop Resume)**: El sistema nunca se detiene. Tras una confirmación de acción sensible, el agente reanuda automáticamente su hilo de pensamiento para completar flujos complejos (ej. Odoo -> Trello) sin intervención adicional.
-- **🔌 Ecosistema de Herramientas**: Integración nativa con **HandsAI** para ejecutar herramientas, permitiendo automatizar flujos reales de negocio con sincronización bajo demanda.
-- **🌟 Agentes Especializados**: Ya no dependés de un único bot monolítico. Podés crear múltiples Agentes con identidades propias, eligiendo qué herramientas exactas pueden acceder y con qué modelo o proveedor (Groq, OpenRouter) procesarán la información. Esto salva masivamente los costos limitando el uso de `Input Tokens` y mejora el enfoque (reduciendo alucinaciones).
-- **🎨 UX/UI**: Interfaz minimalista en **Angular 21** con visualización del flujo de pensamiento (logs de ejecución) y estados de razonamiento en tiempo real.
-- **⚙️ Backend de Alto Rendimiento**: Escrito íntegramente en **Go**, garantizando concurrencia, velocidad y bajo consumo de recursos.
-- **🔁 Fallback automático entre proveedores LLM**: Si la inferencia falla por cuota, rate limit, modelo no disponible u otros errores recuperables, el backend prueba **otros proveedores activos** en orden hasta que uno responda. Si el cambio tiene éxito, la sesión queda usando ese proveedor y el usuario ve un aviso en el chat.
-- **🔌 MCP stdio y MCP stream (HTTP / SSE)**: Además de **HandsAI**, podés registrar servidores MCP **locales** (proceso por stdin/stdout) y **remotos** (URL HTTP con transporte streamable, típicamente SSE). Las herramientas se exponen al agente con un prefijo por alias y se sincronizan junto al resto del catálogo.
-
-## 🏗️ Decisiones de Arquitectura
-
-En una competencia donde cada byte cuenta, AIgent ha sido diseñado pensando en la eficiencia y la seguridad:
-
-1.  **¿Por qué Go?**: Se eligió Go por su baja latencia y su mínima huella de memoria en comparación con otros lenguajes como Java. Esto permite que el **90% de los recursos del VPS** se dediquen exclusivamente al razonamiento del agente y al procesamiento pesado de herramientas mediante HandsAI.
-2.  **Seguridad Proactiva (AES-256-GCM)**: Dado que manejamos identidades y credenciales reales, implementamos cifrado simétrico dinámico. Las API Keys nunca residen en texto plano, ni siquiera en variables de entorno fijas después de su configuración inicial.
-3.  **Resiliencia en el Chain-of-Thought**: Implementamos una lógica de "Loop Resume" que detecta estados de pausa y reanuda la inferencia tras la aprobación humana. Esto garantiza que procesos complejos (ej: "Crear en Odoo -> Crear en Trello") no se pierdan en el tiempo.
-
----
-
-## 🔁 Resiliencia del proveedor LLM (fallback)
-
-Durante cada llamada al modelo, AIgent construye una **lista ordenada de candidatos**:
-
-1. **Override de la sesión** (si el usuario eligió otro proveedor/modelo para esa conversación).
-2. **Proveedor del agente** activo en el chat.
-3. **Proveedor marcado como default** en la pestaña de proveedores.
-
-El primero que aplique es el **preferido**; el resto de proveedores **activos** se añaden como respaldo (priorizando el que también esté marcado como default entre los secundarios).
-
-Si la API del preferido devuelve un error considerado **recuperable** (por ejemplo: cuota insuficiente, rate limit `429`, modelo no encontrado, clave inválida, `401`/`403`, etc.), el sistema **reintenta la misma petición** con el siguiente candidato, y así sucesivamente. Cuando un fallback **funciona**:
-
-- Se **persiste** en la base de datos un override de proveedor para esa sesión (y se limpia el override de modelo si había uno), de modo que los siguientes mensajes sigan usando el proveedor que respondió bien.
-- El frontend puede mostrar un mensaje del tipo *provider_fallback* indicando el cambio (proveedor y modelo anteriores → nuevos).
-
-Si el error **no** se considera recuperable, no hay cadena de fallback: se devuelve el error al usuario. Así se evita enmascarar fallos de validación o de red que no tienen sentido “saltar” a otro LLM.
+- **🛡️ Security**: API keys and bridge tokens are stored encrypted with **AES-256-GCM**. Keys are never saved in plain text in the database or config files.
+- **⚙️ Dynamic configuration**: Manage provider connections (Groq, OpenRouter, Gemini, etc.) and the HandsAI bridge directly from the UI. Changes apply hot without restarting the server.
+- **🔄 Agentic resilience (Loop Resume)**: After approving a sensitive action, the agent automatically resumes its reasoning thread to complete complex flows (e.g. Odoo → Trello) without extra intervention.
+- **🔐 Persistent tool permissions**: When approving a sensitive action, check **"Always allow"** to skip future prompts for that tool. Manage, pause, or revoke permissions from the dedicated **Permissions** tab.
+- **✅ Centralized approvals**: The **Approvals** tab lists pending confirmations across all sessions, so you can approve or reject actions without switching chats.
+- **🔌 Tool ecosystem**: Native **HandsAI** integration plus MCP stdio/stream servers and local **Python skills**. Tools sync on demand.
+- **🌟 Specialized agents**: Create multiple agents with their own identity, tool subset, and model/provider. The **General** agent always has access to the full tool registry. This reduces input token costs and improves focus.
+- **📡 SSE streaming**: Chat responses stream token by token via `POST /api/sessions/:id/chat/stream`, with real-time tool execution logs and **Mermaid** diagram rendering in the chat.
+- **⏹️ Stop generation**: Cancel an in-progress response at any time with the stop button.
+- **✏️ Prompt editing**: Edit a user message to truncate history from that point and retry with a revised prompt.
+- **🔁 Automatic LLM fallback**: If inference fails due to quota, rate limit, unavailable model, or other recoverable errors, the backend tries other active providers in order. On success, the session switches to the working provider and the user sees a notice in chat.
+- **🔌 MCP stdio & MCP stream (HTTP / SSE)**: Register **local** MCP servers (stdin/stdout process) and **remote** ones (HTTP streamable transport, typically SSE). Tools are prefixed by alias and synced with the rest of the catalog.
+- **📚 RAG / Knowledge base**: Upload documents, chunk them, generate embeddings with a designated provider, and store vectors in **pgvector**. Relevant chunks are automatically injected into the system prompt on each query.
+- **⚡ RuleGo workflows**: Create deterministic, schedulable workflows (RuleChain JSON) from the UI or via the agent. Visualize them as **Mermaid** diagrams and run them manually or on a cron schedule.
+- **🐍 Local Python skills**: Drop skill folders under `skills/` with a `metadata.json` and a script — they are loaded at startup and exposed as native tools.
+- **🧠 Invok memory & intents**: Core `invok_*` tools (knowledge save/search, intent mapping) are automatically injected into every agent context when HandsAI is configured.
+- **📅 Scheduled tasks**: Create cron tasks from the **Dashboard** UI or ask the agent to schedule them.
+- **🌐 Bilingual UI (EN / ES)**: Full interface translation via a dynamic translation service.
+- **🎨 UX/UI**: Minimalist **Angular 21** interface aligned with the Invok visual system, with reasoning states, session filtering (hide cron/workflow sessions), and per-session agent/model selection.
+- **⚙️ High-performance backend**: Written entirely in **Go**, with a modular brain runtime (`prompt_logic`, `provider_runtime`, `tool_context`, `session_manager`).
 
 ---
 
-## 🔌 Servidores MCP además de HandsAI
+## 🏗️ Architecture Decisions
 
-HandsAI sigue siendo la capa principal para APIs REST registradas, pero AIgent integra también **Model Context Protocol** de dos formas:
+AIgent was designed for efficiency and security:
 
-### MCP stdio (proceso local)
-
-- Configurás un **comando**, **argumentos** y **variables de entorno** (los secretos sensibles se guardan cifrados en base de datos).
-- El servidor arranca como subproceso y habla MCP por **stdin/stdout**.
-- Desde la UI/API: rutas bajo `/api/config/mcp-stdio` (listar, crear, editar, borrar y **probar conexión**).
-
-### MCP stream / HTTP (remoto, SSE)
-
-- Configurás una **URL base** y **cabeceras HTTP** opcionales (también con campos sensibles cifrados).
-- El cliente usa el transporte **HTTP streamable** habitual de MCP (muchas implementaciones usan **SSE**).
-- Opción `disable_standalone_sse` para entornos donde el servidor no expone SSE “standalone” y hay que ajustar el comportamiento del cliente.
-- Rutas API: `/api/config/mcp-stream` con las mismas operaciones CRUD y test que stdio.
-
-En ambos casos, tras guardar o actualizar una entrada, el backend **recarga integraciones** y **vuelve a sincronizar** el registro de herramientas para que el agente vea los nombres y esquemas actualizados. Las tools de MCP suelen aparecer con un **prefijo por alias** (p. ej. `mi_servidor_nombre_tool`) para no chocar con HandsAI ni entre servidores.
+1. **Why Go?**: Low latency and a small memory footprint compared to heavier runtimes. Most VPS resources go to agent reasoning and tool processing via HandsAI.
+2. **Proactive security (AES-256-GCM)**: Since we handle real credentials, we use dynamic symmetric encryption. API keys never live in plain text, even in fixed environment variables after initial setup.
+3. **Chain-of-thought resilience**: Loop Resume detects pause states and resumes inference after human approval, so complex processes (e.g. "Create in Odoo → Create in Trello") are not lost.
+4. **Modular brain runtime**: Chat processing is split into prompt building, tool context, provider runtime, and tool execution modules to reduce coupling and ease evolution.
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🔁 LLM Provider Resilience (Fallback)
 
-- **Frontend**: Angular 21 (Signals, Standalone Components, CSS Vanilla).
-- **Backend**: Go 1.22+ (Fiber, GORM).
-- **Base de Datos**: PostgreSQL (Almacenamiento persistente de sesiones y reglas).
-- **IA**: Orquestación agéntica mediante OpenRouter / Groq / Gemini.
-- **Infraestructura**: Docker & Docker Compose (Listo para **CubePath**).
+On each model call, AIgent builds an **ordered candidate list**:
+
+1. **Session override** (if the user chose another provider/model for that conversation).
+2. **Active agent's provider**.
+3. **Provider marked as default** in the providers tab.
+
+The first applicable entry is the **preferred** one; remaining **active** providers are added as backups (prioritizing the one also marked as default among secondaries).
+
+If the preferred API returns a **recoverable** error (insufficient quota, rate limit `429`, model not found, invalid key, `401`/`403`, etc.), the system **retries the same request** with the next candidate. When a fallback **succeeds**:
+
+- A provider override is **persisted** in the database for that session (and any model override is cleared), so subsequent messages keep using the working provider.
+- The frontend may show a *provider_fallback* message indicating the switch (previous provider/model → new ones).
+
+Non-recoverable errors are returned directly — validation or network failures are not masked by switching LLMs. Fallback also applies to **streaming** requests.
 
 ---
 
-## 🚀 Instalación y Despliegue
+## 🔌 MCP Servers Beyond HandsAI
 
-### Requisitos Previos
-- Docker y Docker Compose instalados.
-- Un navegador moderno.
+HandsAI remains the main layer for registered REST APIs, but AIgent also integrates **Model Context Protocol** in two ways:
 
-### Pasos para el Despliegue
-1. **Configuración**: Copia el archivo de ejemplo y configura tu `DB_ENCRYPTION_KEY` (una cadena de 32 caracteres aleatorios).
+### MCP stdio (local process)
+
+- Configure a **command**, **arguments**, and **environment variables** (sensitive secrets are stored encrypted in the database).
+- The server starts as a subprocess and speaks MCP over **stdin/stdout**.
+- UI/API routes under `/api/config/mcp-stdio` (list, create, edit, delete, and **test connection**).
+
+### MCP stream / HTTP (remote, SSE)
+
+- Configure a **base URL** and optional **HTTP headers** (sensitive fields encrypted).
+- The client uses the standard MCP **HTTP streamable** transport (many implementations use **SSE**).
+- `disable_standalone_sse` option for environments where the server does not expose standalone SSE.
+- API routes: `/api/config/mcp-stream` with the same CRUD and test operations as stdio.
+
+After saving or updating an entry, the backend **reloads integrations** and **re-syncs** the tool registry. MCP tools appear with an **alias prefix** (e.g. `my_server_tool_name`) to avoid collisions with HandsAI or other servers.
+
+---
+
+## 📚 Knowledge Base (RAG)
+
+AIgent includes a built-in retrieval layer powered by **pgvector**:
+
+1. **Upload documents** via `POST /api/rag/upload` (PDF, TXT, MD, HTML, etc.) with configurable chunk size and overlap.
+2. **Designate an embeddings provider** in the LLM Providers tab (`Embeddings Provider` checkbox). At least one active provider must be marked for embeddings.
+3. Chunks are embedded and stored in PostgreSQL with vector similarity search.
+4. On each user query, the backend retrieves the most relevant chunks and injects them into the system prompt under `=== RELEVANT KNOWLEDGE CONTEXT (RAG) ===`.
+5. Search manually via `GET/POST /api/rag/search`.
+
+The agent is instructed to answer directly from injected RAG context rather than calling search tools redundantly.
+
+---
+
+## ⚡ Deterministic Workflows (RuleGo)
+
+Beyond free-form agentic orchestration, AIgent integrates the **RuleGo** engine for repeatable, schedulable flows:
+
+- Create workflows from the **Workflows** tab or ask the agent to build one with the `save_workflow` tool.
+- Each workflow is a **RuleChain** JSON definition, visualized as a **Mermaid** diagram in the UI.
+- Run workflows manually or on a **cron** schedule; execution history is tracked per run.
+- Workflow-triggered chat sessions can be hidden from the sidebar (session filtering).
+
+The agent can call `get_workflow_guide` to learn the RuleChain schema and available tool nodes.
+
+---
+
+## 🐍 Local Python Skills
+
+Place skill folders under `skills/`, each containing:
+
+```
+skills/
+  my_skill/
+    metadata.json   # name, description, parameters schema, script filename, sensitive flag
+    my_skill.py     # executable script
+```
+
+Skills are scanned at startup and registered in the tool catalog. Example included: `skills/ping_host/`.
+
+---
+
+## ⚡ Smart Context Cache (SCC) — Experimental
+
+> **Status: implemented, not yet fully tested.** The feature is available in the UI and backend, but end-to-end validation (cache hits across providers, cost/latency gains, edge cases) is still pending.
+
+Smart Context Cache organizes each LLM request into three volatility layers to maximize **context caching** across providers (DeepSeek, Anthropic, Gemini, OpenAI, etc.):
+
+| Layer | Content | Volatility |
+|-------|---------|------------|
+| **Layer 1** | System prompt, tool contracts, RuleGo spec | Immutable (0%) |
+| **Layer 2** | Session goals, local workspace files, uploaded session files | Semi-static (low) |
+| **Layer 3** | Chat history and current user message | Dynamic (100%) |
+
+### What you can configure today (Layer 2)
+
+From the chat panel (⚡ toggle):
+
+- **Session goals** — focus instructions for the current conversation (e.g. *"Today we only refine unit tests"*).
+- **Local workspace** — path to a project directory, with a folder browser. Commands are sandboxed to stay within the workspace boundary.
+- **Session files** — upload PDF, HTML, TXT, MD, JSON, CSV, or XLSX files attached to the session context.
+
+API endpoints: `POST /api/sessions/:id/goals`, `POST /api/sessions/:id/workspace`, `POST/GET/DELETE /api/sessions/:id/files`, `GET /api/workspace/browse`.
+
+See `docs/smart-context-cache-specification.md` for the full technical design (provider-specific cache adapters, deterministic hashing, tail compacting, etc.).
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Angular 21 (Signals, Standalone Components, vanilla CSS).
+- **Backend**: Go 1.25+ (Fiber, GORM).
+- **Database**: PostgreSQL with **pgvector** (`pgvector/pgvector:pg15`).
+- **AI**: Agentic orchestration via OpenRouter / Groq / Gemini and other OpenAI-compatible providers.
+- **Workflows**: RuleGo engine with Mermaid visualization.
+- **RAG**: LangChainGo document parsing + pgvector similarity search.
+- **Infrastructure**: Docker & Docker Compose (ready for **CubePath**).
+
+---
+
+## 🚀 Installation & Deployment
+
+### Prerequisites
+- Docker and Docker Compose installed.
+- A modern browser.
+
+### Deployment Steps
+
+1. **Configuration**: Copy the example file and set your `DB_ENCRYPTION_KEY` (a 32-character random string) plus `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
    ```bash
    cp .env.example .env
    ```
-2. **Levantar el Sistema**: Usa docker-compose para levantar el Backend, el Frontend y la Base de Datos.
+2. **Start the system**: Docker Compose builds and runs the app (API + Angular static files) and the database.
    ```bash
    docker-compose up -d --build
    ```
-3. **Acceso**:
-   - Frontend: `http://localhost:4200`
-   - API: `http://localhost:8080`
+3. **Access**:
+   - **Production (Docker)**: `http://localhost:3000` (API and UI on the same port)
+   - **Local development**: Angular dev server at `http://localhost:4200` (proxied to the Go API on `:3000`)
 
 ---
 
-## 📖 Cómo Funciona
+## 📖 How It Works
 
-1. **Configura tu Cerebro**: Ve a la pestaña "Proveedores de LLM" y añade **varios** proveedores si querés redundancia: el primero que corresponda al agente o al default se usa, y el resto actúa como **fallback** automático si el primero falla por cuota, modelo no disponible, etc. AIgent probará la conexión y guardará las llaves cifradas.
-2. **Conecta tus Manos**: En la misma sección, configura la URL y el Token de tu bridge **HandsAI**. Opcionalmente, en **MCP stdio** y **MCP stream**, registrá servidores adicionales (CLI locales o endpoints remotos) para ampliar el catálogo de herramientas.
-3. **Establece Reglas**: AIgent aprende cómo trabajar. Puedes definir reglas como *"Sé siempre conciso"* o *"Valida el ID de Odoo antes de crear nada"*.
-4. **Agentes y herramientas**: En "Agentes" definís qué modelo/proveedor usa cada personalidad y qué subconjunto de tools puede invocar; en el chat podés **volver al default del agente** si aplicaste un override o un fallback.
-5. **Automatiza**: Pide cosas complejas: *"Crea una tarea en Trello en el tablero de Hackatón, y luego regístrala también en el CRM de Odoo"*. Observa cómo AIgent encadena las herramientas, te pide confirmación solo para lo más crítico y sincroniza las capacidades en tiempo real.
+1. **Configure your brain**: In **LLM Providers**, add one or more providers for redundancy. Mark one as **default** and optionally one as **Embeddings Provider** for RAG. Use the model dropdown with refresh to pick models dynamically. Keys are encrypted after a successful connection test.
+2. **Connect your hands**: Configure the **HandsAI** bridge URL and token. Optionally register additional **MCP stdio** and **MCP stream** servers to expand the tool catalog.
+3. **Set rules**: Define behavioral rules like *"Always be concise"* or *"Validate the Odoo ID before creating anything"*.
+4. **Agents & tools**: In **Agents**, define each personality's model/provider and tool subset. Switch agents per session in chat. Reset LLM overrides if a fallback or manual override was applied.
+5. **Upload knowledge (RAG)**: Upload documents so the agent can answer from your data. Relevant chunks are injected automatically on each message.
+6. **Smart Context Cache (optional)**: Set session goals, point to a local workspace, and attach session files for long-running, context-heavy work. *Still pending full testing.*
+7. **Automate**: Ask for complex tasks — *"Create a Trello card on the Hackathon board and register it in Odoo"* — or create **scheduled tasks** and **RuleGo workflows** from the Dashboard / Workflows tabs.
+8. **Approve & permission**: Sensitive actions pause for confirmation. Check **Always allow** to persist permission, or manage all permissions from the **Permissions** tab. Pending actions across sessions appear in **Approvals**.
 
 ---
 
-## ⚠️ Nota sobre la elección del modelo
-> El rendimiento de AIgent depende directamente de las capacidades de razonamiento
-> del modelo configurado. Los modelos **menores de 100B parámetros** funcionan bien
-> para tareas simples y consultas directas, pero pueden tener dificultades para
-> encadenar flujos de ejecución complejos entre múltiples herramientas.
-> Para aprovechar al máximo la orquestación de AIgent se recomienda usar modelos
-> **de 100B parámetros o más**
+## ⚠️ Note on Model Selection
+
+> AIgent's performance depends directly on the reasoning capabilities of the configured model. Models **under 100B parameters** work well for simple tasks and direct queries, but may struggle to chain complex multi-tool execution flows. For full orchestration, models of **100B parameters or more** are recommended.
