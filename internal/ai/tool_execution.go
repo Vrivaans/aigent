@@ -14,14 +14,25 @@ type ContextKey string
 const IsScheduledTaskKey ContextKey = "is_scheduled_task"
 const AutoApproveToolsKey ContextKey = "auto_approve_tools"
 
+func (b *Brain) toolRequiresApproval(realName string) bool {
+	if tDef, exists := b.Registry.Get(realName); exists && tDef.Sensitive {
+		return true
+	}
+	matches, err := database.ToolMatchesApprovalPolicy(database.DB, realName)
+	if err != nil {
+		log.Printf("⚠️ approval policy check failed for %q: %v", realName, err)
+		return false
+	}
+	return matches
+}
+
 func (b *Brain) findSensitiveToolCall(ctx context.Context, toolCalls []ToolCall, sanitizedToOriginal map[string]string, agentID uint) *ToolCall {
 	for i, tc := range toolCalls {
 		realName, ok := sanitizedToOriginal[tc.Function.Name]
 		if !ok {
 			realName = tc.Function.Name
 		}
-		tDef, exists := b.Registry.Get(realName)
-		if !exists || !tDef.Sensitive {
+		if !b.toolRequiresApproval(realName) {
 			continue
 		}
 
@@ -41,8 +52,7 @@ func (b *Brain) findSensitiveToolCalls(ctx context.Context, toolCalls []ToolCall
 		if !ok {
 			realName = tc.Function.Name
 		}
-		tDef, exists := b.Registry.Get(realName)
-		if !exists || !tDef.Sensitive {
+		if !b.toolRequiresApproval(realName) {
 			continue
 		}
 
@@ -60,8 +70,7 @@ func (b *Brain) isToolCallSensitive(ctx context.Context, tc ToolCall, sanitizedT
 	if !ok {
 		realName = tc.Function.Name
 	}
-	tDef, exists := b.Registry.Get(realName)
-	if !exists || !tDef.Sensitive {
+	if !b.toolRequiresApproval(realName) {
 		return false
 	}
 	return !hasAutoAllowPermission(ctx, agentID, realName)

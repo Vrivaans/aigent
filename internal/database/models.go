@@ -183,6 +183,17 @@ type PendingAction struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
+// ApprovalPolicy defines when a tool pattern requires human approval beyond registry defaults.
+type ApprovalPolicy struct {
+	ID                uint      `gorm:"primarykey" json:"id"`
+	ToolPattern       string    `gorm:"size:255;not null;index" json:"tool_pattern"`
+	Environment       string    `gorm:"size:64;not null;default:*" json:"environment"`
+	RequiresApproval  bool      `gorm:"not null;default:true" json:"requires_approval"`
+	MinRole           string    `gorm:"size:64;not null;default:operator" json:"min_role"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
 type LLMProvider struct {
 	ID           uint           `gorm:"primarykey" json:"id"`
 	Name         string         `json:"name" gorm:"unique"`

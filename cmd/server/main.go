@@ -279,6 +279,12 @@ func main() {
 	adminOnly.Patch("/users/:id/roles", userHandler.UpdateUserRoles)
 	adminOnly.Get("/roles", userHandler.GetRoles)
 
+	approvalPolicyHandler := &handlers.ApprovalPolicyHandler{}
+	adminOnly.Get("/approval-policies", approvalPolicyHandler.List)
+	adminOnly.Post("/approval-policies", approvalPolicyHandler.Create)
+	adminOnly.Patch("/approval-policies/:id", approvalPolicyHandler.Update)
+	adminOnly.Delete("/approval-policies/:id", approvalPolicyHandler.Delete)
+
 	configHandler := &handlers.ConfigHandler{Brain: brain}
 	mcpRead := api.Group("", permRead("mcp", "read"))
 	mcpWrite := api.Group("", permWrite("mcp", "write"))

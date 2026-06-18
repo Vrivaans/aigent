@@ -6,6 +6,62 @@
     </div>
   </div>
 
+  @if (auth.hasRole('admin')) {
+    <section class="policies-section">
+      <div class="section-header">
+        <h3>{{ t('permissions.policies_title') }}</h3>
+        <p>{{ t('permissions.policies_desc') }}</p>
+      </div>
+
+      <form class="policy-form" (ngSubmit)="createPolicy()">
+        <input
+          type="text"
+          [(ngModel)]="newPolicyPattern"
+          name="toolPattern"
+          [placeholder]="t('permissions.policy_pattern_placeholder')"
+          class="policy-input"
+        />
+        <input
+          type="text"
+          [(ngModel)]="newPolicyEnvironment"
+          name="environment"
+          [placeholder]="t('permissions.policy_env_placeholder')"
+          class="policy-input policy-input-sm"
+        />
+        <input
+          type="text"
+          [(ngModel)]="newPolicyMinRole"
+          name="minRole"
+          [placeholder]="t('permissions.policy_role_placeholder')"
+          class="policy-input policy-input-sm"
+        />
+        <button type="submit" class="btn-create-policy" [disabled]="isSavingPolicy()">
+          {{ isSavingPolicy() ? t('permissions.policy_saving') : t('permissions.policy_add') }}
+        </button>
+      </form>
+
+      <div class="policies-list">
+        @for (policy of policies(); track policy.id) {
+          <div class="policy-row">
+            <div class="policy-info">
+              <span class="policy-pattern">{{ policy.tool_pattern }}</span>
+              <span class="policy-meta">
+                {{ t('permissions.policy_env_label', { env: policy.environment }) }}
+                ·
+                {{ t('permissions.policy_role_label', { role: policy.min_role }) }}
+              </span>
+            </div>
+            <button type="button" class="btn-revoke" (click)="deletePolicy(policy.id)">
+              {{ t('permissions.policy_delete') }}
+            </button>
+          </div>
+        } @empty {
+          <p class="policies-empty">{{ t('permissions.policies_empty') }}</p>
+        }
+      </div>
+    </section>
+  }
+
   @if (isLoading()) {
     <div class="loading-state">
       <span class="spinner">⏳</span> {{ t('permissions.loading') }}

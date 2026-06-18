@@ -203,6 +203,7 @@ func autoMigrate(db *gorm.DB) error {
 		&WorkflowRun{},
 		&DocumentChunk{},
 		&AuditEvent{},
+		&ApprovalPolicy{},
 	)
 }
 

@@ -190,6 +190,16 @@ export interface AppRole {
   description: string;
 }
 
+export interface ApprovalPolicy {
+  id: number;
+  tool_pattern: string;
+  environment: string;
+  requires_approval: boolean;
+  min_role: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AuditEvent {
   id: number;
   occurred_at: string;
@@ -498,6 +508,26 @@ export class ApiService {
       method: 'PATCH',
       body: JSON.stringify({ roles })
     });
+  }
+
+  async getApprovalPolicies(): Promise<ApprovalPolicy[]> {
+    return this.request('/admin/approval-policies');
+  }
+
+  async createApprovalPolicy(data: {
+    tool_pattern: string;
+    environment?: string;
+    requires_approval?: boolean;
+    min_role?: string;
+  }): Promise<ApprovalPolicy> {
+    return this.request('/admin/approval-policies', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteApprovalPolicy(id: number): Promise<{ status: string }> {
+    return this.request(`/admin/approval-policies/${id}`, { method: 'DELETE' });
   }
 
   async getAuditEvents(params: Record<string, string | number> = {}): Promise<AuditEventsPage> {
