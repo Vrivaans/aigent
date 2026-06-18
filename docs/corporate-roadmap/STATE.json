@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "5-scc",
-  "current_slice": "16-scc-e2e-cache-test",
+  "current_slice": "17-scc-provider-adapters",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -19,10 +19,11 @@
     "12-approval-policies-basic",
     "13-approval-audit-link",
     "14-separate-jwt-encryption-keys",
-    "15-secret-rotation-doc-env"
+    "15-secret-rotation-doc-env",
+    "16-scc-e2e-cache-test"
   ],
-  "last_commit": "41cfc8f",
-  "last_iteration_at": "2026-06-18T23:15:00Z",
+  "last_commit": "a0e7e77",
+  "last_iteration_at": "2026-06-18T23:52:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

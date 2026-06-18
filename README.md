@@ -204,7 +204,7 @@ Skills are scanned at startup and registered in the tool catalog. Example includ
 
 ## ⚡ Smart Context Cache (SCC) — Experimental
 
-> **Status: implemented, not yet fully tested.** The feature is available in the UI and backend, but end-to-end validation (cache hits across providers, cost/latency gains, edge cases) is still pending.
+> **Status: Layer 2 determinism validated (automated tests).** Live provider cache-hit metrics still require optional manual verification with Anthropic/OpenRouter. See [docs/corporate-roadmap/SCC-TEST-RESULTS.md](docs/corporate-roadmap/SCC-TEST-RESULTS.md).
 
 Smart Context Cache organizes each LLM request into three volatility layers to maximize **context caching** across providers (DeepSeek, Anthropic, Gemini, OpenAI, etc.):
 
@@ -269,7 +269,7 @@ See `docs/smart-context-cache-specification.md` for the full technical design (p
 3. **Set rules**: Define behavioral rules like *"Always be concise"* or *"Validate the Odoo ID before creating anything"*.
 4. **Agents & tools**: In **Agents**, define each personality's model/provider and tool subset. Switch agents per session in chat. Reset LLM overrides if a fallback or manual override was applied.
 5. **Upload knowledge (RAG)**: Upload documents so the agent can answer from your data. Relevant chunks are injected automatically on each message.
-6. **Smart Context Cache (optional)**: Set session goals, point to a local workspace, and attach session files for long-running, context-heavy work. *Still pending full testing.*
+6. **Smart Context Cache (optional)**: Set session goals, point to a local workspace, and attach session files for long-running, context-heavy work. Layer 2 hash stability is covered by automated tests; see [SCC-TEST-RESULTS.md](docs/corporate-roadmap/SCC-TEST-RESULTS.md).
 7. **Automate**: Ask for complex tasks — *"Create a Trello card on the Hackathon board and register it in Odoo"* — or create **scheduled tasks** and **RuleGo workflows** from the Dashboard / Workflows tabs.
 8. **Approve & permission**: Sensitive actions pause for confirmation. Check **Always allow** to persist permission, or manage all permissions from the **Permissions** tab. Pending actions across sessions appear in **Approvals**.
 

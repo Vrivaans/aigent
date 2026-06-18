@@ -204,7 +204,7 @@ Las skills se escanean al arranque y se registran en el catálogo de tools. Ejem
 
 ## ⚡ Smart Context Cache (SCC) — Experimental
 
-> **Estado: implementado, aún sin testear completamente.** La funcionalidad está disponible en la UI y el backend, pero falta validación end-to-end (cache hits entre proveedores, ganancias de costo/latencia, casos límite).
+> **Estado: determinismo de Capa 2 validado (tests automáticos).** Métricas de cache hit en proveedor real aún requieren verificación manual opcional con Anthropic/OpenRouter. Ver [docs/corporate-roadmap/SCC-TEST-RESULTS.md](docs/corporate-roadmap/SCC-TEST-RESULTS.md).
 
 Smart Context Cache organiza cada petición al LLM en tres capas de volatilidad para maximizar el **context caching** entre proveedores (DeepSeek, Anthropic, Gemini, OpenAI, etc.):
 
@@ -269,7 +269,7 @@ Ver `docs/smart-context-cache-specification.md` para el diseño técnico complet
 3. **Establecé reglas**: Definí reglas como *"Sé siempre conciso"* o *"Valida el ID de Odoo antes de crear nada"*.
 4. **Agentes y herramientas**: En **Agentes**, definí modelo/proveedor y subconjunto de tools por personalidad. Cambiá de agente por sesión en el chat. Reseteá overrides de LLM si hubo fallback o cambio manual.
 5. **Subí conocimiento (RAG)**: Cargá documentos para que el agente responda desde tus datos. Los fragmentos relevantes se inyectan automáticamente en cada mensaje.
-6. **Smart Context Cache (opcional)**: Configurá objetivos de sesión, apuntá a un workspace local y adjuntá archivos para trabajo de contexto extenso. *Aún pendiente de testeo completo.*
+6. **Smart Context Cache (opcional)**: Configurá objetivos de sesión, apuntá a un workspace local y adjuntá archivos para trabajo de contexto extenso. La estabilidad del hash de Capa 2 está cubierta por tests automáticos; ver [SCC-TEST-RESULTS.md](docs/corporate-roadmap/SCC-TEST-RESULTS.md).
 7. **Automatizá**: Pedí tareas complejas — *"Creá una tarea en Trello y registrála en Odoo"* — o creá **tasks programadas** y **workflows RuleGo** desde el Dashboard / pestaña Workflows.
 8. **Aprobá y gestioná permisos**: Las acciones sensibles pausan para confirmación. Marcá **Permitir siempre** para persistir el permiso, o administrá todo desde la pestaña **Permisos**. Las acciones pendientes de todas las sesiones aparecen en **Aprobaciones**.
 

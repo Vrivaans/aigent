@@ -43,12 +43,17 @@ type ChatCompletionRequest struct {
 	IncludeReasoning bool          `json:"include_reasoning,omitempty"`
 }
 
+type CacheControl struct {
+	Type string `json:"type"` // "ephemeral"
+}
+
 type ChatMessage struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"` // Convertimos content en texto para simplificar
-	Name       string     `json:"name,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	Role         string        `json:"role"`
+	Content      string        `json:"content"` // Convertimos content en texto para simplificar
+	Name         string        `json:"name,omitempty"`
+	ToolCallID   string        `json:"tool_call_id,omitempty"`
+	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
+	CacheControl *CacheControl `json:"cache_control,omitempty"`
 }
 
 // Tool definitions (estandar OpenAI usado por OpenRouter)
@@ -64,7 +69,8 @@ type ToolFunction struct {
 }
 
 type ChatCompletionResponse struct {
-	Choices []Choice `json:"choices"`
+	Choices []Choice    `json:"choices"`
+	Usage   *TokenUsage `json:"usage,omitempty"`
 }
 
 type Choice struct {
@@ -145,6 +151,8 @@ func (c *OpenRouterClient) CreateChatCompletion(ctx context.Context, req ChatCom
 			msg.Reasoning = msg.ReasoningContent
 		}
 	}
+
+	LogTokenUsage(req.Model, completion.Usage)
 
 	return &completion, nil
 }
