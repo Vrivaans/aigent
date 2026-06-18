@@ -97,18 +97,20 @@ func PermissionPayload(p database.ToolPermission) *string {
 }
 
 type approvalAuditPayload struct {
-	ID        uint   `json:"id"`
-	SessionID uint   `json:"session_id"`
-	ToolName  string `json:"tool_name"`
-	Status    string `json:"status"`
+	ID               uint   `json:"id"`
+	SessionID        uint   `json:"session_id"`
+	ToolName         string `json:"tool_name"`
+	Status           string `json:"status"`
+	ResolvedByUserID *uint  `json:"resolved_by_user_id,omitempty"`
 }
 
 func ApprovalPayload(p database.PendingAction) *string {
 	return jsonPtr(approvalAuditPayload{
-		ID:        p.ID,
-		SessionID: p.SessionID,
-		ToolName:  p.ToolName,
-		Status:    p.Status,
+		ID:               p.ID,
+		SessionID:        p.SessionID,
+		ToolName:         p.ToolName,
+		Status:           p.Status,
+		ResolvedByUserID: p.ResolvedByUserID,
 	})
 }
 

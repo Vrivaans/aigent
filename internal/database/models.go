@@ -170,15 +170,17 @@ type Artifact struct {
 }
 
 type PendingAction struct {
-	ID         uint           `gorm:"primarykey" json:"id"`
-	SessionID  uint           `json:"session_id"`
-	ToolName   string         `json:"tool_name"`
-	Arguments  string         `json:"arguments"` // JSON representation
-	ToolCallID string         `json:"tool_call_id"`
-	Status     string         `json:"status"` // pending, approved, rejected
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID               uint           `gorm:"primarykey" json:"id"`
+	SessionID        uint           `json:"session_id"`
+	ToolName         string         `json:"tool_name"`
+	Arguments        string         `json:"arguments"` // JSON representation
+	ToolCallID       string         `json:"tool_call_id"`
+	Status           string         `json:"status"` // PENDING, APPROVED, REJECTED
+	ResolvedByUserID *uint          `gorm:"index" json:"resolved_by_user_id,omitempty"`
+	ResolvedAt       *time.Time     `json:"resolved_at,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 type LLMProvider struct {

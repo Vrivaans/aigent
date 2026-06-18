@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "3-approvals",
-  "current_slice": "11-approval-actor-id",
+  "current_slice": "12-approval-policies-basic",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -14,10 +14,11 @@
     "07-audit-events-table",
     "08-audit-middleware",
     "09-audit-ui-readonly",
-    "10-audit-export-endpoint"
+    "10-audit-export-endpoint",
+    "11-approval-actor-id"
   ],
-  "last_commit": "bb80eb2",
-  "last_iteration_at": "2026-06-18T23:45:00Z",
+  "last_commit": "9aa16c1",
+  "last_iteration_at": "2026-06-18T23:55:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

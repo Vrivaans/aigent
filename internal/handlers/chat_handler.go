@@ -11,6 +11,7 @@ import (
 
 	"aigent/internal/ai"
 	"aigent/internal/audit"
+	"aigent/internal/auth"
 	"aigent/internal/database"
 	"aigent/internal/utils"
 
@@ -240,6 +241,18 @@ type ConfirmRequest struct {
 	AlwaysAllow bool `json:"always_allow"`
 }
 
+func resolvePendingAction(c *fiber.Ctx, pending *database.PendingAction, status string) error {
+	userID, ok := auth.GetUserID(c)
+	if !ok {
+		return fmt.Errorf("user context missing")
+	}
+	now := time.Now().UTC()
+	pending.Status = status
+	pending.ResolvedByUserID = &userID
+	pending.ResolvedAt = &now
+	return database.DB.Save(pending).Error
+}
+
 func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	id := c.Params("pending_id")
 	var req ConfirmRequest
@@ -253,8 +266,9 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 
 	if !req.Approved {
-		pending.Status = "REJECTED"
-		database.DB.Save(&pending)
+		if err := resolvePendingAction(c, &pending, "REJECTED"); err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		}
 		sessionID := pending.SessionID
 		audit.Emit(c, audit.Event{
 			Action:       "approval.reject",
@@ -364,8 +378,9 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 			Content:   "❌ Error al ejecutar la herramienta: " + err.Error(),
 		}
 		database.DB.Create(&sysMsg)
-		pending.Status = "REJECTED"
-		database.DB.Save(&pending)
+		if err := resolvePendingAction(c, &pending, "REJECTED"); err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		}
 
 		return c.JSON(fiber.Map{
 			"status": "error",
@@ -373,8 +388,9 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		})
 	}
 
-	pending.Status = "APPROVED"
-	database.DB.Save(&pending)
+	if err := resolvePendingAction(c, &pending, "APPROVED"); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
 	sessionID := pending.SessionID
 	audit.Emit(c, audit.Event{
 		Action:       "approval.approve",
@@ -473,6 +489,8 @@ type ChatMessageResponse struct {
 	RequiresConfirmation bool        `json:"requires_confirmation"`
 	PendingActionID      uint        `json:"pending_action_id"`
 	WaitingTool          interface{} `json:"waiting_tool"`
+	ResolvedByUserID     *uint       `json:"resolved_by_user_id,omitempty"`
+	ResolvedAt           *string     `json:"resolved_at,omitempty"`
 }
 
 // GetHistory expone el chat de una sesion enriquecido con acciones pendientes
@@ -492,10 +510,19 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 	var pendingActions []database.PendingAction
 	database.DB.Where("session_id = ? AND status = ?", sessionID, "PENDING").Find(&pendingActions)
 
+	var resolvedActions []database.PendingAction
+	database.DB.Where("session_id = ? AND status IN ?", sessionID, []string{"APPROVED", "REJECTED"}).Find(&resolvedActions)
+
 	// Mapa para búsqueda rápida por ToolCallID
 	pendingMap := make(map[string]database.PendingAction)
 	for _, p := range pendingActions {
 		pendingMap[p.ToolCallID] = p
+	}
+	resolvedMap := make(map[string]database.PendingAction)
+	for _, p := range resolvedActions {
+		if p.ToolCallID != "" {
+			resolvedMap[p.ToolCallID] = p
+		}
 	}
 
 	// Enriquecer mensajes
@@ -508,7 +535,7 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 			ChatMessage: msg,
 		}
 
-		// Si el mensaje tiene tool calls, ver si alguno está pendiente
+		// Si el mensaje tiene tool calls, ver si alguno está pendiente o resuelto
 		if msg.Role == "assistant" && msg.RawToolCalls != "" {
 			var tCalls []ai.ToolCall
 			if err := json.Unmarshal([]byte(msg.RawToolCalls), &tCalls); err == nil {
@@ -518,6 +545,12 @@ func (h *ChatHandler) HandleGetHistory(c *fiber.Ctx) error {
 						response[i].PendingActionID = p.ID
 						response[i].WaitingTool = tc
 						break // Solo soportamos una acción pendiente por mensaje por ahora
+					}
+					if p, ok := resolvedMap[tc.ID]; ok && p.ResolvedByUserID != nil {
+						resolvedAt := p.ResolvedAt.UTC().Format(time.RFC3339)
+						response[i].ResolvedByUserID = p.ResolvedByUserID
+						response[i].ResolvedAt = &resolvedAt
+						break
 					}
 				}
 			}
