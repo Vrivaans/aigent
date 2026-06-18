@@ -54,6 +54,10 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	auth.PermissionChecker = func(userID uint, resource, action string) (bool, error) {
+		return database.UserHasPermission(database.DB, userID, resource, action)
+	}
+
 	// 3. Inicializar integraciones (HandsAI y LLM)
 	// La configuración de HandsAI viene EXCLUSIVAMENTE de la base de datos.
 	// No hay fallback a variables de entorno — debe configurarse desde la UI.
@@ -225,6 +229,14 @@ func main() {
 	api.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 	api.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
 	api.Get("/approvals", chatHandler.GetPendingApprovals)
+
+	// Smart Context Cache endpoints
+	api.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
+	api.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)
+	api.Post("/sessions/:id/files", handlers.UploadSessionFile)
+	api.Get("/sessions/:id/files", handlers.GetSessionFiles)
+	api.Delete("/sessions/:id/files/:file_id", handlers.DeleteSessionFile)
+	api.Get("/workspace/browse", handlers.BrowseWorkspaceDirectories)
 
 	// LLM Provider Management
 	agentHandler := &handlers.AgentHandler{Brain: brain}

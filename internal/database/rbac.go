@@ -116,6 +116,23 @@ func assignAdminRoleToBootstrapUser(db *gorm.DB) error {
 	return nil
 }
 
+// GetUserRoleNames returns role names assigned to a user.
+func GetUserRoleNames(db *gorm.DB, userID uint) ([]string, error) {
+	var roles []Role
+	err := db.Table("roles").
+		Joins("JOIN user_roles ON user_roles.role_id = roles.id").
+		Where("user_roles.user_id = ?", userID).
+		Find(&roles).Error
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(roles))
+	for _, role := range roles {
+		names = append(names, role.Name)
+	}
+	return names, nil
+}
+
 // UserHasPermission reports whether the user has the given resource/action via any assigned role.
 // Supports wildcard permissions: *:*, resource:*, *:action.
 func UserHasPermission(db *gorm.DB, userID uint, resource, action string) (bool, error) {

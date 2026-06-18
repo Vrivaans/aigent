@@ -17,10 +17,9 @@ func NewAuthMiddleware() fiber.Handler {
 			})
 		}
 
-		// Support "Bearer <token>"
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		_, err := ValidateToken(tokenString)
+		claims, err := ValidateToken(tokenString)
 		if err != nil {
 			log.Printf("⚠️ Unauthorized access attempt: invalid token for path %s. Error: %v", c.Path(), err)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -28,6 +27,7 @@ func NewAuthMiddleware() fiber.Handler {
 			})
 		}
 
+		SetRequestUser(c, claims)
 		return c.Next()
 	}
 }

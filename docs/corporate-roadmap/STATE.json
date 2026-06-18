@@ -1,12 +1,12 @@
 {
   "version": 1,
   "phase": "1-rbac",
-  "current_slice": "03-auth-jwt-claims",
+  "current_slice": "04-rbac-middleware",
   "status": "pending",
   "blockers": [],
-  "completed": ["01-users-table", "02-roles-permissions-model"],
-  "last_commit": "a8cde05",
-  "last_iteration_at": "2026-06-18T22:07:25Z",
+  "completed": ["01-users-table", "02-roles-permissions-model", "03-auth-jwt-claims"],
+  "last_commit": null,
+  "last_iteration_at": "2026-06-18T22:09:45Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

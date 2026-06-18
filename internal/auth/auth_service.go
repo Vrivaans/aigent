@@ -8,32 +8,44 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte(os.Getenv("DB_ENCRYPTION_KEY"))
+func jwtSecretKey() []byte {
+	return []byte(os.Getenv("DB_ENCRYPTION_KEY"))
+}
 
 type Claims struct {
-	Username string `json:"username"`
+	UserID   uint     `json:"user_id"`
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(username string) (string, error) {
+func GenerateToken(userID uint, username string, roles []string) (string, error) {
+	if userID == 0 {
+		return "", errors.New("user_id is required")
+	}
 	if username == "" {
 		return "", errors.New("username is required")
 	}
+	if roles == nil {
+		roles = []string{}
+	}
 
 	claims := &Claims{
+		UserID:   userID,
 		Username: username,
+		Roles:    roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(jwtSecretKey())
 }
 
 func ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		return jwtSecretKey(), nil
 	})
 
 	if err != nil {
@@ -41,6 +53,9 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	}
 
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		if claims.UserID == 0 {
+			return nil, errors.New("invalid token: missing user_id")
+		}
 		return claims, nil
 	}
 
