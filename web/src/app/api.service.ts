@@ -190,6 +190,27 @@ export interface AppRole {
   description: string;
 }
 
+export interface AuditEvent {
+  id: number;
+  occurred_at: string;
+  actor_user_id?: number;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  session_id?: number;
+  ip?: string;
+  correlation_id?: string;
+  payload_before?: string;
+  payload_after?: string;
+}
+
+export interface AuditEventsPage {
+  items: AuditEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -477,6 +498,17 @@ export class ApiService {
       method: 'PATCH',
       body: JSON.stringify({ roles })
     });
+  }
+
+  async getAuditEvents(params: Record<string, string | number> = {}): Promise<AuditEventsPage> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== '' && value !== undefined && value !== null) {
+        query.set(key, String(value));
+      }
+    }
+    const qs = query.toString();
+    return this.request(`/audit/events${qs ? `?${qs}` : ''}`);
   }
 
   async getTasks(): Promise<Task[]> {
@@ -776,5 +808,57 @@ export class ApiService {
       throw new Error(data.error || 'Failed to upload document');
     }
     return data;
+  }
+
+  // --- Smart Context Cache Endpoints ---
+  async updateSessionGoals(sessionId: number, goals: string): Promise<any> {
+    return this.request(`/sessions/${sessionId}/goals`, {
+      method: 'POST',
+      body: JSON.stringify({ goals })
+    });
+  }
+
+  async updateSessionWorkspace(sessionId: number, workspacePath: string): Promise<any> {
+    return this.request(`/sessions/${sessionId}/workspace`, {
+      method: 'POST',
+      body: JSON.stringify({ workspace_path: workspacePath })
+    });
+  }
+
+  async uploadSessionFile(sessionId: number, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = localStorage.getItem('aigent_token');
+    const headers: Record<string, string> = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/files`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to upload session file');
+    }
+    return data;
+  }
+
+  async getSessionFiles(sessionId: number): Promise<any[]> {
+    return this.request(`/sessions/${sessionId}/files`);
+  }
+
+  async deleteSessionFile(sessionId: number, fileId: number): Promise<any> {
+    return this.request(`/sessions/${sessionId}/files/${fileId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async browseWorkspace(path?: string): Promise<{ current_path: string, parent_path: string, directories: string[] }> {
+    const query = path ? `?path=${encodeURIComponent(path)}` : '';
+    return this.request(`/workspace/browse${query}`);
   }
 }

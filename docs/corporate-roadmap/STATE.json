@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "2-audit",
-  "current_slice": "09-audit-ui-readonly",
+  "current_slice": "10-audit-export-endpoint",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -12,10 +12,11 @@
     "05-protect-admin-routes",
     "06-auth-ui-minimal",
     "07-audit-events-table",
-    "08-audit-middleware"
+    "08-audit-middleware",
+    "09-audit-ui-readonly"
   ],
-  "last_commit": "155e82b",
-  "last_iteration_at": "2026-06-18T23:00:00Z",
+  "last_commit": "9670bb4",
+  "last_iteration_at": "2026-06-18T23:30:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

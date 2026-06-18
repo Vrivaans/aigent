@@ -12,17 +12,18 @@ import { PermissionsComponent } from './permissions/permissions';
 import { ApprovalsComponent } from './approvals/approvals';
 import { WorkflowsComponent } from './workflows/workflows';
 import { UsersComponent } from './users/users';
+import { AuditComponent } from './audit/audit';
 
 import { TranslationService } from './translation.service';
 
-export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'agents' | 'permissions' | 'approvals' | 'workflows' | 'users';
+export type Tab = 'chats' | 'dashboard' | 'rules' | 'providers' | 'tools' | 'agents' | 'permissions' | 'approvals' | 'workflows' | 'users' | 'audit';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule, Chat, Dashboard, RuleConfig, Providers, LoginComponent,
-    AgentsComponent, PermissionsComponent, ApprovalsComponent, WorkflowsComponent, UsersComponent
+    AgentsComponent, PermissionsComponent, ApprovalsComponent, WorkflowsComponent, UsersComponent, AuditComponent
   ],
   templateUrl: './app.html',
   styleUrl: './app.css'

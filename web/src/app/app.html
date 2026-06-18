@@ -87,6 +87,7 @@
           @else if (currentTab === 'approvals') { {{ t('tabs.approvals') }} }
           @else if (currentTab === 'workflows') { {{ t('tabs.workflows') }} }
           @else if (currentTab === 'users') { {{ t('tabs.users') }} }
+          @else if (currentTab === 'audit') { {{ t('tabs.audit') }} }
         </span>
       </div>
 
@@ -185,6 +186,17 @@
             {{ t('tabs.users') }}
           </button>
           }
+          @if (auth.canViewAudit()) {
+          <button [class.active]="currentTab === 'audit'" (click)="currentTab = 'audit'; isMenuOpen.set(false)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            {{ t('tabs.audit') }}
+          </button>
+          }
         </div>
       </div>
     </header>
@@ -270,6 +282,10 @@
       } @else if (currentTab === 'users') {
       <div class="feature-view">
         <app-users></app-users>
+      </div>
+      } @else if (currentTab === 'audit') {
+      <div class="feature-view">
+        <app-audit></app-audit>
       </div>
       }
     </div>

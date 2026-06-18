@@ -33,6 +33,10 @@ export class AuthService {
     return this.getRoles().includes(role);
   }
 
+  canViewAudit(): boolean {
+    return this.hasRole('admin') || this.hasRole('auditor');
+  }
+
   setToken(token: string) {
     localStorage.setItem(this.TOKEN_KEY, token);
     this.isLoggedIn.set(true);

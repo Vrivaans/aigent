@@ -1,0 +1,82 @@
+<div class="audit-panel">
+  <div class="panel-header">
+    <div class="header-main">
+      <h2 class="view-title">{{ t('audit.title') }}</h2>
+      <p class="view-desc">{{ t('audit.desc') }}</p>
+    </div>
+  </div>
+
+  <form class="filters-form" (ngSubmit)="applyFilters()">
+    <div class="form-row">
+      <label>{{ t('audit.filter_from') }}</label>
+      <input type="date" [(ngModel)]="filters.from" name="from">
+    </div>
+    <div class="form-row">
+      <label>{{ t('audit.filter_to') }}</label>
+      <input type="date" [(ngModel)]="filters.to" name="to">
+    </div>
+    <div class="form-row">
+      <label>{{ t('audit.filter_actor') }}</label>
+      <input type="number" min="1" [(ngModel)]="filters.actorUserId" name="actorUserId" [placeholder]="t('audit.filter_actor_ph')">
+    </div>
+    <div class="form-row">
+      <label>{{ t('audit.filter_action') }}</label>
+      <input type="text" [(ngModel)]="filters.action" name="action" [placeholder]="t('audit.filter_action_ph')">
+    </div>
+    <div class="form-row">
+      <label>{{ t('audit.filter_resource') }}</label>
+      <input type="text" [(ngModel)]="filters.resourceType" name="resourceType" [placeholder]="t('audit.filter_resource_ph')">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn-primary" [disabled]="isLoading()">{{ t('audit.btn_search') }}</button>
+      <button type="button" class="btn-secondary" (click)="clearFilters()" [disabled]="isLoading()">{{ t('audit.btn_clear') }}</button>
+    </div>
+  </form>
+
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner">⏳</span> {{ t('audit.loading') }}
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="audit-table">
+        <thead>
+          <tr>
+            <th>{{ t('audit.col_time') }}</th>
+            <th>{{ t('audit.col_action') }}</th>
+            <th>{{ t('audit.col_resource') }}</th>
+            <th>{{ t('audit.col_actor') }}</th>
+            <th>{{ t('audit.col_correlation') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of events(); track e.id) {
+            <tr>
+              <td>{{ e.occurred_at | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+              <td><code>{{ e.action }}</code></td>
+              <td><code>{{ e.resource_type }}/{{ e.resource_id }}</code></td>
+              <td>{{ e.actor_user_id ?? '—' }}</td>
+              <td class="corr-cell">{{ e.correlation_id || '—' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="empty-cell">{{ t('audit.empty') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <span class="page-info">{{ pageLabel() }}</span>
+      <div class="page-actions">
+        <button type="button" class="btn-secondary" (click)="prevPage()" [disabled]="offset() === 0 || isLoading()">
+          {{ t('audit.btn_prev') }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="nextPage()" [disabled]="offset() + limit() >= total() || isLoading()">
+          {{ t('audit.btn_next') }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

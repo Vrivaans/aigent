@@ -335,6 +335,10 @@ func main() {
 	permRoutesWrite.Delete("/permissions/:id", handlers.HandleDeletePermission)
 	permRoutesWrite.Post("/permissions/:id/pause", handlers.HandleTogglePausePermission)
 
+	auditHandler := &handlers.AuditHandler{}
+	auditRead := api.Group("", permRead("audit", "read"))
+	auditRead.Get("/audit/events", auditHandler.ListEvents)
+
 	ragWrite := api.Group("", permWrite("providers", "write"))
 	ragWrite.Post("/rag/upload", handlers.UploadKnowledgeFile)
 	ragWrite.Get("/rag/search", handlers.SearchKnowledge)

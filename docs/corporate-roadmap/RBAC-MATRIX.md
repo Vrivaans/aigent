@@ -54,6 +54,7 @@ Route enforcement added in `cmd/server/main.go` (slice `05-protect-admin-routes`
 | `POST/DELETE /api/tasks`, `POST/DELETE /api/rules`, workflow mutations | matching `:write` |
 | `POST/GET /api/rag/*` | `providers:write` (knowledge ingestion) |
 | `GET/POST/PATCH /api/admin/users*`, `GET /api/admin/roles` | **admin** role (`RequireRoleMiddleware`) |
+| `GET /api/audit/events` | `audit:read` |
 
 ## Wildcard matching
 
