@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -44,31 +46,46 @@ func GetRoles(c *fiber.Ctx) []string {
 	return roles
 }
 
-// RequirePermission checks DB-backed permissions for the current user.
-// Returns an error response via Fiber when denied; nil when allowed.
-func RequirePermission(c *fiber.Ctx, resource, action string) error {
+// enforcePermission writes JSON error responses when access is denied.
+// Returns true when the request may proceed.
+func enforcePermission(c *fiber.Ctx, resource, action string) bool {
 	userID, ok := GetUserID(c)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+		log.Printf("⚠️ RBAC denied: missing user context path=%s resource=%s action=%s", c.Path(), resource, action)
+		_ = c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Unauthorized: user context missing",
 		})
+		return false
 	}
 	if PermissionChecker == nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		_ = c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Permission checker not configured",
 		})
+		return false
 	}
 
 	allowed, err := PermissionChecker(userID, resource, action)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		_ = c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Permission check failed",
 		})
+		return false
 	}
 	if !allowed {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+		log.Printf("⚠️ RBAC denied: user_id=%d resource=%s action=%s path=%s", userID, resource, action, c.Path())
+		_ = c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Forbidden: insufficient permissions",
 		})
+		return false
 	}
-	return nil
+	return true
+}
+
+// RequirePermission checks DB-backed permissions for the current user.
+// Returns an error response via Fiber when denied; nil when allowed.
+func RequirePermission(c *fiber.Ctx, resource, action string) error {
+	if enforcePermission(c, resource, action) {
+		return nil
+	}
+	return fiber.ErrForbidden
 }

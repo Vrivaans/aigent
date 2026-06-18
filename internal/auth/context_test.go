@@ -63,3 +63,29 @@ func TestRequirePermission(t *testing.T) {
 		t.Fatalf("denied request: err=%v status=%d", err, denyResp.StatusCode)
 	}
 }
+
+func TestRequirePermissionReturnsForbiddenError(t *testing.T) {
+	PermissionChecker = func(userID uint, resource, action string) (bool, error) {
+		return false, nil
+	}
+	t.Cleanup(func() { PermissionChecker = nil })
+
+	app := fiber.New()
+	app.Get("/deny", func(c *fiber.Ctx) error {
+		SetRequestUser(c, &Claims{UserID: 1, Username: "u", Roles: []string{"viewer"}})
+		err := RequirePermission(c, "providers", "write")
+		if err == nil {
+			t.Fatal("expected forbidden error")
+		}
+		return err
+	})
+
+	denyReq := httptest.NewRequest("GET", "/deny", nil)
+	denyResp, err := app.Test(denyReq)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if denyResp.StatusCode != fiber.StatusForbidden {
+		t.Fatalf("expected 403, got %d", denyResp.StatusCode)
+	}
+}

@@ -1,12 +1,17 @@
 {
   "version": 1,
   "phase": "1-rbac",
-  "current_slice": "04-rbac-middleware",
+  "current_slice": "05-protect-admin-routes",
   "status": "pending",
   "blockers": [],
-  "completed": ["01-users-table", "02-roles-permissions-model", "03-auth-jwt-claims"],
-  "last_commit": "c96d631",
-  "last_iteration_at": "2026-06-18T22:09:45Z",
+  "completed": [
+    "01-users-table",
+    "02-roles-permissions-model",
+    "03-auth-jwt-claims",
+    "04-rbac-middleware"
+  ],
+  "last_commit": null,
+  "last_iteration_at": "2026-06-18T22:12:30Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",
