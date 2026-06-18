@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"aigent/internal/ai"
+	"aigent/internal/audit"
 	"aigent/internal/database"
 	"aigent/internal/utils"
 
@@ -254,6 +255,14 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	if !req.Approved {
 		pending.Status = "REJECTED"
 		database.DB.Save(&pending)
+		sessionID := pending.SessionID
+		audit.Emit(c, audit.Event{
+			Action:       "approval.reject",
+			ResourceType: "pending_action",
+			ResourceID:   audit.UintID(pending.ID),
+			SessionID:    &sessionID,
+			PayloadAfter: audit.ApprovalPayload(pending),
+		})
 
 		// Agregar mensaje de herramienta rechazada en el historial para mantener la integridad de la API
 		activeSess, err := ai.GetSessionManager().GetOrCreateSession(pending.SessionID)
@@ -366,11 +375,19 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 
 	pending.Status = "APPROVED"
 	database.DB.Save(&pending)
+	sessionID := pending.SessionID
+	audit.Emit(c, audit.Event{
+		Action:       "approval.approve",
+		ResourceType: "pending_action",
+		ResourceID:   audit.UintID(pending.ID),
+		SessionID:    &sessionID,
+		PayloadAfter: audit.ApprovalPayload(pending),
+	})
 
 	var session database.Session
 	if err := database.DB.First(&session, pending.SessionID).Error; err == nil {
 		if req.AlwaysAllow {
-			AutoSaveToolPermission(session.AgentID, tDef.Name)
+			AutoSaveToolPermission(c, session.AgentID, tDef.Name)
 		}
 	}
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"aigent/internal/ai"
+	"aigent/internal/audit"
 	"aigent/internal/auth"
 	"aigent/internal/database"
 	"aigent/internal/handlers"
@@ -116,6 +117,7 @@ func main() {
 	app := fiber.New()
 	app.Use(cors.New())
 	app.Use(logger.New())
+	app.Use(audit.CorrelationMiddleware())
 
 	api := app.Group("/api")
 

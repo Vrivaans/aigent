@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": "2-audit",
-  "current_slice": "08-audit-middleware",
+  "current_slice": "09-audit-ui-readonly",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -11,10 +11,11 @@
     "04-rbac-middleware",
     "05-protect-admin-routes",
     "06-auth-ui-minimal",
-    "07-audit-events-table"
+    "07-audit-events-table",
+    "08-audit-middleware"
   ],
-  "last_commit": "e05057e",
-  "last_iteration_at": "2026-06-18T22:45:00Z",
+  "last_commit": "155e82b",
+  "last_iteration_at": "2026-06-18T23:00:00Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

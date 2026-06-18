@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 
+	"aigent/internal/audit"
 	"aigent/internal/database"
 	"aigent/internal/utils"
 
@@ -115,6 +116,13 @@ func HandleCreateProvider(c *fiber.Ctx) error {
 
 	go fetchAndStoreModels(provider.ID, req.BaseURL, req.APIKey, req.ProviderType)
 
+	audit.Emit(c, audit.Event{
+		Action:       "provider.create",
+		ResourceType: "provider",
+		ResourceID:   audit.UintID(provider.ID),
+		PayloadAfter: audit.ProviderPayload(provider),
+	})
+
 	return c.Status(201).JSON(provider)
 }
 
@@ -143,6 +151,7 @@ func HandleUpdateProvider(c *fiber.Ctx) error {
 	if err := database.DB.First(&provider, id).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
 	}
+	before := provider
 
 	provider.Name = strings.TrimSpace(req.Name)
 	provider.BaseURL = strings.TrimSpace(req.BaseURL)
@@ -169,14 +178,32 @@ func HandleUpdateProvider(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	audit.Emit(c, audit.Event{
+		Action:        "provider.update",
+		ResourceType:  "provider",
+		ResourceID:    audit.UintID(provider.ID),
+		PayloadBefore: audit.ProviderPayload(before),
+		PayloadAfter:  audit.ProviderPayload(provider),
+	})
+
 	return c.JSON(provider)
 }
 
 func HandleDeleteProvider(c *fiber.Ctx) error {
 	id := c.Params("id")
+	var provider database.LLMProvider
+	if err := database.DB.First(&provider, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Provider not found"})
+	}
 	if err := database.DB.Delete(&database.LLMProvider{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+	audit.Emit(c, audit.Event{
+		Action:        "provider.delete",
+		ResourceType:  "provider",
+		ResourceID:    id,
+		PayloadBefore: audit.ProviderPayload(provider),
+	})
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 

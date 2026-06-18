@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"aigent/internal/ai"
+	"aigent/internal/audit"
 	"aigent/internal/database"
 	"aigent/internal/mcpstream"
 
@@ -119,6 +120,12 @@ func (h *McpStreamConfigHandler) Create(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	h.triggerReloadAndSync()
+	audit.Emit(c, audit.Event{
+		Action:       "mcp_stream.create",
+		ResourceType: "mcp_stream",
+		ResourceID:   audit.UintID(row.ID),
+		PayloadAfter: audit.McpStreamPayload(row),
+	})
 	return c.JSON(fiber.Map{"status": "created", "id": row.ID})
 }
 
@@ -135,6 +142,7 @@ func (h *McpStreamConfigHandler) Update(c *fiber.Ctx) error {
 		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+	before := cur
 	var req mcpStreamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
@@ -183,11 +191,25 @@ func (h *McpStreamConfigHandler) Update(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	h.triggerReloadAndSync()
+	audit.Emit(c, audit.Event{
+		Action:        "mcp_stream.update",
+		ResourceType:  "mcp_stream",
+		ResourceID:    id,
+		PayloadBefore: audit.McpStreamPayload(before),
+		PayloadAfter:  audit.McpStreamPayload(cur),
+	})
 	return c.JSON(fiber.Map{"status": "updated"})
 }
 
 func (h *McpStreamConfigHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
+	var row database.McpStreamServer
+	if err := database.DB.First(&row, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(404).JSON(fiber.Map{"error": "not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	res := database.DB.Delete(&database.McpStreamServer{}, id)
 	if res.Error != nil {
 		return c.Status(500).JSON(fiber.Map{"error": res.Error.Error()})
@@ -196,6 +218,12 @@ func (h *McpStreamConfigHandler) Delete(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "not found"})
 	}
 	h.triggerReloadAndSync()
+	audit.Emit(c, audit.Event{
+		Action:        "mcp_stream.delete",
+		ResourceType:  "mcp_stream",
+		ResourceID:    id,
+		PayloadBefore: audit.McpStreamPayload(row),
+	})
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 

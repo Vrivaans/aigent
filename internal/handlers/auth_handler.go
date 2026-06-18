@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"aigent/internal/audit"
 	"aigent/internal/auth"
 	"aigent/internal/database"
 
@@ -28,6 +29,7 @@ func HandleLogin(c *fiber.Ctx) error {
 	if err != nil {
 		if errors.Is(err, database.ErrInvalidCredentials) {
 			log.Printf("[login] rejected: invalid credentials for user %q", req.Username)
+			audit.EmitLogin(c, "auth.login.failure", nil, audit.LoginFailurePayload(req.Username, "invalid_credentials"))
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid username or password",
 			})
@@ -55,6 +57,8 @@ func HandleLogin(c *fiber.Ctx) error {
 	}
 
 	log.Printf("[login] success: token issued for user %q", req.Username)
+	actorID := user.ID
+	audit.EmitLogin(c, "auth.login.success", &actorID, audit.LoginSuccessPayload(req.Username))
 
 	return c.JSON(fiber.Map{
 		"token": token,
