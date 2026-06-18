@@ -1,0 +1,21 @@
+{
+  "id": "filesystem",
+  "name": "Filesystem",
+  "description": "Official MCP filesystem server over stdio. Grants read/write access to configured directories.",
+  "version": "1.0.0",
+  "transport": "stdio",
+  "default_alias": "filesystem",
+  "tags": ["files", "local", "stdio"],
+  "param_defaults": {
+    "allowed_dir": "."
+  },
+  "stdio": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "{{allowed_dir}}"
+    ],
+    "env": {}
+  }
+}

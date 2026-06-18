@@ -311,6 +311,13 @@ func main() {
 	mcpWrite.Delete("/config/mcp-stream/:id", mcpStreamHandler.Delete)
 	mcpWrite.Post("/config/mcp-stream/:id/test", mcpStreamHandler.TestSaved)
 
+	mcpCatalogHandler := &handlers.McpCatalogHandler{
+		Brain:     brain,
+		StdioMgr:  mcpStdioMgr,
+		StreamMgr: mcpStreamMgr,
+	}
+	mcpWrite.Post("/catalog/mcp/install", mcpCatalogHandler.Install)
+
 	taskHandler := &handlers.TaskHandler{}
 	tasksRead := api.Group("", permRead("tasks", "read"))
 	tasksWrite := api.Group("", permWrite("tasks", "write"))

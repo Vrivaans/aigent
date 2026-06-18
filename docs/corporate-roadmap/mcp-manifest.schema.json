@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aigent.local/schemas/mcp-manifest.json",
+  "title": "MCP Catalog Manifest",
+  "description": "Installable MCP server template for the AIgent catalog.",
+  "type": "object",
+  "required": ["id", "name", "version", "transport"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+      "description": "Stable catalog identifier (filename without .json)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$"
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["stdio", "stream"]
+    },
+    "default_alias": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$",
+      "description": "Default MCP alias when install request omits alias."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 32 },
+      "maxItems": 16
+    },
+    "param_defaults": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Default values for {{placeholder}} tokens in stdio args."
+    },
+    "stdio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 64
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["command"]
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base_url": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "disable_standalone_sse": { "type": "boolean" }
+      },
+      "required": ["base_url"]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "transport": { "const": "stdio" } } },
+      "then": { "required": ["stdio"] }
+    },
+    {
+      "if": { "properties": { "transport": { "const": "stream" } } },
+      "then": { "required": ["stream"] }
+    }
+  ]
+}

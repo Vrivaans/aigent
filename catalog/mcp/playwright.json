@@ -1,0 +1,14 @@
+{
+  "id": "playwright",
+  "name": "Playwright",
+  "description": "Browser automation MCP server over HTTP stream (SSE). Requires a Playwright MCP process listening on base_url.",
+  "version": "1.0.0",
+  "transport": "stream",
+  "default_alias": "playwright",
+  "tags": ["browser", "automation", "stream"],
+  "stream": {
+    "base_url": "http://127.0.0.1:8931/mcp",
+    "headers": {},
+    "disable_standalone_sse": false
+  }
+}
