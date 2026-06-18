@@ -5,7 +5,7 @@
   "status": "pending",
   "blockers": [],
   "completed": ["01-users-table"],
-  "last_commit": null,
+  "last_commit": "6a31dfa",
   "last_iteration_at": "2026-06-18T22:04:58Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
