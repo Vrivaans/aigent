@@ -3,6 +3,7 @@ package audit
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"aigent/internal/database"
 )
@@ -100,17 +101,28 @@ type approvalAuditPayload struct {
 	ID               uint   `json:"id"`
 	SessionID        uint   `json:"session_id"`
 	ToolName         string `json:"tool_name"`
+	ToolCallID       string `json:"tool_call_id,omitempty"`
+	ChatMessageID    *uint  `json:"chat_message_id,omitempty"`
 	Status           string `json:"status"`
 	ResolvedByUserID *uint  `json:"resolved_by_user_id,omitempty"`
+	ResolvedAt       *string `json:"resolved_at,omitempty"`
 }
 
-func ApprovalPayload(p database.PendingAction) *string {
+func ApprovalPayload(p database.PendingAction, chatMessageID *uint) *string {
+	var resolvedAt *string
+	if p.ResolvedAt != nil {
+		s := p.ResolvedAt.UTC().Format(time.RFC3339)
+		resolvedAt = &s
+	}
 	return jsonPtr(approvalAuditPayload{
 		ID:               p.ID,
 		SessionID:        p.SessionID,
 		ToolName:         p.ToolName,
+		ToolCallID:       p.ToolCallID,
+		ChatMessageID:    chatMessageID,
 		Status:           p.Status,
 		ResolvedByUserID: p.ResolvedByUserID,
+		ResolvedAt:       resolvedAt,
 	})
 }
 

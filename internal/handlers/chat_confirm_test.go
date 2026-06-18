@@ -129,6 +129,109 @@ func TestHandleConfirmRejectSetsResolver(t *testing.T) {
 	if auditRows[0].ActorUserID == nil || *auditRows[0].ActorUserID != operatorID {
 		t.Fatalf("audit actor_user_id = %v", auditRows[0].ActorUserID)
 	}
+	fields := audit.ParseApprovalFields(auditRows[0].PayloadAfter)
+	if fields == nil {
+		t.Fatal("expected parsed approval fields in audit payload")
+	}
+	if fields.ResolvedByUserID == nil || *fields.ResolvedByUserID != operatorID {
+		t.Fatalf("payload resolved_by_user_id = %v", fields.ResolvedByUserID)
+	}
+	if fields.ResolvedAt == "" {
+		t.Fatal("expected resolved_at in audit payload")
+	}
+}
+
+func TestHandleConfirmAuditLinksChatMessage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&database.User{},
+		&database.Agent{},
+		&database.Session{},
+		&database.ChatMessage{},
+		&database.PendingAction{},
+		&database.AuditEvent{},
+	); err != nil {
+		t.Fatalf("automigrate: %v", err)
+	}
+
+	operator := database.User{Username: "operator1", PasswordHash: "x", IsActive: true}
+	if err := db.Create(&operator).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	agent := database.Agent{Name: "General", IsDefault: true}
+	if err := db.Create(&agent).Error; err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
+	session := database.Session{Title: "Audit link", AgentID: agent.ID}
+	if err := db.Create(&session).Error; err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	toolCalls := `[{"id":"call_link","type":"function","function":{"name":"tool","arguments":"{}"}}]`
+	msg := database.ChatMessage{
+		SessionID:    session.ID,
+		Role:         "assistant",
+		Content:      "approve me",
+		RawToolCalls: toolCalls,
+	}
+	if err := db.Create(&msg).Error; err != nil {
+		t.Fatalf("create message: %v", err)
+	}
+	pending := database.PendingAction{
+		SessionID:  session.ID,
+		ToolName:   "tool",
+		Arguments:  `{}`,
+		ToolCallID: "call_link",
+		Status:     "PENDING",
+	}
+	if err := db.Create(&pending).Error; err != nil {
+		t.Fatalf("create pending: %v", err)
+	}
+
+	database.DB = db
+	restore := audit.SetDBForTest(db)
+	t.Cleanup(func() {
+		restore()
+		database.DB = nil
+	})
+
+	handler := &handlers.ChatHandler{}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		auth.SetRequestUser(c, &auth.Claims{
+			UserID:   operator.ID,
+			Username: "operator1",
+			Roles:    []string{"operator"},
+		})
+		return c.Next()
+	})
+	app.Post("/sessions/:id/confirm/:pending_id", handler.HandleConfirm)
+
+	body, _ := json.Marshal(map[string]bool{"approved": false})
+	req := httptest.NewRequest("POST", "/sessions/1/confirm/1", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d body=%s", resp.StatusCode, string(respBody))
+	}
+
+	var auditRows []database.AuditEvent
+	if err := db.Where("action = ?", "approval.reject").Find(&auditRows).Error; err != nil {
+		t.Fatalf("find audit rows: %v", err)
+	}
+	if len(auditRows) != 1 {
+		t.Fatalf("expected 1 audit row, got %d", len(auditRows))
+	}
+	fields := audit.ParseApprovalFields(auditRows[0].PayloadAfter)
+	if fields == nil || fields.ChatMessageID == nil || *fields.ChatMessageID != msg.ID {
+		t.Fatalf("expected chat_message_id=%d in audit payload, got %+v", msg.ID, fields)
+	}
 }
 
 func TestHandleGetHistoryExposesResolver(t *testing.T) {

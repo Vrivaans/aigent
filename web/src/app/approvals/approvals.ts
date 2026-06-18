@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService, PendingApproval } from '../api.service';
+import { ApiService, ApprovalHistoryItem, PendingApproval } from '../api.service';
 import { TranslationService } from '../translation.service';
 
 @Component({
@@ -19,6 +19,7 @@ export class ApprovalsComponent implements OnInit {
   }
 
   approvals = signal<PendingApproval[]>([]);
+  history = signal<ApprovalHistoryItem[]>([]);
   isLoading = signal(false);
 
   async ngOnInit() {
@@ -28,8 +29,12 @@ export class ApprovalsComponent implements OnInit {
   async loadApprovals() {
     this.isLoading.set(true);
     try {
-      const list = await this.api.getPendingApprovals();
-      this.approvals.set(list || []);
+      const [pending, resolved] = await Promise.all([
+        this.api.getPendingApprovals(),
+        this.api.getApprovalHistory()
+      ]);
+      this.approvals.set(pending || []);
+      this.history.set(resolved || []);
     } catch (err) {
       console.error('Failed to load pending approvals:', err);
     } finally {
@@ -46,10 +51,16 @@ export class ApprovalsComponent implements OnInit {
     }
   }
 
+  statusLabel(status: string): string {
+    if (status === 'APPROVED') return this.t('approvals.status_approved');
+    if (status === 'REJECTED') return this.t('approvals.status_rejected');
+    return status;
+  }
+
   async approve(app: PendingApproval) {
     try {
       await this.api.confirmAction(app.session_id, app.id, true);
-      this.approvals.update(list => list.filter(item => item.id !== app.id));
+      await this.loadApprovals();
     } catch (err) {
       console.error('Failed to approve action:', err);
       alert(this.t('approvals.error_approve'));
@@ -59,7 +70,7 @@ export class ApprovalsComponent implements OnInit {
   async reject(app: PendingApproval) {
     try {
       await this.api.confirmAction(app.session_id, app.id, false);
-      this.approvals.update(list => list.filter(item => item.id !== app.id));
+      await this.loadApprovals();
     } catch (err) {
       console.error('Failed to reject action:', err);
       alert(this.t('approvals.error_reject'));

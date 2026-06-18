@@ -49,6 +49,7 @@
             <th>{{ t('audit.col_action') }}</th>
             <th>{{ t('audit.col_resource') }}</th>
             <th>{{ t('audit.col_actor') }}</th>
+            <th>{{ t('audit.col_link') }}</th>
             <th>{{ t('audit.col_correlation') }}</th>
           </tr>
         </thead>
@@ -59,11 +60,23 @@
               <td><code>{{ e.action }}</code></td>
               <td><code>{{ e.resource_type }}/{{ e.resource_id }}</code></td>
               <td>{{ e.actor_user_id ?? '—' }}</td>
+              <td class="link-cell">
+                @if (isApprovalEvent(e) && (e.link_session_id || e.session_id)) {
+                  <button type="button" class="btn-link-session" (click)="openSessionLink(e)">
+                    {{ t('audit.open_chat') }}
+                    @if (e.link_chat_message_id) {
+                      <span class="msg-ref">#{{ e.link_chat_message_id }}</span>
+                    }
+                  </button>
+                } @else {
+                  —
+                }
+              </td>
               <td class="corr-cell">{{ e.correlation_id || '—' }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="empty-cell">{{ t('audit.empty') }}</td>
+              <td colspan="6" class="empty-cell">{{ t('audit.empty') }}</td>
             </tr>
           }
         </tbody>

@@ -152,6 +152,10 @@ export class App implements OnInit {
     if (window.innerWidth < 768) this.isSidebarOpen.set(false);
   }
 
+  openSessionFromAudit(target: { sessionId: number; messageId?: number }) {
+    this.selectSession(target.sessionId);
+  }
+
   async deleteSession(id: number, event: Event) {
     event.stopPropagation(); // Evitar que se seleccione el chat al borrarlo
     if (!confirm('Seguro que querés eliminar?')) return;

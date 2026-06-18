@@ -182,3 +182,24 @@
   display: flex;
   gap: 8px;
 }
+
+.link-cell {
+  white-space: nowrap;
+}
+
+.btn-link-session {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(200, 240, 74, 0.25);
+  background: rgba(200, 240, 74, 0.08);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-link-session .msg-ref {
+  margin-left: 4px;
+  opacity: 0.85;
+  font-family: var(--font-mono);
+}

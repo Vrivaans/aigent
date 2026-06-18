@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "phase": "3-approvals",
-  "current_slice": "13-approval-audit-link",
+  "phase": "4-secrets",
+  "current_slice": "14-separate-jwt-encryption-keys",
   "status": "pending",
   "blockers": [],
   "completed": [
@@ -16,10 +16,11 @@
     "09-audit-ui-readonly",
     "10-audit-export-endpoint",
     "11-approval-actor-id",
-    "12-approval-policies-basic"
+    "12-approval-policies-basic",
+    "13-approval-audit-link"
   ],
-  "last_commit": "98de96c",
-  "last_iteration_at": "2026-06-18T22:39:30Z",
+  "last_commit": "47d83a8",
+  "last_iteration_at": "2026-06-18T22:44:40Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
     "go_vet": "go vet ./cmd/... ./internal/...",

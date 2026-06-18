@@ -20,18 +20,24 @@ const auditExportMaxRows = 10000
 type AuditHandler struct{}
 
 type AuditEventResponse struct {
-	ID            uint    `json:"id"`
-	OccurredAt    string  `json:"occurred_at"`
-	ActorUserID   *uint   `json:"actor_user_id,omitempty"`
-	Action        string  `json:"action"`
-	ResourceType  string  `json:"resource_type"`
-	ResourceID    string  `json:"resource_id"`
-	SessionID     *uint   `json:"session_id,omitempty"`
-	IP            string  `json:"ip,omitempty"`
-	UserAgent     string  `json:"user_agent,omitempty"`
-	PayloadBefore *string `json:"payload_before,omitempty"`
-	PayloadAfter  *string `json:"payload_after,omitempty"`
-	CorrelationID string  `json:"correlation_id,omitempty"`
+	ID                       uint    `json:"id"`
+	OccurredAt               string  `json:"occurred_at"`
+	ActorUserID              *uint   `json:"actor_user_id,omitempty"`
+	Action                   string  `json:"action"`
+	ResourceType             string  `json:"resource_type"`
+	ResourceID               string  `json:"resource_id"`
+	SessionID                *uint   `json:"session_id,omitempty"`
+	IP                       string  `json:"ip,omitempty"`
+	UserAgent                string  `json:"user_agent,omitempty"`
+	PayloadBefore            *string `json:"payload_before,omitempty"`
+	PayloadAfter             *string `json:"payload_after,omitempty"`
+	CorrelationID            string  `json:"correlation_id,omitempty"`
+	LinkSessionID            *uint   `json:"link_session_id,omitempty"`
+	LinkChatMessageID        *uint   `json:"link_chat_message_id,omitempty"`
+	ApprovalToolName         string  `json:"approval_tool_name,omitempty"`
+	ApprovalStatus           string  `json:"approval_status,omitempty"`
+	ApprovalResolvedByUserID *uint   `json:"approval_resolved_by_user_id,omitempty"`
+	ApprovalResolvedAt       string  `json:"approval_resolved_at,omitempty"`
 }
 
 type AuditEventsListResponse struct {
@@ -42,7 +48,7 @@ type AuditEventsListResponse struct {
 }
 
 func toAuditEventResponse(row database.AuditEvent) AuditEventResponse {
-	return AuditEventResponse{
+	resp := AuditEventResponse{
 		ID:            row.ID,
 		OccurredAt:    row.OccurredAt.UTC().Format(time.RFC3339),
 		ActorUserID:   row.ActorUserID,
@@ -56,6 +62,22 @@ func toAuditEventResponse(row database.AuditEvent) AuditEventResponse {
 		PayloadAfter:  row.PayloadAfter,
 		CorrelationID: row.CorrelationID,
 	}
+	if audit.IsApprovalAction(row.Action) {
+		fields := audit.ParseApprovalFields(row.PayloadAfter)
+		if fields != nil {
+			sessionID := fields.SessionID
+			resp.LinkSessionID = &sessionID
+			resp.LinkChatMessageID = fields.ChatMessageID
+			resp.ApprovalToolName = fields.ToolName
+			resp.ApprovalStatus = fields.Status
+			resp.ApprovalResolvedByUserID = fields.ResolvedByUserID
+			resp.ApprovalResolvedAt = fields.ResolvedAt
+			if resp.SessionID == nil && sessionID > 0 {
+				resp.SessionID = &sessionID
+			}
+		}
+	}
+	return resp
 }
 
 func parseAuditTime(raw string, endOfDay bool) (time.Time, error) {
@@ -121,10 +143,13 @@ func auditEventsToCSV(rows []database.AuditEvent) ([]byte, error) {
 	if err := w.Write([]string{
 		"id", "occurred_at", "actor_user_id", "action", "resource_type", "resource_id",
 		"session_id", "ip", "user_agent", "correlation_id", "payload_before", "payload_after",
+		"approval_tool_name", "approval_status", "approval_resolved_by_user_id",
+		"approval_resolved_at", "approval_session_id", "approval_chat_message_id",
 	}); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
+		approvalCols := approvalCSVFields(row)
 		record := []string{
 			strconv.FormatUint(uint64(row.ID), 10),
 			row.OccurredAt.UTC().Format(time.RFC3339),
@@ -138,6 +163,12 @@ func auditEventsToCSV(rows []database.AuditEvent) ([]byte, error) {
 			row.CorrelationID,
 			strPtrCSV(row.PayloadBefore),
 			strPtrCSV(row.PayloadAfter),
+			approvalCols.toolName,
+			approvalCols.status,
+			approvalCols.resolvedBy,
+			approvalCols.resolvedAt,
+			approvalCols.sessionID,
+			approvalCols.chatMessageID,
 		}
 		if err := w.Write(record); err != nil {
 			return nil, err
@@ -148,6 +179,35 @@ func auditEventsToCSV(rows []database.AuditEvent) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+type approvalCSVCols struct {
+	toolName, status, resolvedBy, resolvedAt, sessionID, chatMessageID string
+}
+
+func approvalCSVFields(row database.AuditEvent) approvalCSVCols {
+	if !audit.IsApprovalAction(row.Action) {
+		return approvalCSVCols{}
+	}
+	fields := audit.ParseApprovalFields(row.PayloadAfter)
+	if fields == nil {
+		return approvalCSVCols{}
+	}
+	cols := approvalCSVCols{
+		toolName: fields.ToolName,
+		status:   fields.Status,
+	}
+	if fields.ResolvedByUserID != nil {
+		cols.resolvedBy = strconv.FormatUint(uint64(*fields.ResolvedByUserID), 10)
+	}
+	cols.resolvedAt = fields.ResolvedAt
+	if fields.SessionID > 0 {
+		cols.sessionID = strconv.FormatUint(uint64(fields.SessionID), 10)
+	}
+	if fields.ChatMessageID != nil {
+		cols.chatMessageID = strconv.FormatUint(uint64(*fields.ChatMessageID), 10)
+	}
+	return cols
 }
 
 func uintPtrCSV(v *uint) string {

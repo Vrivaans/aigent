@@ -117,6 +117,11 @@ export class TranslationService {
       "approvals.empty_desc": "The agent is operating or waiting for tasks without blocks.",
       "approvals.error_approve": "Error approving action",
       "approvals.error_reject": "Error rejecting action",
+      "approvals.history_title": "Recent resolutions",
+      "approvals.resolved_by": "Resolved by {user}",
+      "approvals.resolved_by_id": "Resolved by user #{id}",
+      "approvals.status_approved": "Approved",
+      "approvals.status_rejected": "Rejected",
 
       // Workflows component
       "workflows.title": "Workflows",
@@ -321,7 +326,9 @@ export class TranslationService {
       "audit.col_action": "Action",
       "audit.col_resource": "Resource",
       "audit.col_actor": "Actor",
+      "audit.col_link": "Link",
       "audit.col_correlation": "Correlation",
+      "audit.open_chat": "Open chat",
       // Providers component
       "prov.title": "LLM Providers",
       "prov.desc": "Manage your AI connections and select the default model.",
@@ -501,6 +508,11 @@ export class TranslationService {
       "approvals.empty_desc": "El agente se encuentra operando o esperando tareas sin bloqueos.",
       "approvals.error_approve": "Error al aprobar la acción",
       "approvals.error_reject": "Error al rechazar la acción",
+      "approvals.history_title": "Resoluciones recientes",
+      "approvals.resolved_by": "Resuelto por {user}",
+      "approvals.resolved_by_id": "Resuelto por usuario #{id}",
+      "approvals.status_approved": "Aprobado",
+      "approvals.status_rejected": "Rechazado",
 
       // Workflows component
       "workflows.title": "Automatizaciones",
@@ -705,7 +717,9 @@ export class TranslationService {
       "audit.col_action": "Acción",
       "audit.col_resource": "Recurso",
       "audit.col_actor": "Actor",
+      "audit.col_link": "Enlace",
       "audit.col_correlation": "Correlación",
+      "audit.open_chat": "Abrir chat",
       // Providers component
       "prov.title": "Proveedores de LLM",
       "prov.desc": "Gestiona tus conexiones de IA y selecciona el modelo por defecto.",

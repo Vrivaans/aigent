@@ -285,7 +285,7 @@
       </div>
       } @else if (currentTab === 'audit') {
       <div class="feature-view">
-        <app-audit></app-audit>
+        <app-audit (navigateToSession)="openSessionFromAudit($event)"></app-audit>
       </div>
       }
     </div>

@@ -1,8 +1,13 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService, AuditEvent, AuditEventsPage } from '../api.service';
 import { TranslationService } from '../translation.service';
+
+export interface AuditSessionLink {
+  sessionId: number;
+  messageId?: number;
+}
 
 @Component({
   selector: 'app-audit',
@@ -14,6 +19,8 @@ import { TranslationService } from '../translation.service';
 export class AuditComponent implements OnInit {
   private api = inject(ApiService);
   private translation = inject(TranslationService);
+
+  @Output() navigateToSession = new EventEmitter<AuditSessionLink>();
 
   t(key: string, params?: Record<string, string>): string {
     return this.translation.t(key, params);
@@ -36,6 +43,19 @@ export class AuditComponent implements OnInit {
 
   async ngOnInit() {
     await this.loadEvents();
+  }
+
+  isApprovalEvent(e: AuditEvent): boolean {
+    return e.action.startsWith('approval.');
+  }
+
+  openSessionLink(e: AuditEvent) {
+    const sessionId = e.link_session_id ?? e.session_id;
+    if (!sessionId) return;
+    this.navigateToSession.emit({
+      sessionId,
+      messageId: e.link_chat_message_id
+    });
   }
 
   async loadEvents() {

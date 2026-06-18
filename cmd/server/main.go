@@ -238,6 +238,7 @@ func main() {
 	chatRead.Get("/sessions/:id/chat", chatHandler.HandleGetHistory)
 	chatRead.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
 	chatRead.Get("/approvals", chatHandler.GetPendingApprovals)
+	chatRead.Get("/approvals/history", chatHandler.GetApprovalHistory)
 
 	chatWrite.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
 	chatWrite.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)

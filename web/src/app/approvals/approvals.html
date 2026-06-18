@@ -71,5 +71,37 @@
         </div>
       }
     </div>
+
+    @if (history().length > 0) {
+      <section class="history-section">
+        <h3 class="history-title">{{ t('approvals.history_title') }}</h3>
+        <div class="history-list">
+          @for (item of history(); track item.id) {
+            <div class="history-row">
+              <div class="history-main">
+                <span class="history-tool">{{ item.tool_name }}</span>
+                <span class="history-meta">
+                  {{ item.session_title }}
+                  ·
+                  <span [class.approved]="item.status === 'APPROVED'" [class.rejected]="item.status === 'REJECTED'">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                </span>
+              </div>
+              <div class="history-resolver">
+                @if (item.resolved_by_username) {
+                  {{ t('approvals.resolved_by', { user: item.resolved_by_username }) }}
+                } @else if (item.resolved_by_user_id) {
+                  {{ t('approvals.resolved_by_id', { id: '' + item.resolved_by_user_id }) }}
+                }
+                @if (item.resolved_at) {
+                  · {{ item.resolved_at | date:'short' }}
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
   }
 </div>

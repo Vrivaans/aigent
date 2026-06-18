@@ -140,11 +140,17 @@ export interface PendingApproval {
   arguments: string;
   tool_call_id: string;
   status: string;
+  resolved_by_user_id?: number;
+  resolved_at?: string;
   created_at: string;
   updated_at: string;
   session_title: string;
   task_name?: string;
   task_id?: number;
+}
+
+export interface ApprovalHistoryItem extends PendingApproval {
+  resolved_by_username?: string;
 }
 
 export interface Workflow {
@@ -212,6 +218,12 @@ export interface AuditEvent {
   correlation_id?: string;
   payload_before?: string;
   payload_after?: string;
+  link_session_id?: number;
+  link_chat_message_id?: number;
+  approval_tool_name?: string;
+  approval_status?: string;
+  approval_resolved_by_user_id?: number;
+  approval_resolved_at?: string;
 }
 
 export interface AuditEventsPage {
@@ -419,6 +431,10 @@ export class ApiService {
   async getPendingApprovals(): Promise<PendingApproval[]> {
     const res = await this.fetchApi('/approvals');
     return res.json();
+  }
+
+  async getApprovalHistory(): Promise<ApprovalHistoryItem[]> {
+    return this.request('/approvals/history');
   }
 
   async resetSessionLLMOverride(sessionId: number): Promise<{ status: string }> {

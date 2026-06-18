@@ -253,6 +253,42 @@ func resolvePendingAction(c *fiber.Ctx, pending *database.PendingAction, status 
 	return database.DB.Save(pending).Error
 }
 
+func findChatMessageIDForToolCall(sessionID uint, toolCallID string) *uint {
+	if toolCallID == "" {
+		return nil
+	}
+	var messages []database.ChatMessage
+	if err := database.DB.Where("session_id = ? AND role = ? AND raw_tool_calls != ''", sessionID, "assistant").
+		Order("id desc").Limit(20).Find(&messages).Error; err != nil {
+		return nil
+	}
+	for _, msg := range messages {
+		var tCalls []ai.ToolCall
+		if err := json.Unmarshal([]byte(msg.RawToolCalls), &tCalls); err != nil {
+			continue
+		}
+		for _, tc := range tCalls {
+			if tc.ID == toolCallID {
+				id := msg.ID
+				return &id
+			}
+		}
+	}
+	return nil
+}
+
+func emitApprovalAudit(c *fiber.Ctx, action string, pending database.PendingAction) {
+	sessionID := pending.SessionID
+	chatMsgID := findChatMessageIDForToolCall(pending.SessionID, pending.ToolCallID)
+	audit.Emit(c, audit.Event{
+		Action:       action,
+		ResourceType: "pending_action",
+		ResourceID:   audit.UintID(pending.ID),
+		SessionID:    &sessionID,
+		PayloadAfter: audit.ApprovalPayload(pending, chatMsgID),
+	})
+}
+
 func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	id := c.Params("pending_id")
 	var req ConfirmRequest
@@ -269,14 +305,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		if err := resolvePendingAction(c, &pending, "REJECTED"); err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 		}
-		sessionID := pending.SessionID
-		audit.Emit(c, audit.Event{
-			Action:       "approval.reject",
-			ResourceType: "pending_action",
-			ResourceID:   audit.UintID(pending.ID),
-			SessionID:    &sessionID,
-			PayloadAfter: audit.ApprovalPayload(pending),
-		})
+		emitApprovalAudit(c, "approval.reject", pending)
 
 		// Agregar mensaje de herramienta rechazada en el historial para mantener la integridad de la API
 		activeSess, err := ai.GetSessionManager().GetOrCreateSession(pending.SessionID)
@@ -391,14 +420,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	if err := resolvePendingAction(c, &pending, "APPROVED"); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
-	sessionID := pending.SessionID
-	audit.Emit(c, audit.Event{
-		Action:       "approval.approve",
-		ResourceType: "pending_action",
-		ResourceID:   audit.UintID(pending.ID),
-		SessionID:    &sessionID,
-		PayloadAfter: audit.ApprovalPayload(pending),
-	})
+	emitApprovalAudit(c, "approval.approve", pending)
 
 	var session database.Session
 	if err := database.DB.First(&session, pending.SessionID).Error; err == nil {
@@ -706,6 +728,29 @@ type PendingApprovalResponse struct {
 	TaskID       *uint  `json:"task_id,omitempty"`
 }
 
+type ApprovalHistoryItem struct {
+	PendingApprovalResponse
+	ResolvedByUsername string `json:"resolved_by_username,omitempty"`
+}
+
+func buildPendingApprovalResponse(p database.PendingAction) PendingApprovalResponse {
+	var sess database.Session
+	resp := PendingApprovalResponse{PendingAction: p}
+	if err := database.DB.First(&sess, p.SessionID).Error; err == nil {
+		resp.SessionTitle = sess.Title
+		if sess.TaskID != nil {
+			var t database.Task
+			if err := database.DB.First(&t, *sess.TaskID).Error; err == nil {
+				resp.TaskName = t.Name
+				resp.TaskID = sess.TaskID
+			}
+		}
+	} else {
+		resp.SessionTitle = fmt.Sprintf("Sesión #%d", p.SessionID)
+	}
+	return resp
+}
+
 // GetPendingApprovals retorna todas las aprobaciones pendientes del sistema
 func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
 	var pendings []database.PendingAction
@@ -715,32 +760,50 @@ func (h *ChatHandler) GetPendingApprovals(c *fiber.Ctx) error {
 
 	response := make([]PendingApprovalResponse, len(pendings))
 	for i, p := range pendings {
-		var sess database.Session
-		var taskName string
-		var taskID *uint
+		response[i] = buildPendingApprovalResponse(p)
+	}
 
-		if err := database.DB.First(&sess, p.SessionID).Error; err == nil {
-			if sess.TaskID != nil {
-				var t database.Task
-				if err := database.DB.First(&t, *sess.TaskID).Error; err == nil {
-					taskName = t.Name
-					taskID = sess.TaskID
-				}
-			}
-			response[i] = PendingApprovalResponse{
-				PendingAction: p,
-				SessionTitle:  sess.Title,
-				TaskName:      taskName,
-				TaskID:        taskID,
-			}
-		} else {
-			response[i] = PendingApprovalResponse{
-				PendingAction: p,
-				SessionTitle:  fmt.Sprintf("Sesión #%d", p.SessionID),
+	return c.JSON(response)
+}
+
+// GetApprovalHistory retorna aprobaciones resueltas recientes con el username del resolver.
+func (h *ChatHandler) GetApprovalHistory(c *fiber.Ctx) error {
+	const limit = 50
+	var resolved []database.PendingAction
+	if err := database.DB.Where("status IN ?", []string{"APPROVED", "REJECTED"}).
+		Order("resolved_at desc").Limit(limit).Find(&resolved).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	userIDs := make([]uint, 0)
+	seen := make(map[uint]struct{})
+	for _, p := range resolved {
+		if p.ResolvedByUserID != nil {
+			if _, ok := seen[*p.ResolvedByUserID]; !ok {
+				seen[*p.ResolvedByUserID] = struct{}{}
+				userIDs = append(userIDs, *p.ResolvedByUserID)
 			}
 		}
 	}
 
+	usernames := make(map[uint]string)
+	if len(userIDs) > 0 {
+		var users []database.User
+		if err := database.DB.Where("id IN ?", userIDs).Find(&users).Error; err == nil {
+			for _, u := range users {
+				usernames[u.ID] = u.Username
+			}
+		}
+	}
+
+	response := make([]ApprovalHistoryItem, len(resolved))
+	for i, p := range resolved {
+		item := ApprovalHistoryItem{PendingApprovalResponse: buildPendingApprovalResponse(p)}
+		if p.ResolvedByUserID != nil {
+			item.ResolvedByUsername = usernames[*p.ResolvedByUserID]
+		}
+		response[i] = item
+	}
 	return c.JSON(response)
 }
 

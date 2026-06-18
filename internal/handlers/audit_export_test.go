@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,10 @@ func TestValidateExportRowCount(t *testing.T) {
 
 func TestAuditEventsToCSV(t *testing.T) {
 	actorID := uint(7)
+	resolverID := uint(3)
+	msgID := uint(55)
+	resolvedAt := "2026-06-01T11:00:00Z"
+	payload := `{"id":1,"session_id":10,"tool_name":"odoo_write","tool_call_id":"call_1","chat_message_id":55,"status":"APPROVED","resolved_by_user_id":3,"resolved_at":"2026-06-01T11:00:00Z"}`
 	rows := []database.AuditEvent{
 		{
 			ID:           1,
@@ -31,14 +36,26 @@ func TestAuditEventsToCSV(t *testing.T) {
 			ResourceType: "provider",
 			ResourceID:   "42",
 		},
+		{
+			ID:           2,
+			OccurredAt:   mustParseTime(t, "2026-06-01T11:00:00Z"),
+			ActorUserID:  &actorID,
+			Action:       "approval.approve",
+			ResourceType: "pending_action",
+			ResourceID:   "1",
+			PayloadAfter: &payload,
+		},
 	}
 	csvBytes, err := auditEventsToCSV(rows)
 	if err != nil {
 		t.Fatalf("auditEventsToCSV: %v", err)
 	}
 	out := string(csvBytes)
-	if !containsAll(out, "id,occurred_at", "provider.create", "42") {
+	if !containsAll(out, "id,occurred_at", "provider.create", "42", "approval_tool_name", "odoo_write", "APPROVED") {
 		t.Fatalf("unexpected csv: %q", out)
+	}
+	if !containsAll(out, strconv.FormatUint(uint64(resolverID), 10), resolvedAt, "10", strconv.FormatUint(uint64(msgID), 10)) {
+		t.Fatalf("csv missing approval resolution fields: %q", out)
 	}
 }
 
