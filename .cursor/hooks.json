@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".cursor/hooks/roadmap-continue.sh",
+        "loop_limit": 30
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+---
+description: Corporate roadmap iteration protocol — one slice per run
+alwaysApply: false
+---
+
+# Corporate roadmap iteration
+
+When the user mentions corporate roadmap, RBAC enterprise, audit trail, multi-tenant loop, or `@corporate-iteration`:
+
+1. Read `docs/corporate-roadmap/STATE.json`.
+2. Read `docs/corporate-roadmap/slices/<current_slice>.md`.
+3. Implement **only** that slice. Do not skip phases.
+4. Run gates from STATE (`go test ./...`, `go vet ./...`; `web` build only if frontend changed).
+5. Update `STATE.json`:
+   - On success: append slice id to `completed`, set next `current_slice`, `status: pending`, `last_iteration_at` ISO8601.
+   - On last slice of phase: update `phase` to next phase id.
+   - On failure: `status: blocked`, add to `blockers`.
+6. Commit: `feat(<area>): <slice-id> <short description>` — only if gates pass and user rules allow commits.
+7. End with: **Done / Next slice / Blockers**.
+
+**Hard rules**
+
+- Do not start phase `7-multi-tenant` until slices `01`–`10` are in `completed`.
+- One slice per iteration unless the user explicitly asks for more.
+- Match existing Aigent patterns (Fiber, GORM, Angular signals, translation service).
+- Minimize scope — no drive-by refactors.
+
+**Loop triggers:** user may say `/loop` or hook `stop` will inject follow-up — same protocol each time.

@@ -27,7 +27,14 @@ web/node_modules/
 web/dist/
 **/.DS_Store
 
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 .design/
 .openclaw
 .hermes

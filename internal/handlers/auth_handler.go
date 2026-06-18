@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"log"
-	"os"
-	"strings"
 
 	"aigent/internal/auth"
+	"aigent/internal/database"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -24,18 +24,17 @@ func HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 
-	adminUser := os.Getenv("ADMIN_USERNAME")
-	adminPass := os.Getenv("ADMIN_PASSWORD")
-
-	trimUserOK := strings.TrimSpace(req.Username) == strings.TrimSpace(adminUser)
-	trimPassOK := strings.TrimSpace(req.Password) == strings.TrimSpace(adminPass)
-
-	if req.Username != adminUser || req.Password != adminPass {
-		log.Printf("[login] rejected: strict user=%v pass=%v trim user=%v pass=%v lens env(usr,pwd)=%d,%d req(usr,pwd)=%d,%d",
-			req.Username == adminUser, req.Password == adminPass, trimUserOK, trimPassOK,
-			len(adminUser), len(adminPass), len(req.Username), len(req.Password))
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid username or password",
+	_, err := database.AuthenticateUser(database.DB, req.Username, req.Password)
+	if err != nil {
+		if errors.Is(err, database.ErrInvalidCredentials) {
+			log.Printf("[login] rejected: invalid credentials for user %q", req.Username)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Invalid username or password",
+			})
+		}
+		log.Printf("[login] database error: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Login failed",
 		})
 	}
 
@@ -47,7 +46,7 @@ func HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("[login] success: token issued (user len=%d)", len(req.Username))
+	log.Printf("[login] success: token issued for user %q", req.Username)
 
 	return c.JSON(fiber.Map{
 		"token": token,

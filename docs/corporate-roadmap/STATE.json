@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "phase": "1-rbac",
+  "current_slice": "02-roles-permissions-model",
+  "status": "pending",
+  "blockers": [],
+  "completed": ["01-users-table"],
+  "last_commit": null,
+  "last_iteration_at": "2026-06-18T22:04:58Z",
+  "gates": {
+    "go_test": "go test ./internal/... ./cmd/...",
+    "go_vet": "go vet ./cmd/... ./internal/...",
+    "web_build": "cd web && npm run build"
+  },
+  "phases": [
+    "1-rbac",
+    "2-audit",
+    "3-approvals",
+    "4-secrets",
+    "5-scc",
+    "6-mcp-catalog",
+    "7-multi-tenant",
+    "done"
+  ]
+}

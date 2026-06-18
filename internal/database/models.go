@@ -8,6 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
+// User represents a login account (RBAC roles come in a later slice).
+type User struct {
+	ID           uint      `gorm:"primarykey" json:"id"`
+	Username     string    `gorm:"size:255;uniqueIndex;not null" json:"username"`
+	PasswordHash string    `gorm:"type:text;not null" json:"-"`
+	IsActive     bool      `gorm:"not null;default:true" json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 // Agent represents a specialized AI persona with its own model and toolset
 type Agent struct {
 	ID            uint        `gorm:"primarykey" json:"id"`
@@ -80,8 +90,20 @@ type Session struct {
 	LLMProviderOverride   *LLMProvider `gorm:"foreignKey:LLMProviderOverrideID" json:"llm_provider_override,omitempty"`
 	LLMModelOverride      string       `gorm:"size:255" json:"llm_model_override,omitempty"`
 	ContextSummary        string       `gorm:"type:text" json:"context_summary,omitempty"`
+	SessionGoals          string       `gorm:"type:text" json:"session_goals,omitempty"`
+	WorkspacePath         string       `gorm:"size:512" json:"workspace_path,omitempty"`
 	CreatedAt             time.Time    `json:"created_at"`
 	UpdatedAt             time.Time    `json:"updated_at"`
+}
+
+// SessionFile represents a file ingested to be cached as session context (Layer 2)
+type SessionFile struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	SessionID uint      `gorm:"not null;index" json:"session_id"`
+	Filename  string    `gorm:"size:255;not null" json:"filename"`
+	Content   string    `gorm:"type:text;not null" json:"content"` // Markdown/Plain Text content
+	Hash      string    `gorm:"size:64;not null" json:"hash"`      // SHA-256 hash of the content
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // ChatMessage represents the conversation history between User and AIgent

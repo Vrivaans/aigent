@@ -146,6 +146,14 @@ func autoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	// 1.25 Users (auth foundation for RBAC)
+	if err := db.AutoMigrate(&User{}); err != nil {
+		return err
+	}
+	if err := SeedAdminUser(db); err != nil {
+		return err
+	}
+
 	// 1.5 Migrate Model table (depends on LLMProvider)
 	if err := db.AutoMigrate(&Model{}); err != nil {
 		return err
@@ -177,6 +185,7 @@ func autoMigrate(db *gorm.DB) error {
 		&Rule{},
 		&Task{},
 		&Session{},
+		&SessionFile{},
 		&ChatMessage{},
 		&Artifact{},
 		&PendingAction{},
