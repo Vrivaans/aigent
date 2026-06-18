@@ -10,7 +10,7 @@
     "03-auth-jwt-claims",
     "04-rbac-middleware"
   ],
-  "last_commit": null,
+  "last_commit": "96f252e",
   "last_iteration_at": "2026-06-18T22:12:30Z",
   "gates": {
     "go_test": "go test ./internal/... ./cmd/...",
