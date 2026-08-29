@@ -1,6 +1,6 @@
 {
   "name": "work_hunter_scout",
-  "description": "Busca oportunidades reales de micro-trabajo (bounties, bugs pagos) en GitHub: recolecta issues con bounty, filtra granjas/spam, evalúa salud del repo y scorrea por relación recompensa/esfuerzo/competencia. Devuelve JSON rankeado con score, señales de peligro y stack. Recomendado configurar GH_TOKEN en el entorno del server para evitar rate limits.",
+  "description": "Busca oportunidades reales de micro-trabajo (bounties, trabajo huérfano) en GitHub a través de Invok (sin manejar credenciales): recolecta issues, filtra granjas/spam, evalúa salud del repo, competencia real (PRs) y scorrea con money_evidence, bot_hours y flag auto_attackable. Devuelve JSON rankeado. Requiere Invok corriendo (default http://localhost:8080, configurable con env INVOK_URL).",
   "parameters": {
     "type": "object",
     "properties": {

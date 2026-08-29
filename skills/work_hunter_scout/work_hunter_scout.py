@@ -27,7 +27,11 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+INVOK_URL = os.environ.get("INVOK_URL", "http://localhost:8080").rstrip("/")
+# Fallback directo a api.github.com SOLO si Invok está caído y se pide
+# explicitamente. Default: fallar ruidoso (sin Invok no hay credenciales).
+ALLOW_DIRECT = os.environ.get("WORK_HUNTER_ALLOW_DIRECT", "0") == "1"
+GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
 QUERIES = {
     "bounties": [
         'label:bounty is:issue is:open sort:created-desc',
@@ -55,13 +59,71 @@ def log(m):
     print(m, file=sys.stderr, flush=True)
 
 
+def _parse_mcp_body(body):
+    """Extrae el texto de una respuesta JSON-RPC (acepta body SSE o JSON puro)
+    y parsea el contenido de la tool (Invok envuelve respuestas externas en
+    <UntrustedExternalContent>: se limpia antes de json.loads)."""
+    raw = body
+    if "data:" in body and body.lstrip().startswith(("event:", "data:")):
+        lines = [l[5:].strip() for l in body.splitlines() if l.startswith("data:")]
+        raw = lines[-1] if lines else body
+    resp = json.loads(raw)
+    if "error" in resp:
+        log(f"invok rpc error: {str(resp['error'])[:200]}")
+        return None
+    result = resp.get("result") or {}
+    content = (result.get("content") or [{}])[0].get("text", "")
+    cleaned = re.sub(r"</?UntrustedExternalContent>", "", content).strip()
+    if not cleaned:
+        return None
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return cleaned
+
+
+_RPC_ID = [0]
+
+
+def invok_call(tool, args, retries=2):
+    """Ejecuta una tool de Invok via MCP (JSON-RPC sobre HTTP). Las credenciales
+    de GitHub viven cifradas en Invok: esta skill jamás las ve ni las maneja."""
+    _RPC_ID[0] += 1
+    payload = json.dumps({
+        "jsonrpc": "2.0", "id": _RPC_ID[0], "method": "tools/call",
+        "params": {"name": tool, "arguments": args},
+    }).encode()
+    req = urllib.request.Request(f"{INVOK_URL}/mcp", data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json, text/event-stream")
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                return _parse_mcp_body(r.read().decode())
+        except urllib.error.HTTPError as e:
+            if attempt < retries and e.code in (500, 502, 503, 504):
+                time.sleep(2 * (attempt + 1))
+                continue
+            log(f"invok {tool}: HTTP {e.code}")
+            return None
+        except Exception as e:
+            if attempt < retries:
+                time.sleep(2 * (attempt + 1))
+                continue
+            log(f"invok {tool}: {e}")
+            return None
+    return None
+
+
 def gh(path, retries=1):
+    """Fallback directo (sin credenciales salvo GH_TOKEN en env). Solo se usa
+    si ALLOW_DIRECT=1 e Invok no responde."""
     url = f"https://api.github.com{path}"
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("User-Agent", "aigent-work-hunter")
-    if TOKEN:
-        req.add_header("Authorization", f"Bearer {TOKEN}")
+    if GH_TOKEN:
+        req.add_header("Authorization", f"Bearer {GH_TOKEN}")
     for attempt in range(retries + 1):
         try:
             with urllib.request.urlopen(req, timeout=25) as r:
@@ -79,6 +141,41 @@ def gh(path, retries=1):
             log(f"error {path}: {e}")
             return None
     return None
+
+
+MODE = "invok"  # o "direct", resuelto en main()
+
+
+def api_search(q, per_page, sort=None, order=None):
+    if MODE == "invok":
+        args = {"q": q, "per_page": per_page}
+        if sort:
+            args["sort"] = sort
+        if order:
+            args["order"] = order
+        return invok_call("github-search-issues", args)
+    extra = f"&per_page={per_page}"
+    if sort:
+        extra += f"&sort={sort}"
+    if order:
+        extra += f"&order={order}"
+    return gh(f"/search/issues?q={urllib.parse.quote(q)}{extra}")
+
+
+def api_repo(fullname):
+    if MODE == "invok":
+        owner, repo = fullname.split("/", 1)
+        return invok_call("github-get-repo", {"owner": owner, "repo": repo})
+    return gh(f"/repos/{fullname}")
+
+
+def api_timeline(fullname, number):
+    if MODE == "invok":
+        owner, repo = fullname.split("/", 1)
+        return invok_call("github-issue-timeline",
+                          {"owner": owner, "repo": repo,
+                           "issue_number": int(number), "per_page": 100})
+    return gh(f"/repos/{fullname}/issues/{number}/timeline?per_page=100")
 
 
 def days_ago(iso):
@@ -189,14 +286,27 @@ def main():
     deep_check = int(args.get("deep_check", 8))
     sources = args.get("sources", ["bounties", "orphan"])
     dataset_path = args.get("dataset_path", "scratch/work_hunter/dataset/opportunities.jsonl")
-    if not TOKEN:
-        log("WARNING: sin GH_TOKEN (cuotas bajas; el modulo de credenciales del arnes lo resolvera)")
+
+    # ── 0. resolver modo de acceso: Invok (autenticado, sin ver credenciales) ──
+    global MODE
+    health = invok_call("github-get-user", {}, retries=1)
+    if isinstance(health, dict) and health.get("login"):
+        MODE = "invok"
+        log(f"modo: invok (autenticado como {health['login']}) — sin cuotas anonimas")
+    elif ALLOW_DIRECT:
+        MODE = "direct"
+        log("modo: direct (fallback) — Invok no responde; cuotas anonimas salvo GH_TOKEN")
+    else:
+        stats = {"error": "invok_unavailable",
+                 "hint": f"Invok no responde en {INVOK_URL}/mcp. Levantalo (docker compose up -d en el proyecto invok) o pasa WORK_HUNTER_ALLOW_DIRECT=1 para forzar fallback sin credenciales."}
+        print(json.dumps({"stats": stats, "opportunities": []}, ensure_ascii=False))
+        return
 
     # ── 1. recolectar ──
     items = {}
     for src in sources:
         for q in QUERIES.get(src, []):
-            data = gh(f"/search/issues?q={urllib.parse.quote(q)}&per_page={min(max_per_query, 50)}")
+            data = api_search(q, min(max_per_query, 50))
             if data and "items" in data:
                 for it in data["items"]:
                     url = it.get("html_url", "")
@@ -213,12 +323,13 @@ def main():
                         "source": src,
                         "body": (it.get("body") or "")[:1500],
                     }
-            time.sleep(7 if not TOKEN else 1)
+            time.sleep(2 if MODE == "invok" else 7)
     all_items = list(items.values())
     repo_counts = {}
     for it in all_items:
         repo_counts[it["repo"]] = repo_counts.get(it["repo"], 0) + 1
-    stats = {"collected": len(all_items), "sources": sources, "token": bool(TOKEN)}
+    stats = {"collected": len(all_items), "sources": sources,
+             "mode": MODE, "github_user": health.get("login") if isinstance(health, dict) else None}
     log(f"collected: {len(all_items)}")
 
     # ── 2. pre-filtro cheapo y pre-score ──
@@ -257,8 +368,8 @@ def main():
     finalists = candidates[:deep_check]
     results = []
     for j, it in enumerate(finalists):
-        info = gh(f"/repos/{it['repo']}")
-        time.sleep(1.2 if not TOKEN else 0.2)
+        info = api_repo(it["repo"])
+        time.sleep(0.5 if MODE == "invok" else 1.2)
         if not info or "full_name" not in info:
             it["_prefilter"] = "REPO_UNAVAILABLE"
             continue
@@ -273,8 +384,8 @@ def main():
             it["_prefilter"] = "DEAD_REPO"
             continue
         prs = None
-        tl = gh(f"/repos/{it['repo']}/issues/{it['number']}/timeline?per_page=100")
-        time.sleep(1.2 if not TOKEN else 0.2)
+        tl = api_timeline(it["repo"], it["number"])
+        time.sleep(0.5 if MODE == "invok" else 1.2)
         if isinstance(tl, list):
             prs = len([e for e in tl
                        if e.get("event") == "cross-referenced"
