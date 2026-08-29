@@ -30,7 +30,7 @@ func NewClient(apiKey, baseURL string) *OpenRouterClient {
 	return &OpenRouterClient{
 		APIKey:     apiKey,
 		BaseURL:    baseURL,
-		HTTPClient: &http.Client{Timeout: 90 * time.Second},
+		HTTPClient: &http.Client{Timeout: 300 * time.Second},
 	}
 }
 

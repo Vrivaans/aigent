@@ -84,7 +84,9 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	}
 
 	// 3. Ejecutar The Brain Loop
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// 10 min: el loop agéntico puede encadenar varias iteraciones LLM + ejecución
+	// de tools largas (scout de GitHub, timelines). 2 min cortaba rondas legítimas.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	respMsg, _, err := h.Brain.ProcessChatInteraction(ctx, session.ID, nil, req.Message)
@@ -337,7 +339,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 		}
 
 		// Re-inferencia tras el rechazo final
-		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		newCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
 		msg, _, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, nil, "")
@@ -367,7 +369,8 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 
 	// EXECUTE TOOL
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	// 5 min: tools como work_hunter_scout hacen multiple llamadas a APIs externas.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	var args map[string]interface{}
@@ -459,7 +462,7 @@ func (h *ChatHandler) HandleConfirm(c *fiber.Ctx) error {
 	}
 
 	// 7. RE-INFERENCIA: Reanudamos el bucle del agente al estar todo resuelto.
-	newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	newCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	msg, _, err := h.Brain.ProcessChatInteraction(newCtx, pending.SessionID, nil, "")
