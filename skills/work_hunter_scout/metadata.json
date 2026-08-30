@@ -1,6 +1,6 @@
 {
   "name": "work_hunter_scout",
-  "description": "Busca oportunidades reales de micro-trabajo (bounties, trabajo huérfano) en GitHub a través de Invok (sin manejar credenciales): recolecta issues, filtra granjas/spam, evalúa salud del repo, competencia real (PRs) y scorrea con money_evidence, bot_hours y flag auto_attackable. Devuelve JSON rankeado. Requiere Invok corriendo (default http://localhost:8080, configurable con env INVOK_URL).",
+  "description": "Scout multi-fuente de trabajo técnico con valor económico, todo vía Invok (sin manejar credenciales). Fuentes: bounties de GitHub (filtra granjas/spam), orphan work en repos activos (con detección de FUNDING.yml = maintainer con presupuesto), gigs de HN (Who is Hiring + hilo freelance), contratos RemoteOK. Esquema unificado: payment_risk, fees_pct, competition, task_type (matriz boring-work), bot_hours y auto_attackable. Devuelve JSON rankeado. Requiere Invok corriendo (default http://localhost:8080, env INVOK_URL).",
   "parameters": {
     "type": "object",
     "properties": {
