@@ -53,6 +53,7 @@ STACK_KW = [("test", 8), ("coverage", 8), ("ci", 6), ("docker", 7), ("github act
 BORING_RE = re.compile(r"\b(test|coverage|e2e|unit test|jsdoc|openapi|swagger|deprecat|"
                        r"upgrade|bump|dependency|linter|lint|readme)\w*", re.IGNORECASE)
 FEATURE_RE = re.compile(r"\b(feature|implement|build|architect|redesign)\b", re.IGNORECASE)
+FREELANCER_QUERIES = ["java spring", "typescript react", "go api", "docker ci"]
 GIG_SEEKING_RE = re.compile(r"looking for|we('re| are) (looking|seeking|hiring)|need a freelancer|"
                             r"seeking (a )?freelancer|budget (of |is )?\$|pay(ing)? \$|hiring a", re.IGNORECASE)
 GIG_OFFERING_RE = re.compile(r"^i('| a)m available|my portfolio|my rates|i offer|hire me", re.IGNORECASE)
@@ -259,7 +260,7 @@ def competition_factor(prs, comments, is_bounty):
     return round(f, 2)
 
 
-def payment_risk(source, ev, sponsored=False):
+def payment_risk(source, ev, sponsored=False, escrow=False):
     if source in ("bounties",):
         if ev >= 3:
             return "escrow_platform"
@@ -270,6 +271,8 @@ def payment_risk(source, ev, sponsored=False):
         return "sponsor_dialogue" if sponsored else "trust_only"
     if source == "hn":
         return "trust_only"
+    if source == "freelancer":
+        return "escrow_platform" if escrow else "milestone"
     if source == "remoteok":
         return "employer"
     return "trust_only"
@@ -488,15 +491,72 @@ def collect_remoteok(items, max_per_query):
     log("remoteok: procesado")
 
 
+def collect_freelancer(items, max_per_query):
+    """Proyectos activos de Freelancer.com via recipe en Invok (PAT del usuario).
+    Campos clave: budget.minimum/maximum (presupuesto real), bid_stats.bid_count
+    (competencia directa), is_escrow_project (payment_risk)."""
+    for q in FREELANCER_QUERIES:
+        data = invok_call("freelancer-search-projects",
+                          {"query": q, "limit": min(max_per_query, 25),
+                           "full_description": True})
+        time.sleep(1)
+        if not (isinstance(data, dict) and data.get("result", {}).get("projects")):
+            continue
+        for p in data["result"]["projects"]:
+            pid = p.get("id")
+            if not pid or f"freelancer-{pid}" in items:
+                continue
+            budget = p.get("budget") or {}
+            bids = (p.get("bid_stats") or {}).get("bid_count") or 0
+            desc = re.sub(r"<[^>]+>", " ", p.get("description") or "")
+            items[f"freelancer-{pid}"] = {
+                "url": f"https://www.freelancer.com/projects/{p.get('seo_url')}" if p.get("seo_url")
+                       else f"https://www.freelancer.com/projects/{pid}.html",
+                "repo": (p.get("owner_info") or {}).get("username") or f"project-{pid}",
+                "number": pid,
+                "title": (p.get("title") or "")[:90],
+                "labels": [j.get("name", "") for j in (p.get("jobs") or []) if isinstance(j, dict)],
+                "comments": bids,          # bids = competencia de la plataforma
+                "reactions": 0,
+                "created_at": datetime.fromtimestamp(p.get("submitdate") or 0, tz=timezone.utc).isoformat() if p.get("submitdate") else "",
+                "source": "freelancer",
+                "body": (f"[budget={budget.get('minimum')}-{budget.get('maximum')} "
+                         f"{(p.get('currency') or {}).get('code', '')} "
+                         f"[escrow={bool(p.get('is_escrow_project'))}] "
+                         f"[bids={bids} avg={(p.get('bid_stats') or {}).get('bid_avg')}] ") + desc[:1400],
+            }
+            # reward y evidencia directa del presupuesto
+            it = items[f"freelancer-{pid}"]
+            it["money_evidence"] = 3 if p.get("is_escrow_project") else 2
+            it["reward_estimate"] = int(budget.get("minimum") or 0) or None
+            it["_freelancer_budget"] = budget
+            it["_freelancer_escrow"] = bool(p.get("is_escrow_project"))
+        log(f"freelancer: '{q}' procesado")
+    time.sleep(1)
+
+
+def bid_competition_factor(bids):
+    """p_accept base por cantidad de bids en la plataforma."""
+    if bids <= 5:
+        return 0.7
+    if bids <= 20:
+        return 0.45
+    if bids <= 50:
+        return 0.3
+    if bids <= 100:
+        return 0.2
+    return 0.12
+
+
 def main():
-    global MODE
+    global MODE, repo_counts
     try:
         args = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError:
         args = {}
     max_per_query = int(args.get("max_per_query", 25))
     deep_check_n = int(args.get("deep_check", 8))
-    sources = args.get("sources", ["bounties", "orphan", "hn", "remoteok"])
+    sources = args.get("sources", ["bounties", "orphan", "hn", "remoteok", "freelancer"])
     dataset_path = args.get("dataset_path", "scratch/work_hunter/dataset/opportunities.jsonl")
 
     # ── 0. modo de acceso ──
@@ -522,6 +582,8 @@ def main():
         collect_hn(items, max_per_query)
     if "remoteok" in sources:
         collect_remoteok(items, max_per_query)
+    if "freelancer" in sources:
+        collect_freelancer(items, max_per_query)
 
     all_items = list(items.values())
     repo_counts = {}
@@ -536,7 +598,11 @@ def main():
     for it in all_items:
         text = it["title"] + " " + it["body"]
         ev, amount = money_evidence(text, it["labels"])
-        it["money_evidence"], it["reward_estimate"] = ev, amount
+        if it["source"] == "freelancer":
+            # el collector ya trajo budget/bids reales del API: no pisar
+            ev, amount = it["money_evidence"], it["reward_estimate"]
+        else:
+            it["money_evidence"], it["reward_estimate"] = ev, amount
         is_bounty = any("bounty" in l.lower() or "💰" in l for l in it["labels"])
         it["is_bounty"] = is_bounty
         it["age_days"] = round(days_ago(it["created_at"]), 1)
@@ -617,13 +683,26 @@ def main():
     for it in candidates:
         if it["url"] in deep_checked_urls or it["source"] in GH_QUERIES:
             continue
-        if it["_prefilter"] if "_prefilter" in it else False:
+        if it.get("_prefilter"):
             continue
-        p_accept = 0.7 if it["source"] == "hn" else 0.4
-        results.append(_unified(it, "GIG_FRESH" if it["source"] == "hn" else "CONTRACT",
-                                None, p_accept, False, it["bot_hours"],
-                                round((it["reward_estimate"] or 0) * p_accept / max(it["bot_hours"], 0.1), 2),
-                                it["task_type"] in ("test", "docs", "deps", "code"), None))
+        if it["source"] == "hn":
+            p_accept, cat = 0.7, "GIG_FRESH"
+        elif it["source"] == "freelancer":
+            p_accept = bid_competition_factor(it["comments"])
+            cat = "ESCROW_ACTIVE" if it.get("_freelancer_escrow") else "PROJECT_ACTIVE"
+        else:
+            p_accept, cat = 0.4, "CONTRACT"
+        bot_h = it["bot_hours"]
+        fees = 0.10 if it["source"] == "freelancer" else 0.0
+        reward = it["reward_estimate"] or 0
+        if it["source"] == "freelancer":
+            auto = (it["task_type"] in ("test", "docs", "deps", "code")
+                    and it["comments"] <= 20 and reward >= 10)
+        else:
+            auto = it["task_type"] in ("test", "docs", "deps", "code")
+        results.append(_unified(it, cat, None, p_accept, False, bot_h,
+                                round(reward * p_accept * (1 - fees) / max(bot_h, 0.1), 2),
+                                auto, None))
 
     results.sort(key=lambda x: -x["score"])
 
@@ -651,16 +730,18 @@ def main():
 
 
 def _unified(it, category, prs, p_accept, sponsored, bot_h, bot_hourly, auto_attackable, repo_info):
+    escrow = bool(it.get("_freelancer_escrow"))
+    fees = 0.10 if it["source"] == "freelancer" else 0.0
     return {
         "url": it["url"], "repo": it["repo"], "number": str(it["number"]),
         "title": it["title"], "source": it["source"],
         "type": {"bounties": "bounty", "orphan": "orphan_sponsored" if sponsored else "orphan",
-                 "hn": "gig", "remoteok": "contract"}.get(it["source"], "unknown"),
+                 "hn": "gig", "remoteok": "contract", "freelancer": "project"}.get(it["source"], "unknown"),
         "category": "ORPHAN_SPONSORED" if (sponsored and it["source"] == "orphan") else category,
         "task_type": it["task_type"],
         "money_evidence": it["money_evidence"], "reward_estimate": it["reward_estimate"],
-        "payment_risk": payment_risk(it["source"], it["money_evidence"], sponsored),
-        "fees_pct": 0,
+        "payment_risk": payment_risk(it["source"], it["money_evidence"], sponsored, escrow),
+        "fees_pct": fees,
         "competition_prs": prs,
         "competition": prs if prs is not None else it["comments"],
         "p_accept_base": p_accept, "age_days": it["age_days"],
