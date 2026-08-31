@@ -22,7 +22,61 @@
           </optgroup>
         }
       </select>
+
+      @if (session?.id) {
+        <button class="btn-cache-toggle" [class.active]="showCacheSettings()" (click)="showCacheSettings.set(!showCacheSettings())" [title]="t('chat.cache_toggle_title')">
+          ⚡ {{ showCacheSettings() ? t('chat.context_toggle_close') : t('chat.context_toggle_open') }}
+        </button>
+      }
     </div>
+
+    @if (session?.id && showCacheSettings()) {
+      <div class="cache-settings-panel">
+        <div class="panel-section">
+          <h4>🎯 {{ t('chat.goals_title') }}</h4>
+          <div class="input-inline">
+            <textarea class="goals-textarea" [ngModel]="sessionGoals()" (ngModelChange)="sessionGoals.set($event)" [placeholder]="t('chat.goals_placeholder')" rows="2"></textarea>
+            <button class="btn-save" [disabled]="isSavingGoals()" (click)="saveGoals()">
+              {{ isSavingGoals() ? '...' : t('chat.goals_save_btn') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h4>📂 {{ t('chat.workspace_title') }}</h4>
+          <div class="input-inline">
+            <input type="text" class="path-input" [ngModel]="workspacePath()" (ngModelChange)="workspacePath.set($event)" [placeholder]="t('chat.workspace_placeholder')">
+            <button class="btn-browse-folder" (click)="openFolderBrowser()">
+              {{ t('chat.workspace_browse_btn') }}
+            </button>
+            <button class="btn-save" [disabled]="isSavingWorkspace()" (click)="saveWorkspace()">
+              {{ isSavingWorkspace() ? '...' : t('chat.workspace_save_btn') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h4>📎 {{ t('chat.files_title') }}</h4>
+          <div class="upload-inline">
+            <input #contextFileInput type="file" style="display: none" (change)="uploadContextFile($event)" accept=".pdf,.html,.htm,.txt,.md,.json,.csv,.xlsx">
+            <button class="btn-upload-context" [disabled]="isUploading()" (click)="contextFileInput.click()">
+              {{ isUploading() ? t('chat.files_uploading_btn') : t('chat.files_upload_btn') }}
+            </button>
+          </div>
+          @if (sessionFiles().length > 0) {
+            <ul class="context-files-list">
+              @for (file of sessionFiles(); track file.id) {
+                <li>
+                  <span class="file-name" [title]="file.filename">📄 {{ file.filename }}</span>
+                  <span class="file-hash">({{ file.hash.substring(0, 8) }})</span>
+                  <button class="btn-delete-file" (click)="deleteContextFile(file.id)">✕</button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </div>
+    }
     
     <div class="messages" #scrollContainer>
       @if (messages().length === 0) {
@@ -189,11 +243,76 @@
               }
             </select>
           }
+          @if (isTextArtifact(art)) {
+            <button class="close-canvas-btn" (click)="downloadArtifact(art)" title="Descargar">⬇</button>
+          }
           <button class="close-canvas-btn" (click)="activeArtifact.set(null)">✕</button>
         </div>
       </div>
       <div class="canvas-content">
-        <app-diagram-renderer [code]="art.content" [title]="art.title" (nodeClicked)="onNodeClicked($event)"></app-diagram-renderer>
+        @if (isTextArtifact(art)) {
+          <pre class="artifact-text-view">{{ art.content }}</pre>
+        } @else {
+          <app-diagram-renderer [code]="art.content" [title]="art.title" (nodeClicked)="onNodeClicked($event)"></app-diagram-renderer>
+        }
+      </div>
+    </div>
+  }
+  @if (showFolderBrowser()) {
+    <div class="folder-browser-overlay">
+      <div class="folder-browser-dialog">
+        <div class="folder-browser-header">
+          <h3>📂 {{ t('chat.folder_browser_title') }}</h3>
+          <button class="btn-close-browser" (click)="showFolderBrowser.set(false)">✕</button>
+        </div>
+        <div class="folder-browser-path-bar">
+          <span>📁</span>
+          <span>{{ browsedPath() }}</span>
+        </div>
+        <div class="folder-browser-content">
+          @if (isLoadingDirectories()) {
+            <div class="folder-browser-loading-state">
+              <div class="dot-typing"></div>
+              <p>{{ t('chat.folder_browser_loading') }}</p>
+            </div>
+          } @else {
+            @if (browsedParentPath() && browsedParentPath() !== browsedPath()) {
+              <div class="folder-item parent-dir" (click)="goUpFolder()">
+                <div class="folder-item-info">
+                  <span class="folder-item-icon">⬆️</span>
+                  <span><strong>{{ t('chat.folder_browser_up') }}</strong></span>
+                </div>
+              </div>
+            }
+
+            @if (browsedDirectories().length === 0) {
+              <div class="folder-browser-empty-state">
+                <span>📂</span>
+                <p>{{ t('chat.folder_browser_empty') }}</p>
+              </div>
+            } @else {
+              @for (dir of browsedDirectories(); track dir) {
+                <div class="folder-item" (click)="selectFolder(dir)">
+                  <div class="folder-item-info">
+                    <span class="folder-item-icon">📁</span>
+                    <span>{{ dir }}</span>
+                  </div>
+                  <div class="folder-item-action">
+                    <span class="folder-item-icon">➜</span>
+                  </div>
+                </div>
+              }
+            }
+          }
+        </div>
+        <div class="folder-browser-footer">
+          <button class="btn-cancel-selection" (click)="showFolderBrowser.set(false)">
+            {{ t('chat.folder_browser_cancel') }}
+          </button>
+          <button class="btn-confirm-selection" [disabled]="isLoadingDirectories()" (click)="confirmFolderSelection()">
+            {{ t('chat.folder_browser_confirm') }}
+          </button>
+        </div>
       </div>
     </div>
   }

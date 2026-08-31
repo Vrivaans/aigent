@@ -50,12 +50,47 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   selectedModelId = signal<string>('');
   localAgentId = signal<number | null>(null);
 
+  // Smart Context Cache state
+  sessionGoals = signal<string>('');
+  workspacePath = signal<string>('');
+  sessionFiles = signal<any[]>([]);
+  showCacheSettings = signal<boolean>(false);
+  isSavingGoals = signal<boolean>(false);
+  isSavingWorkspace = signal<boolean>(false);
+
+  // Folder browser state
+  showFolderBrowser = signal<boolean>(false);
+  browsedPath = signal<string>('');
+  browsedDirectories = signal<string[]>([]);
+  browsedParentPath = signal<string>('');
+  isLoadingDirectories = signal<boolean>(false);
+
   selectedAgentId = computed(() => {
     return this.session ? this.session.agent_id : this.localAgentId();
   });
 
   artifacts = signal<any[]>([]);
   activeArtifact = signal<any | null>(null);
+
+  isTextArtifact(art: any): boolean {
+    const t = (art?.type || '').toLowerCase();
+    const f = (art?.format || '').toLowerCase();
+    if (t === 'diagram' || t === 'mermaid') return false;
+    const textTypes = ['csv', 'markdown', 'md', 'json', 'text', 'txt', 'report', 'table', 'document'];
+    return textTypes.some(k => t.includes(k) || f.includes(k)) || t === '';
+  }
+
+  downloadArtifact(art: any): void {
+    const f = (art?.format || art?.type || 'txt').toLowerCase();
+    const ext = f.includes('csv') ? 'csv' : f.includes('json') ? 'json' : f.includes('markdown') || f === 'md' ? 'md' : 'txt';
+    const blob = new Blob([art?.content || ''], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(art?.title || 'artifact').replace(/[^\w\-áéíóúñ ]+/gi, '').trim() || 'artifact'}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
@@ -77,11 +112,127 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
       const curr = changes['session'].currentValue as Session | null;
       if (curr?.id && curr.id !== prev?.id) {
         this.loadHistory();
+        this.loadCacheContext();
       } else if (!curr?.id) {
         this.messages.set([]);
         this.artifacts.set([]);
         this.activeArtifact.set(null);
+        this.sessionFiles.set([]);
+        this.sessionGoals.set('');
+        this.workspacePath.set('');
       }
+    }
+  }
+
+  async loadCacheContext() {
+    if (!this.session?.id) return;
+    const s = this.session as any;
+    this.sessionGoals.set(s.session_goals || '');
+    this.workspacePath.set(s.workspace_path || '');
+    try {
+      const files = await this.api.getSessionFiles(this.session.id);
+      this.sessionFiles.set(files);
+    } catch (e) {
+      console.error('Failed to load session context files:', e);
+    }
+  }
+
+  async saveGoals() {
+    if (!this.session?.id) return;
+    this.isSavingGoals.set(true);
+    try {
+      await this.api.updateSessionGoals(this.session.id, this.sessionGoals());
+      if (this.session) {
+        (this.session as any).session_goals = this.sessionGoals();
+      }
+    } catch (e) {
+      console.error('Failed to save goals', e);
+    } finally {
+      this.isSavingGoals.set(false);
+    }
+  }
+
+  async saveWorkspace() {
+    if (!this.session?.id) return;
+    this.isSavingWorkspace.set(true);
+    try {
+      await this.api.updateSessionWorkspace(this.session.id, this.workspacePath());
+      if (this.session) {
+        (this.session as any).workspace_path = this.workspacePath();
+      }
+    } catch (e) {
+      console.error('Failed to save workspace path', e);
+    } finally {
+      this.isSavingWorkspace.set(false);
+    }
+  }
+
+  async openFolderBrowser() {
+    this.showFolderBrowser.set(true);
+    await this.browseToPath(this.workspacePath() || '');
+  }
+
+  async browseToPath(path: string) {
+    this.isLoadingDirectories.set(true);
+    try {
+      const data = await this.api.browseWorkspace(path);
+      this.browsedPath.set(data.current_path);
+      this.browsedParentPath.set(data.parent_path);
+      this.browsedDirectories.set(data.directories || []);
+    } catch (e) {
+      console.error('Failed to browse path:', e);
+    } finally {
+      this.isLoadingDirectories.set(false);
+    }
+  }
+
+  async selectFolder(folderName: string) {
+    const current = this.browsedPath();
+    const separator = current.includes('\\') ? '\\' : '/';
+    let targetPath = current;
+    if (current.endsWith(separator)) {
+      targetPath = current + folderName;
+    } else {
+      targetPath = current + separator + folderName;
+    }
+    await this.browseToPath(targetPath);
+  }
+
+  async goUpFolder() {
+    const parent = this.browsedParentPath();
+    if (parent && parent !== this.browsedPath()) {
+      await this.browseToPath(parent);
+    }
+  }
+
+  confirmFolderSelection() {
+    this.workspacePath.set(this.browsedPath());
+    this.showFolderBrowser.set(false);
+  }
+
+  async uploadContextFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0 || !this.session?.id) return;
+    const file = input.files[0];
+    this.isUploading.set(true);
+    try {
+      await this.api.uploadSessionFile(this.session.id, file);
+      await this.loadCacheContext();
+    } catch (e) {
+      console.error('Failed to upload context file', e);
+    } finally {
+      this.isUploading.set(false);
+      input.value = '';
+    }
+  }
+
+  async deleteContextFile(fileId: number) {
+    if (!this.session?.id) return;
+    try {
+      await this.api.deleteSessionFile(this.session.id, fileId);
+      await this.loadCacheContext();
+    } catch (e) {
+      console.error('Failed to delete context file', e);
     }
   }
 
