@@ -4,13 +4,18 @@
   "parameters": {
     "type": "object",
     "properties": {
+      "sources": {
+        "type": "array",
+        "items": {"type": "string", "enum": ["bounties", "orphan", "hn", "remoteok", "freelancer"]},
+        "description": "Fuentes a cazar (default: todas). bounties/orphan = GitHub; hn = gigs Who-is-Hiring + hilo freelance; remoteok = contratos; freelancer = proyectos con presupuesto real y bid_count."
+      },
       "max_per_query": {
         "type": "integer",
         "description": "Máximo de issues a traer por query (default 30)."
       },
-      "skip_enrich": {
-        "type": "boolean",
-        "description": "Si es true, salta la fase de enriquecimiento/scoring por repo (más rápido, solo recolecta y filtra)."
+      "deep_check": {
+        "type": "integer",
+        "description": "Cuántos finalistas de GitHub deep-checkear con repo + timeline (default 8)."
       }
     }
   },

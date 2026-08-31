@@ -509,6 +509,7 @@ def collect_freelancer(items, max_per_query):
             budget = p.get("budget") or {}
             bids = (p.get("bid_stats") or {}).get("bid_count") or 0
             desc = re.sub(r"<[^>]+>", " ", p.get("description") or "")
+            currency = (p.get("currency") or {}).get("code", "")
             items[f"freelancer-{pid}"] = {
                 "url": f"https://www.freelancer.com/projects/{p.get('seo_url')}" if p.get("seo_url")
                        else f"https://www.freelancer.com/projects/{pid}.html",
@@ -520,15 +521,20 @@ def collect_freelancer(items, max_per_query):
                 "reactions": 0,
                 "created_at": datetime.fromtimestamp(p.get("submitdate") or 0, tz=timezone.utc).isoformat() if p.get("submitdate") else "",
                 "source": "freelancer",
-                "body": (f"[budget={budget.get('minimum')}-{budget.get('maximum')} "
-                         f"{(p.get('currency') or {}).get('code', '')} "
+                "body": (f"[currency={currency} budget={budget.get('minimum')}-{budget.get('maximum')} "
                          f"[escrow={bool(p.get('is_escrow_project'))}] "
                          f"[bids={bids} avg={(p.get('bid_stats') or {}).get('bid_avg')}] ") + desc[:1400],
             }
-            # reward y evidencia directa del presupuesto
+            # reward y evidencia directa del presupuesto — SOLO USD cuenta para
+            # la métrica (INR/EUR etc. distorsionan el bot_hourly: bug visto en producción)
             it = items[f"freelancer-{pid}"]
-            it["money_evidence"] = 3 if p.get("is_escrow_project") else 2
-            it["reward_estimate"] = int(budget.get("minimum") or 0) or None
+            bmin = int(budget.get("minimum") or 0)
+            if currency == "USD" and bmin > 0:
+                it["money_evidence"] = 3 if p.get("is_escrow_project") else 2
+                it["reward_estimate"] = bmin
+            else:
+                it["money_evidence"] = 0
+                it["reward_estimate"] = None
             it["_freelancer_budget"] = budget
             it["_freelancer_escrow"] = bool(p.get("is_escrow_project"))
         log(f"freelancer: '{q}' procesado")
@@ -648,12 +654,18 @@ def main():
             it["_prefilter"] = "DEAD_REPO"
             continue
         prs = None
+        closed_pr_attempts = None
         tl = api_timeline(it["repo"], it["number"])
         time.sleep(0.5 if MODE == "invok" else 1.2)
         if isinstance(tl, list):
-            prs = len([e for e in tl
-                       if e.get("event") == "cross-referenced"
-                       and (e.get("source") or {}).get("issue", {}).get("pull_request")])
+            cross = [e for e in tl
+                     if e.get("event") == "cross-referenced"
+                     and (e.get("source") or {}).get("issue", {}).get("pull_request")]
+            prs = len(cross)
+            # gente que intentó y no logró merge: señal de dificultad (o de maintainer duro)
+            closed_pr_attempts = len([e for e in cross
+                                      if (e["source"]["issue"].get("state") == "closed"
+                                          and not e["source"]["issue"]["pull_request"].get("merged_at"))])
         ev, amount = it["money_evidence"], it["reward_estimate"]
         cat = categorize(it, prs, (ev, amount))
         p_accept = competition_factor(prs, it["comments"], it["is_bounty"])
@@ -675,9 +687,10 @@ def main():
                                     "stars": info.get("stargazers_count", 0),
                                     "language": info.get("language", ""),
                                     "open_issues": info.get("open_issues_count", 0),
-                                    "days_since_push": round(days_ago(info.get("pushed_at", "")), 1)}))
+                                    "days_since_push": round(days_ago(info.get("pushed_at", "")), 1)},
+                                closed_pr_attempts=closed_pr_attempts))
         log(f"[{j+1}/{len(gh_finalists)}] {it['repo']}#{it['number']} -> {cat}/{it['task_type']} "
-            f"(prs={prs}, ev={ev}, sponsor={sponsored}, auto={auto_attackable})")
+            f"(prs={prs}, closed_attempts={closed_pr_attempts}, ev={ev}, sponsor={sponsored}, auto={auto_attackable})")
 
     # no-GitHub: pasan directo con su esquema
     for it in candidates:
@@ -702,7 +715,8 @@ def main():
             auto = it["task_type"] in ("test", "docs", "deps", "code")
         results.append(_unified(it, cat, None, p_accept, False, bot_h,
                                 round(reward * p_accept * (1 - fees) / max(bot_h, 0.1), 2),
-                                auto, None))
+                                auto, None,
+                                extra_abandonment=_abandonment_signals_freelancer(it)))
 
     results.sort(key=lambda x: -x["score"])
 
@@ -729,9 +743,29 @@ def main():
     print(json.dumps({"stats": stats, "opportunities": results[:25]}, ensure_ascii=False, indent=1))
 
 
-def _unified(it, category, prs, p_accept, sponsored, bot_h, bot_hourly, auto_attackable, repo_info):
+def _abandonment_signals_freelancer(it):
+    """Señales de por qué un proyecto de Freelancer no recibe bids/atención."""
+    budget = it.get("_freelancer_budget") or {}
+    bmin, bmax = budget.get("minimum") or 0, budget.get("maximum") or 0
+    return {
+        "age_days": it.get("age_days"),
+        "bid_count": it.get("comments"),
+        "budget_min": bmin, "budget_max": bmax,
+        "escrow": it.get("_freelancer_escrow", False),
+    }
+
+
+def _unified(it, category, prs, p_accept, sponsored, bot_h, bot_hourly, auto_attackable, repo_info,
+             closed_pr_attempts=None, extra_abandonment=None):
     escrow = bool(it.get("_freelancer_escrow"))
     fees = 0.10 if it["source"] == "freelancer" else 0.0
+    abandonment = extra_abandonment or {
+        "age_days": it.get("age_days"),
+        "prs_competing": prs,
+        "closed_pr_attempts": closed_pr_attempts,
+        "sponsored": sponsored,
+        "repo_days_since_push": (repo_info or {}).get("days_since_push"),
+    }
     return {
         "url": it["url"], "repo": it["repo"], "number": str(it["number"]),
         "title": it["title"], "source": it["source"],
@@ -749,6 +783,7 @@ def _unified(it, category, prs, p_accept, sponsored, bot_h, bot_hourly, auto_att
         "repo_info": repo_info,
         "bot_hours_estimate": bot_h, "bot_hourly_hint": bot_hourly,
         "auto_attackable": auto_attackable,
+        "abandonment_signals": abandonment,
         "body_snippet": it["body"][:400],
     }
 
