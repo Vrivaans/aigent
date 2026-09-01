@@ -13,6 +13,10 @@
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   min-height: 48px;
+  /* Contexto de apilamiento: el dropdown de notificaciones debe pintarse
+     por encima del chat, pero debajo de los modales (1000+). */
+  position: relative;
+  z-index: 500;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
