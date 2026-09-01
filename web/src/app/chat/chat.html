@@ -28,6 +28,38 @@
           ⚡ {{ showCacheSettings() ? t('chat.context_toggle_close') : t('chat.context_toggle_open') }}
         </button>
       }
+
+      <div class="notif-wrapper">
+        <button class="notif-bell" (click)="toggleNotifications()" title="Notificaciones">
+          🔔
+          @if (unreadCount() > 0) {
+            <span class="notif-badge">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
+          }
+        </button>
+        @if (showNotifications()) {
+          <div class="notif-dropdown">
+            <div class="notif-dropdown-header">
+              <span>Notificaciones</span>
+              <button class="notif-mark-all" (click)="markAllNotifsRead()" title="Marcar todas leídas">✓✓</button>
+            </div>
+            @if (notifications().length === 0) {
+              <div class="notif-empty">Sin notificaciones</div>
+            }
+            @for (n of notifications(); track n.id) {
+              <div class="notif-item" [class.notif-unread]="!n.read_at" (click)="openNotification(n)">
+                <span class="notif-item-icon">{{ notifIcon(n.level) }}</span>
+                <div class="notif-item-body">
+                  <div class="notif-item-title">{{ n.title }}</div>
+                  <div class="notif-item-msg">{{ n.body }}</div>
+                  @if (n.session_title) {
+                    <div class="notif-item-session">💬 {{ n.session_title }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
     </div>
 
     @if (session?.id && showCacheSettings()) {

@@ -120,9 +120,13 @@ func main() {
 		log.Printf("⚠️ RuleGo Workflows initialization failed: %v", err)
 	}
 
-	// 4. Levantar Cron Worker
+	// 3.6 Durable Execution: recuperar runs/tareas interrumpidas por un reinicio
+	// y arrancar el worker de reconciliación (aprobaciones resueltas, zombies).
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ai.StartDurableWorker(ctx, brain)
+
+	// 4. Levantar Cron Worker
 	go scheduler.StartCronWorker(ctx, brain)
 
 	// 5. Inicializar Fiber App y Rutas
@@ -252,6 +256,12 @@ func main() {
 	chatRead.Get("/sessions/:id/artifacts", chatHandler.GetSessionArtifacts)
 	chatRead.Get("/approvals", chatHandler.GetPendingApprovals)
 	chatRead.Get("/approvals/history", chatHandler.GetApprovalHistory)
+
+	// Centro de notificaciones (mensajes de agentes al usuario, linkeados a sesión)
+	chatRead.Get("/notifications", handlers.GetNotifications)
+	chatRead.Get("/notifications/unread-count", handlers.GetUnreadCount)
+	chatWrite.Post("/notifications/:id/read", handlers.MarkNotificationRead)
+	chatWrite.Post("/notifications/read-all", handlers.MarkAllNotificationsRead)
 
 	chatWrite.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
 	chatWrite.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)

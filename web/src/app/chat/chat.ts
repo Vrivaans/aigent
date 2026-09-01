@@ -39,6 +39,7 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   @Input() session: Session | null | undefined = null;
   @Output() agentChanged = new EventEmitter<void>();
   @Output() sessionCreated = new EventEmitter<number>();
+  @Output() openSessionRequest = new EventEmitter<number>();
 
   messages = signal<ChatMessageUI[]>([]);
   inputText = signal('');
@@ -72,6 +73,45 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
   artifacts = signal<any[]>([]);
   activeArtifact = signal<any | null>(null);
 
+  // ── Centro de notificaciones ──
+  notifications = signal<any[]>([]);
+  unreadCount = signal<number>(0);
+  showNotifications = signal<boolean>(false);
+
+  async loadNotifications() {
+    try {
+      this.notifications.set(await this.api.getNotifications());
+      this.unreadCount.set(await this.api.getUnreadNotificationCount());
+    } catch (e) {
+      console.error('Failed to load notifications:', e);
+    }
+  }
+
+  toggleNotifications() {
+    this.showNotifications.set(!this.showNotifications());
+    if (this.showNotifications()) this.loadNotifications();
+  }
+
+  async openNotification(n: any) {
+    if (!n.read_at) {
+      await this.api.markNotificationRead(n.id).catch(() => {});
+      this.loadNotifications();
+    }
+    if (n.session_id > 0) {
+      this.showNotifications.set(false);
+      this.openSessionRequest.emit(n.session_id);
+    }
+  }
+
+  async markAllNotifsRead() {
+    await this.api.markAllNotificationsRead().catch(() => {});
+    this.loadNotifications();
+  }
+
+  notifIcon(level: string): string {
+    return level === 'success' ? '✅' : level === 'warning' ? '⚠️' : '🔔';
+  }
+
   isTextArtifact(art: any): boolean {
     const t = (art?.type || '').toLowerCase();
     const f = (art?.format || '').toLowerCase();
@@ -99,6 +139,8 @@ export class Chat implements OnInit, OnChanges, AfterViewChecked {
     if (this.agents().length > 0) {
       this.localAgentId.set(this.agents()[0].id);
     }
+    this.loadNotifications();
+    setInterval(() => this.loadNotifications(), 60000);
     try {
       this.modelGroups.set(await this.api.getAllModels());
     } catch {

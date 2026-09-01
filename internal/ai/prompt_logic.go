@@ -144,6 +144,7 @@ func NewBrain(llmKey, llmBaseURL string, handsaiCfg handsai.Config, permHandler 
 // registerNativeTools re-registers all built-in (Go) tools in the registry.
 // Called on startup and on every SyncTools to avoid losing native tools after a clear.
 func (b *Brain) registerNativeTools() {
+	registerNotificationTools(b)
 	b.Registry.Register(ToolDef{
 		Name:        "schedule_task",
 		Description: "Programa una tarea recurrente que ejecutará un agente con un prompt en lenguaje natural a la frecuencia indicada.",
@@ -425,7 +426,29 @@ Ejemplo:
   }
 }
 
-### 2. Transformación JavaScript (type: "jsTransform")
+### 2. Sub-Agente Asíncrono (type: "aigent/agent")
+Invoca a un agente especializado de AIgent como sub-tarea DURABLE: el workflow queda en estado WAITING (sin consumir recursos) y se reanuda automáticamente cuando el sub-agente termina, incluso si el servidor se reinicia en el medio.
+- **type**: "aigent/agent"
+- **configuration**:
+  - "agentId" (número, opcional) o "agentName" (texto, opcional): agente a invocar. Si se omiten, usa el agente por defecto.
+  - "prompt" (texto, requerido): instrucción para el sub-agente. Podés incluir el placeholder ${data} que se reemplaza por la salida del nodo anterior.
+  - "autoApprove" (boolean, opcional): si es true, pre-aprueba las herramientas sensibles que use el sub-agente en esta corrida. Si es false (default), se respetan los permisos persistentes del agente y las herramientas sensibles sin permiso pausan la tarea hasta aprobación humana (el workflow se reanuda solo después).
+  - "missionId" (número, opcional): vincula la ejecución a una Misión (hereda su goal y workspace).
+- **Salida**: JSON con {"session_id", "response", "status"} del sub-agente.
+Ejemplo:
+{
+  "id": "n2",
+  "type": "aigent/agent",
+  "name": "Investigar con STORM",
+  "configuration": {
+    "agentName": "Investigador",
+    "prompt": "Investigá a fondo este tema y guardá el resultado como artifact de la misión: ${data}",
+    "autoApprove": false,
+    "missionId": 1
+  }
+}
+
+### 3. Transformación JavaScript (type: "jsTransform")
 Ejecuta código JavaScript ES5 para transformar el mensaje ("msg") o los metadatos ("metadata").
 - **type**: "jsTransform"
 - **configuration**: Debe incluir "jsScript" con una función JS que retorne un objeto con {'msg': msg, 'metadata': metadata, 'msgType': msgType}.
@@ -439,7 +462,7 @@ Ejemplo:
   }
 }
 
-### 3. Filtro JavaScript (type: "jsFilter")
+### 4. Filtro JavaScript (type: "jsFilter")
 Filtra mensajes según una condición lógica en JS.
 - **type**: "jsFilter"
 - **configuration**: Debe incluir "jsScript" que retorne true o false.
@@ -454,7 +477,7 @@ Ejemplo:
   }
 }
 
-### 4. Switch de Ruta JavaScript (type: "jsSwitch")
+### 5. Switch de Ruta JavaScript (type: "jsSwitch")
 Enruta el mensaje a uno o más caminos según una condición JS.
 - **type**: "jsSwitch"
 - **configuration**: Debe incluir "jsScript" que retorne una lista de nombres de relaciones (ej. ['RutaA', 'RutaB']).
@@ -474,7 +497,7 @@ Las conexiones enlazan nodos. Campos requeridos:
 - **fromId**: El ID del nodo de origen.
 - **toId**: El ID del nodo de destino.
 - **type**: Tipo de relación.
-  - Para "aigent/tool" y "jsTransform": usar "Success" o "Failure".
+  - Para "aigent/tool", "aigent/agent" y "jsTransform": usar "Success" o "Failure".
   - Para "jsFilter": usar "True" o "False".
   - Para "jsSwitch": el nombre del canal devuelto por el JS.
 
@@ -490,6 +513,9 @@ Puedes usar cualquiera de estas herramientas activas en los nodos de tipo "aigen
 		},
 		Sensitive: false,
 	})
+
+	// Tools de Misión (blackboard compartido para trabajo de larga duración)
+	b.registerMissionTools()
 }
 
 // SyncTools fetches tools from HandsAI and registers them in the local Registry.
@@ -846,7 +872,7 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 		log.Printf("⚠️ SmartContextCache: Failed to fetch session files for session #%d: %v", sessionID, err)
 	}
 
-	maxIterations := 5
+	maxIterations := 8
 	for i := 0; i < maxIterations; i++ {
 		currentProvider := providerCandidates[activeProviderIdx]
 		defaultModel := modelForActiveProvider(&session, currentProvider)
@@ -953,7 +979,7 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 				}
 
 				log.Printf("🦾 Executing non-sensitive tool pre-confirmation: %s", realName)
-				result, execErr := tDef.Execute(ctx, finalArgs)
+				result, execErr := tDef.Execute(withNotificationSession(ctx, sessionID), finalArgs)
 				resultStr := string(result)
 				if execErr != nil {
 					resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
@@ -995,7 +1021,7 @@ func (b *Brain) ProcessChatInteraction(ctx context.Context, sessionID uint, chat
 			}
 
 			log.Printf("🦾 Executing tool: %s with args: %v", realName, finalArgs)
-			result, execErr := tDef.Execute(ctx, finalArgs)
+			result, execErr := tDef.Execute(withNotificationSession(ctx, sessionID), finalArgs)
 			resultStr := string(result)
 			if execErr != nil {
 				resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
@@ -1239,7 +1265,7 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 		log.Printf("⚠️ SmartContextCache: Failed to fetch session files for stream session #%d: %v", sessionID, err)
 	}
 
-	maxIterations := 5
+	maxIterations := 8
 	var lastChoice *ChoiceMessage
 
 	for i := 0; i < maxIterations; i++ {
@@ -1418,7 +1444,7 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 				}
 
 				onEvent("tool_start", map[string]interface{}{"name": realName, "arguments": finalArgs})
-				result, execErr := tDef.Execute(ctx, finalArgs)
+				result, execErr := tDef.Execute(withNotificationSession(ctx, sessionID), finalArgs)
 				resultStr := string(result)
 				if execErr != nil {
 					resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
@@ -1464,7 +1490,7 @@ func (b *Brain) ProcessChatInteractionStream(ctx context.Context, sessionID uint
 			}
 
 			onEvent("tool_start", map[string]interface{}{"name": realName, "arguments": finalArgs})
-			result, execErr := tDef.Execute(ctx, finalArgs)
+			result, execErr := tDef.Execute(withNotificationSession(ctx, sessionID), finalArgs)
 			resultStr := string(result)
 			if execErr != nil {
 				resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())

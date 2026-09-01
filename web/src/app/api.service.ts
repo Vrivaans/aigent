@@ -338,6 +338,25 @@ export class ApiService {
     return res.json();
   }
 
+  async getNotifications(unreadOnly = false): Promise<any[]> {
+    const res = await this.fetchApi(`/notifications${unreadOnly ? '?unread=true' : ''}`);
+    return res.json();
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const res = await this.fetchApi('/notifications/unread-count');
+    const d = await res.json();
+    return d.unread || 0;
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await this.fetchApi(`/notifications/${id}/read`, {method: 'POST'});
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.fetchApi('/notifications/read-all', {method: 'POST'});
+  }
+
   async sendChatMessage(sessionId: number, message: string, modelOverride?: string): Promise<{
     status?: string;
     error?: string;

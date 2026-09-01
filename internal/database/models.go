@@ -187,6 +187,18 @@ type Artifact struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// Notification: mensaje de un agente al usuario, linkeado a la sesión que lo
+// originó para continuar el contexto desde el centro de notificaciones.
+type Notification struct {
+	ID        uint       `gorm:"primarykey" json:"id"`
+	SessionID uint       `gorm:"index" json:"session_id"`
+	Title     string     `gorm:"size:255;not null" json:"title"`
+	Body      string     `gorm:"type:text" json:"body"`
+	Level     string     `gorm:"size:20;not null;default:info" json:"level"` // info|success|warning
+	ReadAt    *time.Time `gorm:"index" json:"read_at"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
 type PendingAction struct {
 	ID               uint           `gorm:"primarykey" json:"id"`
 	SessionID        uint           `json:"session_id"`
@@ -311,11 +323,75 @@ type Workflow struct {
 type WorkflowRun struct {
 	ID            uint      `gorm:"primarykey" json:"id"`
 	WorkflowID    uint      `gorm:"not null;index" json:"workflow_id"`
-	Status        string    `gorm:"size:50;default:'RUNNING'" json:"status"` // RUNNING, COMPLETED, FAILED, PAUSED
+	Status        string    `gorm:"size:50;default:'RUNNING'" json:"status"` // RUNNING, COMPLETED, FAILED, PAUSED, WAITING
 	CurrentNodeID string    `gorm:"size:100" json:"current_node_id,omitempty"`
 	Logs          string    `gorm:"type:text" json:"logs,omitempty"`
+	// Durable execution
+	InputPayload  string `gorm:"type:text" json:"input_payload,omitempty"`   // Payload original para replay
+	OutputPayload string `gorm:"type:text" json:"output_payload,omitempty"`  // Último mensaje de salida
+	ContextJSON   string `gorm:"type:text" json:"context_json,omitempty"`    // Blackboard KV del run (JSON)
+	ParentRunID   *uint  `gorm:"index" json:"parent_run_id,omitempty"`       // Run padre si es subflujo
+	WaitReason    string `gorm:"size:255" json:"wait_reason,omitempty"`      // ej. "agent_task:12"
+	MissionID     *uint  `gorm:"index" json:"mission_id,omitempty"`          // Misión a la que pertenece
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// WorkflowCheckpoint guarda la salida de un nodo ya ejecutado dentro de un run.
+// Permite replay idempotente: al reanudar, los nodos con checkpoint no se re-ejecutan.
+type WorkflowCheckpoint struct {
+	ID           uint      `gorm:"primarykey" json:"id"`
+	RunID        uint      `gorm:"not null;uniqueIndex:idx_run_node" json:"run_id"`
+	NodeID       string    `gorm:"size:100;not null;uniqueIndex:idx_run_node" json:"node_id"`
+	RelationType string    `gorm:"size:50" json:"relation_type"`        // Success | Failure
+	MsgData      string    `gorm:"type:text" json:"msg_data,omitempty"` // Salida del nodo
+	MetadataJSON string    `gorm:"type:text" json:"metadata_json,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// AgentTask representa la ejecución durable de un sub-agente (nodo aigent/agent).
+// Sobrevive reinicios: el durable worker re-conduce tareas RUNNING/WAITING_APPROVAL.
+type AgentTask struct {
+	ID          uint       `gorm:"primarykey" json:"id"`
+	SessionID   uint       `gorm:"not null;index" json:"session_id"`
+	AgentID     uint       `gorm:"not null" json:"agent_id"`
+	ParentRunID *uint      `gorm:"index" json:"parent_run_id,omitempty"` // WorkflowRun que la espera
+	NodeID      string     `gorm:"size:100" json:"node_id,omitempty"`    // Nodo origen en el run padre
+	MissionID   *uint      `gorm:"index" json:"mission_id,omitempty"`
+	Status      string     `gorm:"size:50;default:'RUNNING'" json:"status"` // RUNNING, COMPLETED, FAILED, WAITING_APPROVAL
+	Prompt      string     `gorm:"type:text" json:"prompt"`
+	AutoApprove bool       `gorm:"default:false" json:"auto_approve"` // Pre-aprobar tools sensibles en esta task
+	Output      string     `gorm:"type:text" json:"output,omitempty"`
+	Error       string     `gorm:"type:text" json:"error,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// Mission es una unidad de trabajo de larga duración (ej. "video sobre hackeo X").
+// Agrupa runs, agent tasks y artifacts alrededor de un objetivo con estado compartido.
+type Mission struct {
+	ID            uint      `gorm:"primarykey" json:"id"`
+	Title         string    `gorm:"size:255;not null" json:"title"`
+	Topic         string    `gorm:"type:text" json:"topic,omitempty"`
+	Goal          string    `gorm:"type:text" json:"goal,omitempty"`
+	Status        string    `gorm:"size:50;default:'ACTIVE'" json:"status"` // ACTIVE, COMPLETED, FAILED, PAUSED
+	ContextJSON   string    `gorm:"type:text" json:"context_json,omitempty"` // Blackboard KV compartido (JSON)
+	WorkspacePath string    `gorm:"size:512" json:"workspace_path,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// MissionArtifact es un entregable producido dentro de una misión
+// (research.md, screenshots, guion, etc.)
+type MissionArtifact struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	MissionID uint      `gorm:"not null;index" json:"mission_id"`
+	Name      string    `gorm:"size:255;not null" json:"name"` // ej. "research.md"
+	Type      string    `gorm:"size:50" json:"type"`           // markdown, json, image, script...
+	Content   string    `gorm:"type:text" json:"content,omitempty"`
+	Path      string    `gorm:"size:512" json:"path,omitempty"` // Ruta en disco si es archivo grande
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // DocumentChunk represents a chunked document segment with its embedding vector

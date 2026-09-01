@@ -30,7 +30,8 @@ func (b *Brain) prepareAgentToolContext(session database.Session) agentToolConte
 		isSystemCoreTool := (strings.HasPrefix(rt.Name, "invok_") && b.HandsAI != nil && b.HandsAI.IsConfigured()) ||
 			rt.Name == "schedule_task" ||
 			rt.Name == "save_workflow" ||
-			rt.Name == "get_workflow_guide"
+			rt.Name == "get_workflow_guide" ||
+			rt.Name == "notify_user"
 
 		switch {
 		case session.Agent == nil:

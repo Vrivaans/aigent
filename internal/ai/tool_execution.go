@@ -160,7 +160,7 @@ func (b *Brain) executeImmediateToolCalls(
 		}
 
 		log.Printf("🦾 Executing tool: %s with args: %v", realName, finalArgs)
-		result, execErr := tDef.Execute(ctx, finalArgs)
+		result, execErr := tDef.Execute(withNotificationSession(ctx, sessionID), finalArgs)
 		resultStr := string(result)
 		if execErr != nil {
 			resultStr = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
