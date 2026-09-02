@@ -343,6 +343,11 @@ export class ApiService {
     return res.json();
   }
 
+  async getSession(sessionId: number): Promise<Session> {
+    const res = await this.fetchApi(`/sessions/${sessionId}`);
+    return res.json();
+  }
+
   async getUnreadNotificationCount(): Promise<number> {
     const res = await this.fetchApi('/notifications/unread-count');
     const d = await res.json();

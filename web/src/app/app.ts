@@ -145,11 +145,21 @@ export class App implements OnInit {
     if (window.innerWidth < 768) this.isSidebarOpen.set(false);
   }
 
-  selectSession(id: number) {
-    this.activeSessionId.set(id);
+  async selectSession(id: number) {
     this.currentTab = 'chats';
     this.isMenuOpen.set(false);
     if (window.innerWidth < 768) this.isSidebarOpen.set(false);
+    // La sesión puede estar fuera del filtro actual (ej: cron/workflow ocultos).
+    // Traerla individualmente para que el chat cargue su historial.
+    if (!this.sessions().some(s => s.id === id)) {
+      try {
+        const s = await this.api.getSession(id);
+        this.sessions.update(list => [s, ...list]);
+      } catch (e) {
+        console.error('Failed to fetch session for notification:', e);
+      }
+    }
+    this.activeSessionId.set(id);
   }
 
   openSessionFromAudit(target: { sessionId: number; messageId?: number }) {

@@ -95,3 +95,13 @@ func MarkAllNotificationsRead(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "all read"})
 }
 
+// GetSessionByID devuelve una sesión individual. Necesario para abrir
+// notificaciones de sesiones ocultas por filtro en la UI (cron/workflow).
+func GetSessionByID(c *fiber.Ctx) error {
+	session, err := loadSessionForTenant(c, c.Params("id"))
+	if err != nil {
+		return respondFiberError(c, err)
+	}
+	return c.JSON(session)
+}
+

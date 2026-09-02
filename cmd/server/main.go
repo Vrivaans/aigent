@@ -262,6 +262,7 @@ func main() {
 	chatRead.Get("/notifications/unread-count", handlers.GetUnreadCount)
 	chatWrite.Post("/notifications/:id/read", handlers.MarkNotificationRead)
 	chatWrite.Post("/notifications/read-all", handlers.MarkAllNotificationsRead)
+	chatRead.Get("/sessions/:id", handlers.GetSessionByID)
 
 	chatWrite.Post("/sessions/:id/goals", handlers.UpdateSessionGoals)
 	chatWrite.Post("/sessions/:id/workspace", handlers.UpdateSessionWorkspace)
